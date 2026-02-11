@@ -1,0 +1,8 @@
+---
+alwaysApply: true
+---
+
+- Comment code so I can read it and understand what its doing simply.
+- Keep diffs minimal; no refactors unless explicitly asked.
+- Write code compatible with Swift 5 mode; avoid Swift 6-only concurrency strictness. 
+- Acceptance: builds in Xcode 26.2 with SWIFT_VERSION=5.
