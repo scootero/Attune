@@ -47,6 +47,16 @@ struct CheckInExtractorService {
         )
         let schema = buildSchema()
         
+        // Debug log: ensure schema required matches properties (helps diagnose HTTP 400)
+        if let schemaInner = schema["schema"] as? [String: Any],
+           let props = schemaInner["properties"] as? [String: Any],
+           let updatesDef = props["updates"] as? [String: Any],
+           let itemsDef = updatesDef["items"] as? [String: Any] {
+            let itemsPropsKeys = (itemsDef["properties"] as? [String: Any])?.keys.sorted().joined(separator: ",") ?? "nil"
+            let itemsRequiredList = (itemsDef["required"] as? [String])?.joined(separator: ",") ?? "nil"
+            AppLogger.log(AppLogger.AI, "checkin_schema_debug updates.items.properties=\(itemsPropsKeys) updates.items.required=\(itemsRequiredList)")
+        }
+        
         do {
             let jsonString = try await OpenAIClient.chatCompletion(
                 model: defaultModel,
@@ -184,14 +194,14 @@ If no progress or mood is clearly stated, return: {"updates": [], "moodLabel": n
                                 "confidence": ["type": "number"],
                                 "evidence": ["type": ["string", "null"]]
                             ],
-                            "required": ["intentionId", "updateType", "amount", "unit", "confidence"],
+                            "required": ["intentionId", "updateType", "amount", "unit", "confidence", "evidence"],
                             "additionalProperties": false
                         ]
                     ],
                     "moodLabel": ["type": ["string", "null"]],
                     "moodScore": ["type": ["integer", "null"]]
                 ],
-                "required": ["updates"],
+                "required": ["updates", "moodLabel", "moodScore"],
                 "additionalProperties": false
             ],
             "strict": true

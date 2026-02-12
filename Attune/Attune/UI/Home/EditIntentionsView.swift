@@ -58,7 +58,7 @@ struct EditIntentionsView: View {
                 if isLoadingDraft {
                     // Show spinner while loading; prevents perceived freeze on sheet open
                     VStack(spacing: 8) {
-                        ProgressView()
+                        SwiftUI.ProgressView()
                         Text("Loading...")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
@@ -115,18 +115,24 @@ struct EditIntentionsView: View {
     
     /// Loads current intentions as draft on background queue; completion runs on main.
     /// Uses EditIntentionsDraftLoader to avoid blocking main thread during sheet open.
+    /// Defers UI update to next run loop so sheet animation can complete; avoids
+    /// "multiple updates per frame" and keyboard snapshot errors.
     private func loadDraftFromCurrent() {
         EditIntentionsDraftLoader.loadDraftInBackground { results in
-            draftIntentions = results.map { r in
-                DraftIntention(
-                    id: r.id,
-                    title: r.title,
-                    targetValue: r.targetValue,
-                    unit: r.unit,
-                    timeframe: r.timeframe
-                )
+            // Defer UI update to next run loop so sheet animation can complete;
+            // avoids "multiple updates per frame" and keyboard snapshot errors.
+            DispatchQueue.main.async {
+                draftIntentions = results.map { r in
+                    DraftIntention(
+                        id: r.id,
+                        title: r.title,
+                        targetValue: r.targetValue,
+                        unit: r.unit,
+                        timeframe: r.timeframe
+                    )
+                }
+                isLoadingDraft = false
             }
-            isLoadingDraft = false
         }
     }
     
@@ -147,10 +153,7 @@ struct EditIntentionsView: View {
         }
         
         do {
-            // 1. End current IntentionSet
-            try IntentionSetStore.shared.endCurrentIntentionSet()
-            
-            // 2. Save each intention (create or update) and collect IDs
+            // 1. Save each intention (create or update) and collect IDs
             var intentionIds: [String] = []
             for draft in valid {
                 let intention = draft.toIntention()
@@ -158,10 +161,10 @@ struct EditIntentionsView: View {
                 intentionIds.append(intention.id)
             }
             
-            // 3. Create new IntentionSet with the intention IDs
-            _ = try IntentionSetStore.shared.createOrLoadCurrentIntentionSet(intentionIds: intentionIds)
+            // 2. Update current IntentionSet in place (same ID) so progress entries stay linked
+            _ = try IntentionSetStore.shared.updateCurrentIntentionSet(intentionIds: intentionIds)
             
-            AppLogger.log(AppLogger.STORE, "EditIntentions saved new IntentionSet with \(intentionIds.count) intentions")
+            AppLogger.log(AppLogger.STORE, "EditIntentions saved IntentionSet with \(intentionIds.count) intentions")
             
             dismiss()
         } catch {

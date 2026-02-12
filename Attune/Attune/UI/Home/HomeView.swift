@@ -403,7 +403,7 @@ struct HomeView: View {
     
     private var processingContent: some View {
         HStack(spacing: 12) {
-            ProgressView()
+            SwiftUI.ProgressView()
                 .scaleEffect(0.9)
             Text("Transcribing...")
                 .font(.subheadline)
@@ -575,10 +575,15 @@ struct HomeView: View {
     }
     
     /// Loads streak on background queue to avoid blocking main thread.
-    /// Completion runs on main; StreakDataLoader handles marshaling.
+    /// Skips updating streak while Edit Intentions sheet is open—known SwiftUI bug
+    /// where parent state updates freeze the sheet. We refresh on sheet dismiss via onDisappear.
     private func loadStreak() {
         StreakDataLoader.loadStreakInBackground { streakValue in
-            streak = streakValue
+            // Avoid updating parent while Edit Intentions sheet is open;
+            // known SwiftUI bug: parent updates freeze the sheet. We refresh on dismiss.
+            if !showEditIntentions {
+                streak = streakValue
+            }
         }
     }
     
@@ -630,7 +635,7 @@ struct HomeView: View {
             AppLogger.log(AppLogger.STORE, "CheckIn saved id=\(AppLogger.shortId(checkInId)) transcriptChars=\(transcript.count)")
             
             let intentions = IntentionStore.shared.loadIntentions(ids: intentionSet.intentionIds)
-            let dateKey = ProgressCalculator.dateKey(for: Date())
+            let dateKey = ProgressCalculator.dateKey(for: checkIn.createdAt)
             let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: intentionSet.id)
             let overrides = OverrideStore.shared.loadOverridesForDate(dateKey: dateKey)
             
@@ -654,21 +659,35 @@ struct HomeView: View {
                 checkInId: checkInId
             )
             
+            // Use AI updates, or fallback parser when AI fails/returns empty
+            let updatesToUse: [CheckInUpdate]
+            if result.updates.isEmpty {
+                updatesToUse = CheckInFallbackParser.parseFallbackUpdates(transcript: transcript, intentions: intentions)
+            } else {
+                updatesToUse = result.updates
+            }
+            
             // Slice 7: Partition into clear (apply immediately) vs ambiguous (show prompt)
+            // Fallback updates are all treated as clear (no ambiguity prompt)
             let intentionById = Dictionary(uniqueKeysWithValues: intentions.map { ($0.id, $0) })
             var clearUpdates: [CheckInUpdate] = []
             var ambiguousUpdates: [CheckInUpdate] = []
-            for update in result.updates {
-                let targetValue = intentionById[update.intentionId]?.targetValue ?? 0
-                let currentTotal = todaysTotals[update.intentionId] ?? 0
-                if AmbiguityChecker.isAmbiguous(update: update, currentTotal: currentTotal, targetValue: targetValue, checkInCreatedAt: checkIn.createdAt) {
-                    ambiguousUpdates.append(update)
-                } else {
-                    clearUpdates.append(update)
+            if result.updates.isEmpty {
+                clearUpdates = updatesToUse
+            } else {
+                for update in updatesToUse {
+                    let targetValue = intentionById[update.intentionId]?.targetValue ?? 0
+                    let currentTotal = todaysTotals[update.intentionId] ?? 0
+                    if AmbiguityChecker.isAmbiguous(update: update, currentTotal: currentTotal, targetValue: targetValue, checkInCreatedAt: checkIn.createdAt) {
+                        ambiguousUpdates.append(update)
+                    } else {
+                        clearUpdates.append(update)
+                    }
                 }
             }
             
-            // Apply clear updates immediately
+            // Apply clear updates immediately; log count and each applied update
+            AppLogger.log(AppLogger.AI, "checkin_apply parsed_updates_count=\(clearUpdates.count)")
             for update in clearUpdates {
                 do {
                     _ = try ProgressStore.shared.appendProgressEntry(
@@ -682,6 +701,17 @@ struct HomeView: View {
                         evidence: update.evidence,
                         sourceCheckInId: checkInId
                     )
+                    // Log applied update with new total for debugging
+                    let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: intentionSet.id)
+                    let newTotal = ProgressCalculator.totalForIntention(
+                        entries: entries,
+                        dateKey: dateKey,
+                        intentionId: update.intentionId,
+                        intentionSetId: intentionSet.id,
+                        overrideAmount: overrides[update.intentionId]
+                    )
+                    let title = intentionById[update.intentionId]?.title ?? "?"
+                    AppLogger.log(AppLogger.AI, "checkin_applied intentionId=\(AppLogger.shortId(update.intentionId)) title=\"\(title)\" delta=\(update.amount) \(update.unit) newTotal=\(newTotal)")
                 } catch {
                     AppLogger.log(AppLogger.ERR, "ProgressEntry save failed id=\(AppLogger.shortId(update.intentionId)) error=\"\(error.localizedDescription)\"")
                 }

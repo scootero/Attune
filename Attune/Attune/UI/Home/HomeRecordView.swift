@@ -53,7 +53,7 @@ struct HomeRecordView: View {
                     
                     // Icon: record circle when idle, square stop when recording, spinner when processing
                     if isProcessing {
-                        ProgressView()
+                        SwiftUI.ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             .scaleEffect(1.5)
                     } else if recorder.isRecording {
@@ -92,7 +92,7 @@ struct HomeRecordView: View {
                 if transcriptionQueue.isRunning || transcriptionQueue.pendingCount > 0 {
                     HStack(spacing: 8) {
                         if transcriptionQueue.isRunning {
-                            ProgressView()
+                            SwiftUI.ProgressView()
                                 .scaleEffect(0.8)
                         }
                         Text("Queue: \(transcriptionQueue.pendingCount)")

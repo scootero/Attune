@@ -121,6 +121,29 @@ final class IntentionSetStore {
         return newSet
     }
     
+    /// Updates the current intention set's intention IDs in place.
+    /// Preserves the same set ID so existing ProgressEntry records stay linked.
+    /// If no current set exists, creates one.
+    /// - Parameter intentionIds: New list of intention IDs for the set
+    /// - Returns: The updated (or newly created) IntentionSet
+    func updateCurrentIntentionSet(intentionIds: [String]) throws -> IntentionSet {
+        if let current = loadCurrentIntentionSet() {
+            // Keep same id and startedAt; only update intentionIds (preserves progress linkage)
+            let updated = IntentionSet(
+                id: current.id,
+                startedAt: current.startedAt,
+                endedAt: nil,
+                intentionIds: intentionIds
+            )
+            try saveIntentionSet(updated)
+            return updated
+        }
+        // No current set — create new one
+        let newSet = IntentionSet(startedAt: Date(), endedAt: nil, intentionIds: intentionIds)
+        try saveIntentionSet(newSet)
+        return newSet
+    }
+
     /// Ends the current intention set by setting endedAt = now
     func endCurrentIntentionSet() throws {
         guard let current = loadCurrentIntentionSet() else { return }
