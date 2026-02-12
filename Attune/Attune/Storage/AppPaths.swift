@@ -49,6 +49,50 @@ struct AppPaths {
         baseDir.appendingPathComponent("Audio").appendingPathComponent(sessionId)
     }
     
+    // MARK: - Intentions + Check-ins + Progress (Slice 2)
+    
+    /// Intentions directory: Documents/Attune/Intentions/
+    /// One JSON file per intention: <intentionId>.json
+    static var intentionsDir: URL {
+        baseDir.appendingPathComponent("Intentions")
+    }
+    
+    /// IntentionSets directory: Documents/Attune/IntentionSets/
+    /// One JSON file per set: <intentionSetId>.json
+    static var intentionSetsDir: URL {
+        baseDir.appendingPathComponent("IntentionSets")
+    }
+    
+    /// CheckIns directory: Documents/Attune/CheckIns/
+    /// One JSON file per check-in: <checkInId>.json
+    static var checkInsDir: URL {
+        baseDir.appendingPathComponent("CheckIns")
+    }
+    
+    /// ProgressEntries directory: Documents/Attune/ProgressEntries/
+    /// One JSON file per progress entry: <entryId>.json
+    static var progressEntriesDir: URL {
+        baseDir.appendingPathComponent("ProgressEntries")
+    }
+    
+    /// DailyMood directory: Documents/Attune/DailyMood/
+    /// One JSON file per date: <dateKey>.json (e.g., 2026-02-11.json)
+    static var dailyMoodDir: URL {
+        baseDir.appendingPathComponent("DailyMood")
+    }
+    
+    /// ProgressOverrides directory (Slice 7): Documents/Attune/ProgressOverrides/
+    /// One JSON file per date: <dateKey>.json (array of overrides for that day)
+    static var progressOverridesDir: URL {
+        baseDir.appendingPathComponent("ProgressOverrides")
+    }
+    
+    /// CheckInAudio directory (Slice 3): Documents/Attune/CheckInAudio/
+    /// One audio file per check-in: <checkInId>.m4a
+    static var checkInAudioDir: URL {
+        baseDir.appendingPathComponent("CheckInAudio")
+    }
+    
     // MARK: - Helpers
     
     /// Returns the file URL for a session's JSON file
@@ -75,6 +119,50 @@ struct AppPaths {
         audioDir(sessionId: sessionId).appendingPathComponent(audioFileName)
     }
     
+    /// Returns the file URL for an intention: Documents/Attune/Intentions/<id>.json
+    static func intentionFileURL(intentionId: String) -> URL {
+        intentionsDir.appendingPathComponent("\(intentionId).json")
+    }
+    
+    /// Returns the file URL for an intention set: Documents/Attune/IntentionSets/<id>.json
+    static func intentionSetFileURL(intentionSetId: String) -> URL {
+        intentionSetsDir.appendingPathComponent("\(intentionSetId).json")
+    }
+    
+    /// Returns the file URL for a check-in: Documents/Attune/CheckIns/<id>.json
+    static func checkInFileURL(checkInId: String) -> URL {
+        checkInsDir.appendingPathComponent("\(checkInId).json")
+    }
+    
+    /// Returns the file URL for a progress entry: Documents/Attune/ProgressEntries/<id>.json
+    static func progressEntryFileURL(entryId: String) -> URL {
+        progressEntriesDir.appendingPathComponent("\(entryId).json")
+    }
+    
+    /// Returns the file URL for daily mood: Documents/Attune/DailyMood/<dateKey>.json
+    static func dailyMoodFileURL(dateKey: String) -> URL {
+        dailyMoodDir.appendingPathComponent("\(dateKey).json")
+    }
+    
+    /// Returns the file URL for day's overrides: Documents/Attune/ProgressOverrides/<dateKey>.json
+    static func progressOverridesFileURL(dateKey: String) -> URL {
+        progressOverridesDir.appendingPathComponent("\(dateKey).json")
+    }
+    
+    /// Returns the file URL for check-in audio: Documents/Attune/CheckInAudio/<fileName>
+    /// FileName is typically "<checkInId>.m4a"
+    static func checkInAudioFileURL(fileName: String) -> URL {
+        checkInAudioDir.appendingPathComponent(fileName)
+    }
+    
+    /// Forms a YYYY-MM-DD date key from a Date using the current calendar (local time)
+    static func dateKey(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone.current
+        return formatter.string(from: date)
+    }
+    
     // MARK: - Directory Creation
     
     /// Ensures all necessary directories exist, creating them if needed
@@ -92,6 +180,15 @@ struct AppPaths {
         
         // Create topics directory
         try fileManager.createDirectory(at: topicsDir, withIntermediateDirectories: true)
+        
+        // Slice 2: Intentions + Check-ins + Progress directories
+        try fileManager.createDirectory(at: intentionsDir, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: intentionSetsDir, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: checkInsDir, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: progressEntriesDir, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: dailyMoodDir, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: checkInAudioDir, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: progressOverridesDir, withIntermediateDirectories: true)
         
         // Audio directories are created per-session as needed
     }

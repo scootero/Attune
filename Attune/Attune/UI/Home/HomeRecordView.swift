@@ -21,13 +21,25 @@ struct HomeRecordView: View {
     /// Timer to check processing status
     @State private var processingCheckTimer: Timer?
     
+    /// Today's session count (read-only query)
+    @State private var todaySessionsCount: Int = 0
+    /// Today's insights count (read-only query from ExtractedItem.createdAt)
+    @State private var todayInsightsCount: Int = 0
+    /// Presents sheet with Sessions list (Library → Sessions)
+    @State private var showSessionsSheet = false
+    /// Presents sheet with Insights list (Library → Insights)
+    @State private var showInsightsSheet = false
+    
     var body: some View {
         VStack(spacing: 40) {
-            // Title at top
-            Text("Attune")
+            // Title at top (matches tab label "All Day")
+            Text("All Day")
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .padding(.top, 40)
+            
+            // Today counts card + deep links to Library (read-only)
+            todayCountsCard
             
             Spacer()
             
@@ -93,14 +105,83 @@ struct HomeRecordView: View {
             .padding(.bottom, 40)
         }
         .onAppear {
-            // Start checking for processing sessions on appear
             startProcessingCheck()
+            loadTodayCounts()
         }
         .onDisappear {
-            // Stop timer when view disappears
             processingCheckTimer?.invalidate()
             processingCheckTimer = nil
         }
+        .sheet(isPresented: $showSessionsSheet, onDismiss: { loadTodayCounts() }) {
+            NavigationView {
+                SessionListView(sessions: SessionStore.shared.loadAllSessions())
+                    .navigationTitle("Sessions")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") { showSessionsSheet = false }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showInsightsSheet, onDismiss: { loadTodayCounts() }) {
+            NavigationView {
+                InsightsListView()
+                    .navigationTitle("Insights")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") { showInsightsSheet = false }
+                        }
+                    }
+            }
+        }
+    }
+    
+    /// Small card: "Today: X sessions • Y insights" + View Sessions / View Insights buttons
+    private var todayCountsCard: some View {
+        VStack(spacing: 12) {
+            Text("Today: \(todaySessionsCount) sessions • \(todayInsightsCount) insights")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            HStack(spacing: 16) {
+                Button(action: { showSessionsSheet = true }) {
+                    Text("View Sessions")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                Button(action: { showInsightsSheet = true }) {
+                    Text("View Insights")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(12)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+        .padding(.horizontal, 24)
+    }
+    
+    /// Loads today's session and insight counts (read-only; startOfDay..endOfDay local timezone)
+    private func loadTodayCounts() {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: Date())
+        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { return }
+        // Sessions: filter by startedAt in today's range
+        let sessions = SessionStore.shared.loadAllSessions()
+        todaySessionsCount = sessions.filter { $0.startedAt >= startOfDay && $0.startedAt < endOfDay }.count
+        // Insights: filter by ExtractedItem.createdAt (ISO8601 string); try both formats for compatibility
+        let items = ExtractionStore.shared.loadAllExtractions()
+        let fmtFrac = ISO8601DateFormatter()
+        fmtFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let fmtPlain = ISO8601DateFormatter()
+        fmtPlain.formatOptions = [.withInternetDateTime]
+        todayInsightsCount = items.filter { item in
+            let d = fmtFrac.date(from: item.createdAt) ?? fmtPlain.date(from: item.createdAt)
+            guard let date = d else { return false }
+            return date >= startOfDay && date < endOfDay
+        }.count
     }
     
     // Format elapsed seconds as mm:ss

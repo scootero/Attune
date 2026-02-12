@@ -2,7 +2,7 @@
 //  RootTabView.swift
 //  Attune
 //
-//  Bottom tab bar with Home, Library, and Settings tabs.
+//  Bottom tab bar with Home, All Day, Library, Settings, and Progress tabs.
 //  Wires shared instances (RecorderService + TranscriptionQueue).
 //
 
@@ -21,22 +21,34 @@ struct RootTabView: View {
     
     var body: some View {
         TabView {
-            // Home tab: Record screen
-            HomeRecordView()
+            // Tab 1: Home — stub for future daily intentions
+            HomeView()
                 .tabItem {
                     Label("Home", systemImage: "house.fill")
                 }
             
-            // Library tab: Browse sessions and segments
+            // Tab 2: All Day — continuous recording screen (renamed from Record; UI only)
+            HomeRecordView()
+                .tabItem {
+                    Label("All Day", systemImage: "record.circle")
+                }
+            
+            // Tab 3: Library — browse sessions and segments
             LibraryView()
                 .tabItem {
                     Label("Library", systemImage: "books.vertical.fill")
                 }
             
-            // Settings tab: App settings and logs
+            // Tab 4: Settings — app settings and logs
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
+                }
+            
+            // Tab 5: Progress — stub for future goals/tracking
+            ProgressView()
+                .tabItem {
+                    Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
                 }
         }
         .onAppear {
