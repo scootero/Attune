@@ -2,22 +2,35 @@
 //  LibraryView.swift
 //  Attune
 //
-//  Debug cockpit: toggle between Sessions and Segments views.
+//  Debug cockpit: toggle between Sessions, Segments, and Insights views.
+//  Sessions tab has sub-picker: All-day (sessions) | Check-ins.
 //
 
 import SwiftUI
 
+/// Sub-tab for Sessions: All-day recordings vs Check-ins
+private enum SessionsSubTab {
+    case allDay
+    case checkIns
+}
+
 struct LibraryView: View {
-    /// Selected tab: Sessions or Segments
+    /// Selected tab: Sessions, Segments, or Insights
     @State private var selectedTab: LibraryTab = .sessions
     
-    /// Loaded sessions from disk (shared state for both views)
+    /// When Sessions is selected: All-day or Check-ins sub-tab
+    @State private var sessionsSubTab: SessionsSubTab = .allDay
+    
+    /// Loaded sessions from disk (for All-day list)
     @State private var sessions: [Session] = []
+    
+    /// Loaded check-ins from disk (for Check-ins list)
+    @State private var checkIns: [CheckIn] = []
     
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Segmented picker at top
+                // Top-level segmented picker
                 Picker("View", selection: $selectedTab) {
                     Text("Sessions").tag(LibraryTab.sessions)
                     Text("Segments").tag(LibraryTab.segments)
@@ -26,49 +39,84 @@ struct LibraryView: View {
                 .pickerStyle(.segmented)
                 .padding()
                 
-                // Content based on selected tab
-                if sessions.isEmpty {
-                    // Empty state
-                    VStack(spacing: 16) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 64))
-                            .foregroundColor(.secondary)
-                        
-                        Text("No Data Yet")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        
-                        Text("Start a recording to create your first session")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
+                // When Sessions tab: show All-day | Check-ins sub-picker
+                if selectedTab == .sessions {
+                    Picker("Sessions content", selection: $sessionsSubTab) {
+                        Text("All-day").tag(SessionsSubTab.allDay)
+                        Text("Check-ins").tag(SessionsSubTab.checkIns)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    // Show appropriate list based on selection
-                    if selectedTab == .sessions {
-                        SessionListView(sessions: sessions)
-                    } else if selectedTab == .segments {
-                        SegmentListView()
-                    } else {
-                        InsightsListView()
-                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 }
+                
+                // Content based on selected tab
+                contentView
             }
             .navigationTitle("Library")
             .onAppear {
-                loadSessions()
+                loadData()
             }
             .refreshable {
-                loadSessions()
+                loadData()
             }
         }
     }
     
-    /// Loads all sessions from disk
-    private func loadSessions() {
+    /// Content for current tab selection
+    @ViewBuilder
+    private var contentView: some View {
+        switch selectedTab {
+        case .sessions:
+            sessionsContentView
+        case .segments:
+            if sessions.isEmpty {
+                libraryEmptyState(message: "Start a recording to create your first session")
+            } else {
+                SegmentListView()
+            }
+        case .insights:
+            InsightsListView()
+        }
+    }
+    
+    /// Sessions tab content: All-day list or Check-ins list
+    @ViewBuilder
+    private var sessionsContentView: some View {
+        switch sessionsSubTab {
+        case .allDay:
+            if sessions.isEmpty {
+                libraryEmptyState(message: "Start a recording to create your first session")
+            } else {
+                SessionListView(sessions: sessions)
+            }
+        case .checkIns:
+            CheckInsListView(checkIns: checkIns, title: "Check-ins")
+        }
+    }
+    
+    /// Shared empty state for Library (sessions/segments)
+    private func libraryEmptyState(message: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "tray")
+                .font(.system(size: 64))
+                .foregroundColor(.secondary)
+            Text("No Data Yet")
+                .font(.title2)
+                .fontWeight(.semibold)
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    /// Loads sessions and check-ins from disk
+    private func loadData() {
         sessions = SessionStore.shared.loadAllSessions()
+        checkIns = CheckInStore.shared.loadAllCheckIns()
     }
 }
 

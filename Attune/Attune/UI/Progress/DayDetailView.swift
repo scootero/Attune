@@ -111,9 +111,7 @@ struct DayDetailView: View {
             }
         }
         .navigationDestination(for: CheckInDetailRoute.self) { route in
-            if let checkIn = data.checkIns.first(where: { $0.id == route.checkInId }) {
-                CheckInTranscriptView(checkIn: checkIn)
-            }
+            CheckInDetailView(checkInId: route.checkInId)
         }
     }
     

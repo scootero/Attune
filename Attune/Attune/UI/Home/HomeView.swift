@@ -17,6 +17,12 @@ private enum CheckInState {
     case error(message: String)
 }
 
+/// Highlight kind for check-in row feedback (green success, red failure)
+private enum CheckInHighlightKind {
+    case success
+    case failure
+}
+
 /// Slice 7: Context for ambiguity disambiguation sheet (Identifiable for .sheet(item:))
 private struct AmbiguitySheetData: Identifiable {
     let id = UUID()
@@ -49,10 +55,18 @@ struct HomeView: View {
     @State private var showMoodEditor = false
     /// Slice 7: Data for ambiguity disambiguation sheet (nil = not showing)
     @State private var ambiguitySheetData: AmbiguitySheetData?
-    /// Today's recording sessions (Session model, from Library/Record flow) for the Today Sessions card
-    @State private var todaySessions: [Session] = []
-    /// When true, presents sheet showing full Sessions list (Library → Sessions)
-    @State private var showAllSessionsSheet = false
+    /// Today's check-ins for the Today Check-ins card (newest-first)
+    @State private var todayCheckIns: [CheckIn] = []
+    /// Check-in ID being processed (shows placeholder row until complete)
+    @State private var processingCheckInId: String?
+    /// When transcription fails: show red Failed row (cleared after highlight fades)
+    @State private var failedCheckInId: String?
+    @State private var failedCheckInCreatedAt: Date?
+    /// Check-in ID to highlight (green success or red failure) after processing
+    @State private var highlightedCheckInId: String?
+    @State private var highlightKind: CheckInHighlightKind?
+    /// When true, presents sheet with full Today Check-ins list
+    @State private var showAllCheckInsSheet = false
     
     var body: some View {
         NavigationView {
@@ -67,7 +81,7 @@ struct HomeView: View {
                     
                     currentIntentionsSection
                     if !todaysProgress.isEmpty { intentionsListSection }
-                    todaySessionsSection
+                    todayCheckInsSection
                     moodSection
                     
                     Spacer(minLength: 40)
@@ -115,15 +129,13 @@ struct HomeView: View {
                 }
             )
         }
-        .sheet(isPresented: $showAllSessionsSheet) {
-            // Presents Library → Sessions list; user can tap to SessionDetailView
+        .sheet(isPresented: $showAllCheckInsSheet) {
+            // Presents full Today Check-ins list (scrollable)
             NavigationView {
-                SessionListView(sessions: SessionStore.shared.loadAllSessions())
-                    .navigationTitle("Sessions")
-                    .navigationBarTitleDisplayMode(.inline)
+                CheckInsListView(checkIns: todayCheckIns, title: "Today Check-ins")
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Done") { showAllSessionsSheet = false }
+                            Button("Done") { showAllCheckInsSheet = false }
                         }
                     }
             }
@@ -202,41 +214,63 @@ struct HomeView: View {
         String(format: "%.1f / %.1f \(intention.unit)", total, intention.targetValue)
     }
     
-    // MARK: - B2) Today Sessions Card
+    // MARK: - B2) Today Check-ins Card
     
-    /// Card showing today's recorded sessions with transcript snippets.
-    /// Uses Session model (Library/Record flow). Query by startOfDay..endOfDay (local timezone).
-    private var todaySessionsSection: some View {
+    /// Card showing today's check-ins with transcript snippets. Max 3 rows + "View all".
+    /// Processing placeholder appears at top when recording completes; green/red flash on done.
+    private var todayCheckInsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Today Sessions")
+                Text("Today Check-ins")
                     .font(.headline)
                 Spacer()
-                // "See all" → Library Sessions list (presented in sheet)
-                Button("See all") {
-                    showAllSessionsSheet = true
+                Button("View all") {
+                    showAllCheckInsSheet = true
                 }
                 .font(.subheadline)
             }
             
-            if todaySessions.isEmpty {
-                Text("No sessions recorded today.")
+            if todayCheckIns.isEmpty && processingCheckInId == nil && failedCheckInId == nil {
+                Text("No check-ins today.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 24)
             } else {
-                // Scrollable list with fixed max height; newest-first
-                ScrollView(.vertical, showsIndicators: true) {
-                    LazyVStack(alignment: .leading, spacing: 12) {
-                        ForEach(todaySessions) { session in
-                            NavigationLink(destination: SessionDetailView(sessionId: session.id)) {
-                                todaySessionRow(session: session)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                VStack(alignment: .leading, spacing: 12) {
+                    // Processing placeholder at top (yellow, spinner)
+                    if let id = processingCheckInId {
+                        processingPlaceholderRow(id: id)
                     }
-                    .padding(.vertical, 4)
+                    // Failed row (red) when transcription failed
+                    if let id = failedCheckInId, let createdAt = failedCheckInCreatedAt {
+                        failedCheckInRow(id: id, createdAt: createdAt)
+                    }
+                    // Up to 3 check-in rows (newest-first)
+                    ForEach(todayCheckIns.prefix(3)) { checkIn in
+                        NavigationLink(destination: CheckInDetailView(checkInId: checkIn.id)) {
+                            todayCheckInRow(checkIn)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    // "View all" row when more than 3
+                    if todayCheckIns.count > 3 {
+                        Button(action: { showAllCheckInsSheet = true }) {
+                            HStack {
+                                Text("View all \(todayCheckIns.count) check-ins")
+                                    .font(.subheadline)
+                                    .foregroundColor(.accentColor)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(10)
+                            .background(Color(.systemBackground))
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .frame(maxHeight: 280)
             }
@@ -247,50 +281,76 @@ struct HomeView: View {
         .padding(.horizontal)
     }
     
-    /// Single row for a session: time, 1–2 line transcript snippet (or "Processing…"), optional status.
-    private func todaySessionRow(session: Session) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                // Time (e.g. 2:30 PM)
-                Text(session.startedAt.formatted(date: .omitted, time: .shortened))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Spacer()
-                // Small status badge (processing/done)
-                StatusBadge(status: session.status)
-            }
-            // Transcript snippet: prefer finalTranscriptText, else first segment with transcript, else "Processing…"
-            Text(transcriptSnippet(for: session))
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
+    /// Placeholder row while check-in is processing (yellow background, spinner)
+    private func processingPlaceholderRow(id: String) -> some View {
+        HStack(spacing: 12) {
+            SwiftUI.ProgressView()
+                .scaleEffect(0.9)
+            Text("Processing…")
+                .font(.subheadline)
+                .foregroundColor(.primary)
+            Spacer()
         }
         .padding(10)
-        .background(Color(.systemBackground))
+        .background(Color.yellow.opacity(0.25))
         .cornerRadius(8)
     }
     
-    /// Cheap transcript snippet: prefer session.finalTranscriptText, else first segment.transcriptText, else "Processing…".
-    private func transcriptSnippet(for session: Session) -> String {
-        // Prefer full session transcript when complete
-        if let text = session.finalTranscriptText, !text.isEmpty {
-            return String(text.prefix(120)).trimmingCharacters(in: .whitespacesAndNewlines)
-                + (text.count > 120 ? "…" : "")
+    /// Failed row when transcription failed (red background)
+    private func failedCheckInRow(id: String, createdAt: Date) -> some View {
+        let isHighlighted = highlightedCheckInId == id
+        let bgColor = isHighlighted ? Color.red.opacity(0.2) : Color.red.opacity(0.12)
+        
+        return HStack(spacing: 8) {
+            Text(createdAt.formatted(date: .omitted, time: .shortened))
+                .font(.subheadline)
+                .fontWeight(.medium)
+            Text("Failed")
+                .font(.caption)
+                .foregroundColor(.red)
+            Spacer()
         }
-        // Else use first segment that has transcript stored
-        let firstWithTranscript = session.segments
-            .sorted { $0.index < $1.index }
-            .first { seg in seg.transcriptText != nil && !seg.transcriptText!.isEmpty }
-        if let text = firstWithTranscript?.transcriptText, !text.isEmpty {
-            return String(text.prefix(120)).trimmingCharacters(in: .whitespacesAndNewlines)
-                + (text.count > 120 ? "…" : "")
+        .padding(10)
+        .background(bgColor)
+        .cornerRadius(8)
+    }
+    
+    /// Single row for a check-in: time, 2-line transcript snippet. Green/red background when highlighted.
+    private func todayCheckInRow(_ checkIn: CheckIn) -> some View {
+        let isHighlighted = highlightedCheckInId == checkIn.id
+        let bgColor: Color = {
+            guard isHighlighted, let kind = highlightKind else { return Color(.systemBackground) }
+            switch kind {
+            case .success: return Color.green.opacity(0.2)
+            case .failure: return Color.red.opacity(0.2)
+            }
+        }()
+        
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(checkIn.createdAt.formatted(date: .omitted, time: .shortened))
+                .font(.subheadline)
+                .fontWeight(.medium)
+            Text(checkInTranscriptSnippet(for: checkIn))
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+            if isHighlighted, highlightKind == .failure {
+                Text("Failed")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
         }
-        // Still processing (recording, stopping, processing, queued, transcribing)
-        let processingStatuses = ["recording", "stopping", "processing", "queued", "transcribing"]
-        if processingStatuses.contains(session.status) {
-            return "Processing…"
-        }
-        return "No transcript"
+        .padding(10)
+        .background(bgColor)
+        .cornerRadius(8)
+    }
+    
+    /// Transcript snippet for check-in (first ~120 chars + ellipsis)
+    private func checkInTranscriptSnippet(for checkIn: CheckIn) -> String {
+        let text = checkIn.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return "No transcript" }
+        let prefix = String(text.prefix(120)).trimmingCharacters(in: .whitespaces)
+        return prefix + (text.count > 120 ? "…" : "")
     }
     
     // MARK: - C) Mood Row
@@ -476,7 +536,7 @@ struct HomeView: View {
     private func refreshAll() {
         loadTodaysProgress()
         loadCurrentIntentionSet()
-        loadTodaySessions()
+        loadTodayCheckIns()
         refreshMoodAndStreak()
     }
     
@@ -489,17 +549,21 @@ struct HomeView: View {
         currentIntentionSet = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet()
     }
     
-    /// Loads sessions where startedAt falls within today (local timezone, startOfDay..endOfDay).
-    private func loadTodaySessions() {
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: Date())
-        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
-            todaySessions = []
-            return
-        }
-        let all = SessionStore.shared.loadAllSessions()
-        todaySessions = all.filter { session in
-            session.startedAt >= startOfDay && session.startedAt < endOfDay
+    /// Loads today's check-ins (local timezone, newest-first).
+    private func loadTodayCheckIns() {
+        let todayKey = ProgressCalculator.dateKey(for: Date())
+        let all = CheckInStore.shared.loadAllCheckIns()
+        todayCheckIns = all.filter { ProgressCalculator.dateKey(for: $0.createdAt) == todayKey }
+    }
+    
+    /// Clears highlight and failed row state after ~2 seconds
+    private func scheduleClearHighlight() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            highlightedCheckInId = nil
+            highlightKind = nil
+            failedCheckInId = nil
+            failedCheckInCreatedAt = nil
         }
     }
     
@@ -601,6 +665,7 @@ struct HomeView: View {
     
     private func stopCheckIn() {
         guard let result = checkInRecorder.stopRecording() else { return }
+        processingCheckInId = result.checkInId
         state = .processing
         
         Task { @MainActor in
@@ -719,6 +784,11 @@ struct HomeView: View {
             
             // Slice 7: If any ambiguous, show disambiguation sheet; else finish
             if !ambiguousUpdates.isEmpty {
+                processingCheckInId = nil
+                loadTodayCheckIns()
+                highlightedCheckInId = checkInId
+                highlightKind = .success
+                scheduleClearHighlight()
                 ambiguitySheetData = AmbiguitySheetData(
                     ambiguousUpdates: ambiguousUpdates,
                     intentions: intentions,
@@ -750,9 +820,24 @@ struct HomeView: View {
             refreshMoodAndStreak()
             state = .saved(transcript: transcript)
             
+            // Clear processing placeholder; show real row with green flash
+            processingCheckInId = nil
+            loadTodayCheckIns()
+            highlightedCheckInId = checkInId
+            highlightKind = .success
+            scheduleClearHighlight()
+            
         } catch {
             AppLogger.log(AppLogger.ERR, "Check-in transcription failed id=\(AppLogger.shortId(checkInId)) error=\"\(error.localizedDescription)\"")
             state = .error(message: error.localizedDescription)
+            
+            // Replace placeholder with failed row; red flash
+            processingCheckInId = nil
+            failedCheckInId = checkInId
+            failedCheckInCreatedAt = Date()
+            highlightedCheckInId = checkInId
+            highlightKind = .failure
+            scheduleClearHighlight()
         }
     }
 }
