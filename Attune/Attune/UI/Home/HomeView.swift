@@ -102,6 +102,9 @@ struct HomeView: View {
         .navigationBarHidden(true)
         .onAppear {
             refreshAll()
+            // Request mic + speech permissions when Home loads (instead of on first record).
+            // Only shows dialogs when status is .undetermined; already granted = no-op.
+            PermissionsHelper.requestRecordingPermissionsIfNeeded()
         }
         .sheet(isPresented: $showEditIntentions) {
             EditIntentionsView()
