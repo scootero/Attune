@@ -18,7 +18,8 @@ struct DailyMood: Codable {
     /// Optional mood label (e.g., "Calm", "Anxious")
     let moodLabel: String?
     
-    /// Optional mood score (e.g., -2 to +2 scale)
+    /// Optional mood score (0–10 integer; 0 = lowest, 10 = highest).
+    /// Legacy: values in -2..+2 are migrated to 0-10 on load.
     let moodScore: Int?
     
     /// When this record was last updated

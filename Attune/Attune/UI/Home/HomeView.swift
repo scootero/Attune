@@ -2,8 +2,8 @@
 //  HomeView.swift
 //  Attune
 //
-//  Home tab: intentions, progress, mood, streak, check-in recording.
-//  SLICE 1–4: Recording + GPT extraction. SLICE 5: Full UX.
+//  Home tab: Daily Summary, Today's Progress, Record Check-In, Weekly Momentum, Streak.
+//  Slice A: Layout matches design image; all data from real stores.
 //
 
 import SwiftUI
@@ -67,36 +67,55 @@ struct HomeView: View {
     @State private var highlightKind: CheckInHighlightKind?
     /// When true, presents sheet with full Today Check-ins list
     @State private var showAllCheckInsSheet = false
+    /// Slice A: Snapshot strip counts (derived from real data)
+    @State private var intentionsInProgressCount: Int = 0
+    @State private var intentionsCompleteCount: Int = 0
+    @State private var intentionsNotStartedCount: Int = 0
+    /// Slice A: Weekly momentum for Mon–Sun (current week)
+    @State private var weekMomentum: WeekMomentum = WeekMomentum(days: [])
+    /// Slice A: For future smart prompt (Slice B). Lowest-progress intention title or fallback.
+    @State private var lowestProgressIntentionTitle: String = "What's one thing you want to move forward today?"
     
     var body: some View {
         NavigationView {
-        VStack(spacing: 0) {
-            // Scrollable content: progress, sessions, mood (CTA stays fixed below)
-            ScrollView {
-                VStack(spacing: 24) {
-                    Text("Home")
+        ZStack {
+            // Dark background (matches image)
+            Color(red: 0.08, green: 0.08, blue: 0.1)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header: Attune + hamburger
+                HStack {
+                    Text("Attune")
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                        .padding(.top, 40)
-                    
-                    currentIntentionsSection
-                    if !todaysProgress.isEmpty { intentionsListSection }
-                    todayCheckInsSection
-                    moodSection
-                    
-                    Spacer(minLength: 40)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Button(action: { showEditIntentions = true }) {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.body)
+                            .foregroundColor(.gray)
+                            .frame(width: 44, height: 44)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
+                    }
                 }
-            }
-            
-            // Fixed CTA area: stable placement at bottom, doesn't scroll; saved/error as compact banners
-            VStack(spacing: 12) {
-                recordCheckInCTAArea
-                streakSection
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .overlay(alignment: .top) {
-                Divider()
+                .padding(.horizontal, 20)
+                .padding(.top, 40)
+                .padding(.bottom, 8)
+                
+                // Slice B: Single-screen non-scrollable layout
+                VStack(spacing: 10) {
+                    dailySummaryStrip
+                    todaysProgressCard
+                    smartPromptLine
+                    recordCheckInCTAArea
+                    moodLabelRow
+                    weeklyMomentumCard
+                    streakSection
+                }
+                .padding(.horizontal, 16)
+                Spacer(minLength: 0)
             }
         }
         .navigationBarHidden(true)
@@ -146,254 +165,197 @@ struct HomeView: View {
         }
     }
     
-    // MARK: - A) Current Intentions Header
+    // MARK: - A) Daily Summary Strip (Slice B: compact single-line)
     
-    private var currentIntentionsSection: some View {
+    /// One compact glass row: "5 Check-ins • Mood 8/10 • 2 In Progress • 1 Done • 1 Not Started"
+    private var dailySummaryStrip: some View {
+        Button(action: { showEditIntentions = true }) {
+            Text(compactSnapshotText)
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.95))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+        }
+        .buttonStyle(.plain)
+        .background(Color.white.opacity(0.08))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+    }
+    
+    /// Slice B: Single-line format, omit zero counts. "Done" not "Complete".
+    private var compactSnapshotText: String {
+        let total = intentionsInProgressCount + intentionsCompleteCount + intentionsNotStartedCount
+        var parts: [String] = []
+        parts.append("\(todayCheckIns.count) Check-ins")
+        parts.append("Mood \(moodScoreToday)/10")
+        if total > 0 {
+            if intentionsInProgressCount > 0 { parts.append("\(intentionsInProgressCount) In Progress") }
+            if intentionsCompleteCount > 0 { parts.append("\(intentionsCompleteCount) Done") }
+            if intentionsNotStartedCount > 0 { parts.append("\(intentionsNotStartedCount) Not Started") }
+        }
+        return parts.joined(separator: " • ")
+    }
+    
+    /// Mood score 0-10 for display (from todayMood, or 0 if unset)
+    private var moodScoreToday: Int {
+        todayMood?.moodScore ?? 0
+    }
+    
+    /// Reusable glass-style card
+    private func glassCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(12)
+            .background(Color.white.opacity(0.08))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+    }
+    
+    // MARK: - B) Today's Progress Card (Slice B: compacted)
+    
+    private var todaysProgressCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Current Intentions")
-                    .font(.headline)
+                Text("Today's Progress")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
                 Spacer()
                 Button(action: { showEditIntentions = true }) {
-                    Text("Edit")
+                    Image(systemName: "arrow.right")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .frame(width: 28, height: 28)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Circle())
                 }
-            }
-            
-            if let set = currentIntentionSet {
-                Text("Started \(set.startedAt, format: .dateTime.month().day().year())")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
             
             if todaysProgress.isEmpty {
                 Text("No intentions yet. Add one to start tracking.")
-                    .font(.body)
-                    .foregroundColor(.secondary)
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 16)
                 Button(action: { showEditIntentions = true }) {
                     Label("Add Intention", systemImage: "plus.circle.fill")
                 }
+                .font(.caption)
                 .buttonStyle(.bordered)
-            }
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-        .padding(.horizontal)
-    }
-    
-    // MARK: - B) Intentions List
-    
-    private var intentionsListSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Today's progress")
-                .font(.headline)
-            
-            // Use enumerated() so ForEach iterates over (Int, IntentionProgressRow) — no Binding overload applies.
-            ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { _, row in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(row.intention.title)
-                            .font(.body)
-                        Spacer()
-                        Text(formatProgress(row.intention, total: row.total))
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                        Text("\(Int(row.percent * 100))%")
-                            .font(.body.monospacedDigit())
-                    }
-                    SwiftUI.ProgressView(value: row.percent)
-                        .tint(.accentColor)
-                }
-                .padding(.vertical, 4)
-            }
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-        .padding(.horizontal)
-    }
-    
-    private func formatProgress(_ intention: Intention, total: Double) -> String {
-        String(format: "%.1f / %.1f \(intention.unit)", total, intention.targetValue)
-    }
-    
-    // MARK: - B2) Today Check-ins Card
-    
-    /// Card showing today's check-ins with transcript snippets. Max 3 rows + "View all".
-    /// Processing placeholder appears at top when recording completes; green/red flash on done.
-    private var todayCheckInsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Today Check-ins")
-                    .font(.headline)
-                Spacer()
-                Button("View all") {
-                    showAllCheckInsSheet = true
-                }
-                .font(.subheadline)
-            }
-            
-            if todayCheckIns.isEmpty && processingCheckInId == nil && failedCheckInId == nil {
-                Text("No check-ins today.")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
             } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Processing placeholder at top (yellow, spinner)
-                    if let id = processingCheckInId {
-                        processingPlaceholderRow(id: id)
-                    }
-                    // Failed row (red) when transcription failed
-                    if let id = failedCheckInId, let createdAt = failedCheckInCreatedAt {
-                        failedCheckInRow(id: id, createdAt: createdAt)
-                    }
-                    // Up to 3 check-in rows (newest-first)
-                    ForEach(todayCheckIns.prefix(3)) { checkIn in
-                        NavigationLink(destination: CheckInDetailView(checkInId: checkIn.id)) {
-                            todayCheckInRow(checkIn)
+                ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { _, row in
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text(row.intention.title)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white)
+                            Spacer()
+                            Text("\(Int(row.percent * 100))%")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .monospacedDigit()
+                                .foregroundColor(.white)
                         }
-                        .buttonStyle(.plain)
+                        SwiftUI.ProgressView(value: row.percent)
+                            .tint(Color(red: 0.2, green: 0.8, blue: 0.7))
                     }
-                    // "View all" row when more than 3
-                    if todayCheckIns.count > 3 {
-                        Button(action: { showAllCheckInsSheet = true }) {
-                            HStack {
-                                Text("View all \(todayCheckIns.count) check-ins")
-                                    .font(.subheadline)
-                                    .foregroundColor(.accentColor)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(10)
-                            .background(Color(.systemBackground))
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    .padding(.vertical, 3)
                 }
-                .frame(maxHeight: 280)
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-        .padding(.horizontal)
+        .padding(12)
+        .background(Color.white.opacity(0.06))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
     
-    /// Placeholder row while check-in is processing (yellow background, spinner)
-    private func processingPlaceholderRow(id: String) -> some View {
-        HStack(spacing: 12) {
-            SwiftUI.ProgressView()
-                .scaleEffect(0.9)
-            Text("Processing…")
-                .font(.subheadline)
-                .foregroundColor(.primary)
-            Spacer()
+    // MARK: - B1) Smart Prompt (Slice B)
+    
+    /// Single line above Record button. Uses lowestProgressIntentionTitle from Slice A.
+    private var smartPromptLine: some View {
+        Text(smartPromptText)
+            .font(.subheadline)
+            .foregroundColor(.white.opacity(0.85))
+            .shadow(color: .white.opacity(0.15), radius: 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
+    }
+    
+    private var smartPromptText: String {
+        let fallback = "What's one thing you want to move forward today?"
+        if lowestProgressIntentionTitle == fallback {
+            return fallback
         }
-        .padding(10)
-        .background(Color.yellow.opacity(0.25))
-        .cornerRadius(8)
+        return "How's your \(lowestProgressIntentionTitle) coming along today?"
     }
     
-    /// Failed row when transcription failed (red background)
-    private func failedCheckInRow(id: String, createdAt: Date) -> some View {
-        let isHighlighted = highlightedCheckInId == id
-        let bgColor = isHighlighted ? Color.red.opacity(0.2) : Color.red.opacity(0.12)
-        
-        return HStack(spacing: 8) {
-            Text(createdAt.formatted(date: .omitted, time: .shortened))
-                .font(.subheadline)
-                .fontWeight(.medium)
-            Text("Failed")
+    // MARK: - B2) Weekly Momentum Card (Slice B: lighter)
+    
+    /// Slice B: Thinner bars, less glow; bar colors carry meaning.
+    private var weeklyMomentumCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Weekly Momentum")
                 .font(.caption)
-                .foregroundColor(.red)
-            Spacer()
-        }
-        .padding(10)
-        .background(bgColor)
-        .cornerRadius(8)
-    }
-    
-    /// Single row for a check-in: time, 2-line transcript snippet. Green/red background when highlighted.
-    private func todayCheckInRow(_ checkIn: CheckIn) -> some View {
-        let isHighlighted = highlightedCheckInId == checkIn.id
-        let bgColor: Color = {
-            guard isHighlighted, let kind = highlightKind else { return Color(.systemBackground) }
-            switch kind {
-            case .success: return Color.green.opacity(0.2)
-            case .failure: return Color.red.opacity(0.2)
+                .foregroundColor(.gray)
+            
+            HStack(spacing: 6) {
+                ForEach(weekMomentum.days) { day in
+                    VStack(spacing: 4) {
+                        if day.isFutureDay {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.clear)
+                                .frame(width: 8, height: 16)
+                        } else {
+                            let ratio = day.completionRatio ?? 0
+                            let barHeight = max(6, CGFloat(ratio) * 48)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(colorForMomentumTier(day.tier))
+                                .frame(width: 8, height: barHeight)
+                        }
+                        Text(day.weekdayLetter)
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
             }
-        }()
-        
-        return VStack(alignment: .leading, spacing: 4) {
-            Text(checkIn.createdAt.formatted(date: .omitted, time: .shortened))
-                .font(.subheadline)
-                .fontWeight(.medium)
-            Text(checkInTranscriptSnippet(for: checkIn))
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-            if isHighlighted, highlightKind == .failure {
-                Text("Failed")
-                    .font(.caption)
-                    .foregroundColor(.red)
-            }
+            .padding(.vertical, 6)
         }
-        .padding(10)
-        .background(bgColor)
-        .cornerRadius(8)
+        .padding(12)
+        .background(Color.white.opacity(0.06))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(red: 0.2, green: 0.7, blue: 0.6).opacity(0.15), lineWidth: 1))
     }
     
-    /// Transcript snippet for check-in (first ~120 chars + ellipsis)
-    private func checkInTranscriptSnippet(for checkIn: CheckIn) -> String {
-        let text = checkIn.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return "No transcript" }
-        let prefix = String(text.prefix(120)).trimmingCharacters(in: .whitespaces)
-        return prefix + (text.count > 120 ? "…" : "")
+    private func colorForMomentumTier(_ tier: MomentumTier) -> Color {
+        switch tier {
+        case .veryLow: return Color(red: 0.9, green: 0.3, blue: 0.25)
+        case .low: return Color(red: 0.95, green: 0.5, blue: 0.2)
+        case .neutral: return Color.gray
+        case .good: return Color(red: 0.3, green: 0.7, blue: 0.5)
+        case .great: return Color(red: 0.2, green: 0.8, blue: 0.5)
+        }
     }
     
-    // MARK: - C) Mood Row
+    // MARK: - C) Mood Label Row (below Record button, Slice A)
     
-    private var moodSection: some View {
+    private var moodLabelRow: some View {
         Button(action: { showMoodEditor = true }) {
-            HStack {
-                Image(systemName: "face.smiling")
-                    .foregroundColor(.secondary)
-                Text(moodDisplayText)
-                    .foregroundColor(.primary)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+            Text("Mood: \(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday)))")
+                .font(.subheadline)
+                .foregroundColor(.gray)
         }
         .buttonStyle(.plain)
-        .padding(.horizontal)
     }
     
-    private var moodDisplayText: String {
-        if let mood = todayMood {
-            var text = mood.moodLabel ?? "Set mood"
-            if let score = mood.moodScore, score != 0 {
-                text += " (\(score > 0 ? "+" : "")\(score))"
-            }
-            return text
-        }
-        return "Set mood"
-    }
+    // MARK: - D) Record Check-In CTA
     
-    // MARK: - D) Record Check-In CTA (stable placement; saved/error as compact banners)
-    
-    /// Single CTA area that stays fixed; all states rendered compactly (no layout shift)
+    /// Single CTA area; all states rendered compactly (no layout shift). Slice B: tighter spacing.
     private var recordCheckInCTAArea: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             // Compact banner for saved/error only (doesn't clutter when idle/recording/processing)
             switch state {
             case .saved(let transcript):
@@ -414,32 +376,49 @@ struct HomeView: View {
                 processingContent
             case .saved:
                 Button(action: { state = .idle }) {
-                    Label("Record Check-In", systemImage: "record.circle")
+                    Text("Record Check-In")
                         .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 16)
                 }
-                .buttonStyle(.borderedProminent)
+                .background(recordButtonColor)
+                .cornerRadius(14)
+                .shadow(color: recordButtonColor.opacity(0.5), radius: 8)
             case .error:
                 Button(action: { state = .idle }) {
-                    Label("Try Again", systemImage: "arrow.clockwise")
+                    Text("Try Again")
                         .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 16)
                 }
-                .buttonStyle(.borderedProminent)
+                .background(recordButtonColor)
+                .cornerRadius(14)
+                .shadow(color: recordButtonColor.opacity(0.5), radius: 8)
             }
         }
     }
     
+    /// Slice B: Button/halo color driven by mood tier (Happy never red).
+    private var recordButtonColor: Color {
+        MoodTier.colorForMoodTier(MoodTier.moodTier(for: moodScoreToday))
+    }
+    
     private var recordCheckInSection: some View {
         Button(action: startCheckIn) {
-            Label("Record Check-In", systemImage: "record.circle")
+            Text("Record Check-In")
                 .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .padding(.vertical, 16)
         }
-        .buttonStyle(.borderedProminent)
+        .background(recordButtonColor)
+        .cornerRadius(14)
+        .shadow(color: recordButtonColor.opacity(0.5), radius: 8)
     }
     
     private var recordingContent: some View {
@@ -454,7 +433,7 @@ struct HomeView: View {
                     .padding(.vertical, 14)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.red)
+            .tint(recordButtonColor)
         }
     }
     
@@ -522,16 +501,18 @@ struct HomeView: View {
         .cornerRadius(8)
     }
     
-    // MARK: - E) Streak
+    // MARK: - E) Streak (Slice A)
     
     private var streakSection: some View {
         HStack {
-            Image(systemName: "flame.fill")
-                .foregroundColor(.orange)
-            Text("Streak: \(streak) days")
-                .font(.body)
+            Text("Streak Counter")
+                .font(.caption)
+                .foregroundColor(.gray)
+            Spacer()
+            Text("\(streak) days")
+                .font(.subheadline)
+                .foregroundColor(.white)
         }
-        .padding()
     }
     
     // MARK: - Data Loading
@@ -541,6 +522,9 @@ struct HomeView: View {
         loadCurrentIntentionSet()
         loadTodayCheckIns()
         refreshMoodAndStreak()
+        loadIntentionsBreakdown()
+        loadWeekMomentum()
+        loadLowestProgressIntention()
     }
     
     private func refreshMoodAndStreak() {
@@ -612,6 +596,52 @@ struct HomeView: View {
         }
         
         todaysProgress = rows
+    }
+    
+    /// Slice A: Compute intention state counts for Daily Summary (Not Started / In Progress / Complete)
+    private func loadIntentionsBreakdown() {
+        var inProgress = 0, complete = 0, notStarted = 0
+        for row in todaysProgress {
+            if row.percent >= 1.0 { complete += 1 }
+            else if row.percent > 0 { inProgress += 1 }
+            else { notStarted += 1 }
+        }
+        intentionsInProgressCount = inProgress
+        intentionsCompleteCount = complete
+        intentionsNotStartedCount = notStarted
+    }
+    
+    /// Slice A: Compute WeekMomentum for current week (Mon–Sun)
+    private func loadWeekMomentum() {
+        guard let intentionSet = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else {
+            weekMomentum = WeekMomentum(days: [])
+            return
+        }
+        let intentions = IntentionStore.shared.loadIntentions(ids: intentionSet.intentionIds)
+            .filter { $0.isActive }
+        
+        weekMomentum = WeekMomentumCalculator.compute(
+            today: Date(),
+            intentionSet: intentionSet,
+            intentions: intentions,
+            entriesForDate: { ProgressStore.shared.loadEntries(dateKey: $0, intentionSetId: intentionSet.id) },
+            overridesForDate: { OverrideStore.shared.loadOverridesForDate(dateKey: $0) }
+        )
+    }
+    
+    /// Slice A: Find lowest-progress intention for future smart prompt (Slice B)
+    private func loadLowestProgressIntention() {
+        let fallback = "What's one thing you want to move forward today?"
+        guard !todaysProgress.isEmpty else {
+            lowestProgressIntentionTitle = fallback
+            return
+        }
+        let sorted = todaysProgress.sorted { a, b in
+            if a.percent != b.percent { return a.percent < b.percent }
+            if a.percent == 0 { return true }
+            return a.percent < 1 && b.percent >= 1
+        }
+        lowestProgressIntentionTitle = sorted.first?.intention.title ?? fallback
     }
     
     /// Slice 7: Persists user-resolved ambiguous updates. totalToday → TOTAL, increment → INCREMENT.

@@ -81,7 +81,7 @@ struct DayDetailView: View {
                     HStack {
                         Text("Mood")
                         Spacer()
-                        Text(data.mood?.moodLabel ?? "Set mood")
+                        Text(moodDisplayText(for: data.mood))
                             .foregroundColor(.secondary)
                     }
                 }
@@ -224,5 +224,15 @@ struct DayDetailView: View {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         return formatter.string(from: date)
+    }
+    
+    /// Slice A: Mood display with 0-10 score. Format: "Label (7/10)" or "Set mood"
+    private func moodDisplayText(for mood: DailyMood?) -> String {
+        guard let mood = mood else { return "Set mood" }
+        let label = mood.moodLabel ?? "Set mood"
+        if let score = mood.moodScore {
+            return "\(label) (\(score)/10)"
+        }
+        return label
     }
 }

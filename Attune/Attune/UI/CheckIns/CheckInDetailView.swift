@@ -56,15 +56,15 @@ struct CheckInDetailView: View {
                 }
             }
             
-            // Optional mood (only if this check-in contributed it)
+            // Optional mood (only if this check-in contributed it). Slice A: score is 0-10.
             if let mood = mood, mood.sourceCheckInId == checkInId {
                 Section("Mood") {
                     HStack {
                         if let label = mood.moodLabel, !label.isEmpty {
                             Text(label)
                         }
-                        if let score = mood.moodScore, score != 0 {
-                            Text("(\(score > 0 ? "+" : "")\(score))")
+                        if let score = mood.moodScore {
+                            Text("(\(score)/10)")
                                 .foregroundColor(.secondary)
                         }
                         if mood.moodLabel == nil && mood.moodScore == nil {

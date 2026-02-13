@@ -2,8 +2,8 @@
 //  MoodEditorView.swift
 //  Attune
 //
-//  Simple mood editor: quick pick list + optional intensity (-2..+2).
-//  Saves as manual override (isManualOverride=true). Clear allows GPT to overwrite. Slice 5.
+//  Simple mood editor: quick pick list + intensity (0-10). Slice A: migrated to 0-10 scale.
+//  Saves as manual override (isManualOverride=true). Clear allows GPT to overwrite.
 //
 
 import SwiftUI
@@ -17,8 +17,9 @@ struct MoodEditorView: View {
     let dateKey: String
     let onSaved: () -> Void
     
+    /// Mood score 0-10 (0 = lowest, 10 = highest). Slice A: migrated from -2..+2.
     @State private var selectedLabel: String?
-    @State private var moodScore: Int = 0  // -2 to +2
+    @State private var moodScore: Int = 5
     
     var body: some View {
         NavigationStack {
@@ -40,14 +41,15 @@ struct MoodEditorView: View {
                 
                 Section("Intensity") {
                     HStack {
-                        Text("Score")
+                        Text("Score (0-10)")
                         Spacer()
                         Picker("", selection: $moodScore) {
-                            ForEach(-2...2, id: \.self) { n in
-                                Text(intensityLabel(n)).tag(n)
+                            ForEach(0...10, id: \.self) { n in
+                                Text("\(n)").tag(n)
                             }
                         }
-                        .pickerStyle(.segmented)
+                        .pickerStyle(.wheel)
+                        .frame(width: 80, height: 100)
                     }
                 }
                 
@@ -72,21 +74,10 @@ struct MoodEditorView: View {
         }
     }
     
-    private func intensityLabel(_ n: Int) -> String {
-        switch n {
-        case -2: return "−2"
-        case -1: return "−1"
-        case 0: return "0"
-        case 1: return "+1"
-        case 2: return "+2"
-        default: return "\(n)"
-        }
-    }
-    
     private func loadExistingMood() {
         guard let mood = DailyMoodStore.shared.loadDailyMood(dateKey: dateKey) else { return }
         selectedLabel = mood.moodLabel
-        moodScore = mood.moodScore ?? 0
+        moodScore = mood.moodScore ?? 5
     }
     
     private func saveAndDismiss() {

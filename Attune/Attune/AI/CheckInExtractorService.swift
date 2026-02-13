@@ -99,11 +99,14 @@ struct CheckInExtractorService {
             }
         }
         
-        // Parse mood (optional)
+        // Parse mood (optional). Clamp to 0-10; convert legacy -2..+2 if present.
+        var moodScore = (json["moodScore"] as? NSNumber)?.intValue
+        if let s = moodScore {
+            moodScore = DailyMoodStore.clampMoodScore(s) ?? s
+        }
         let moodLabel = json["moodLabel"] as? String
-        let moodScore = (json["moodScore"] as? NSNumber)?.intValue
         
-        AppLogger.log(AppLogger.AI, "checkin_extract_ok id=\(AppLogger.shortId(checkInId)) updates=\(updates.count) moodLabel=\(moodLabel ?? "nil")")
+        AppLogger.log(AppLogger.AI, "checkin_extract_ok id=\(AppLogger.shortId(checkInId)) updates=\(updates.count) moodLabel=\(moodLabel ?? "nil") moodScore=\(moodScore?.description ?? "nil")")
         
         return CheckInExtractionResult(updates: updates, moodLabel: moodLabel, moodScore: moodScore)
     }
@@ -148,9 +151,9 @@ RULES:
 - confidence: 0.0 to 1.0 — how certain you are this extraction is correct.
 - evidence: short exact quote from transcript that supports this update (optional).
 
-MOOD (optional, v1):
+MOOD (optional, Slice A):
 - moodLabel: one word or short phrase (e.g., "Calm", "Anxious", "Tired") or null.
-- moodScore: integer -2 to +2 (negative = low, 0 = neutral, positive = good) or null.
+- moodScore: integer 0 to 10 (0 = lowest, 10 = highest; 5 = neutral) or null.
 
 Return ONLY valid JSON matching the schema. No markdown, no explanations.
 If no progress or mood is clearly stated, return: {"updates": [], "moodLabel": null, "moodScore": null}
