@@ -79,33 +79,35 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
         ZStack {
-            // Dark background (matches image)
-            Color(red: 0.08, green: 0.08, blue: 0.1)
-                .ignoresSafeArea()
+            // Cyber glassy background: teal fog glows, vignette, modern crisp look
+            CyberBackground()
             
             VStack(spacing: 0) {
-                // Header: Attune + hamburger
+                // Header: Attune + hamburger (more padding, subtle text shadow)
                 HStack {
                     Text("Attune")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
+                        .shadow(color: NeonPalette.neonTeal.opacity(0.3), radius: 8, x: 0, y: 2)
                     Spacer()
                     Button(action: { showEditIntentions = true }) {
                         Image(systemName: "line.3.horizontal")
                             .font(.body)
                             .foregroundColor(.gray)
                             .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.1))
+                            .background(Color.white.opacity(0.12))
                             .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1))
+                            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 40)
-                .padding(.bottom, 8)
+                .padding(.top, 44)
+                .padding(.bottom, 12)
                 
-                // Slice B: Single-screen non-scrollable layout
-                VStack(spacing: 10) {
+                // Slice B: Single-screen non-scrollable layout (more spacing for modern feel)
+                VStack(spacing: 16) {
                     dailySummaryStrip
                     todaysProgressCard
                     smartPromptLine
@@ -114,7 +116,7 @@ struct HomeView: View {
                     weeklyMomentumCard
                     streakSection
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 20)
                 Spacer(minLength: 0)
             }
         }
@@ -168,6 +170,7 @@ struct HomeView: View {
     // MARK: - A) Daily Summary Strip (Slice B: compact single-line)
     
     /// One compact glass row: "5 Check-ins • Mood 8/10 • 2 In Progress • 1 Done • 1 Not Started"
+    /// Uses HomeStyle glassCard for modern crisp glassy look with bloom shadows.
     private var dailySummaryStrip: some View {
         Button(action: { showEditIntentions = true }) {
             Text(compactSnapshotText)
@@ -176,21 +179,21 @@ struct HomeView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
         }
         .buttonStyle(.plain)
-        .background(Color.white.opacity(0.08))
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .glassCard()
     }
     
     /// Slice B: Single-line format, omit zero counts. "Done" not "Complete".
+    /// Mood: shows "Mood ?" when unset (not yet from ChatGPT or manual); else "Mood X/10".
     private var compactSnapshotText: String {
         let total = intentionsInProgressCount + intentionsCompleteCount + intentionsNotStartedCount
         var parts: [String] = []
         parts.append("\(todayCheckIns.count) Check-ins")
-        parts.append("Mood \(moodScoreToday)/10")
+        // When mood unset: show "Mood ?" (avoids defaulting 0 → "Stressed")
+        parts.append(hasMoodSet ? "Mood \(moodScoreToday)/10" : "Mood ?")
         if total > 0 {
             if intentionsInProgressCount > 0 { parts.append("\(intentionsInProgressCount) In Progress") }
             if intentionsCompleteCount > 0 { parts.append("\(intentionsCompleteCount) Done") }
@@ -199,24 +202,22 @@ struct HomeView: View {
         return parts.joined(separator: " • ")
     }
     
-    /// Mood score 0-10 for display (from todayMood, or 0 if unset)
-    private var moodScoreToday: Int {
-        todayMood?.moodScore ?? 0
+    /// True when mood has been set (from ChatGPT check-in extraction or manual MoodEditor).
+    /// Used to avoid showing "Stressed" when score would default to 0.
+    private var hasMoodSet: Bool {
+        guard let m = todayMood else { return false }
+        return m.moodLabel != nil || m.moodScore != nil
     }
     
-    /// Reusable glass-style card
-    private func glassCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(12)
-            .background(Color.white.opacity(0.08))
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+    /// Mood score 0-10 for display (from todayMood). Only valid when hasMoodSet; else use for button default.
+    private var moodScoreToday: Int {
+        todayMood?.moodScore ?? 0
     }
     
     // MARK: - B) Today's Progress Card (Slice B: compacted)
     
     private var todaysProgressCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Today's Progress")
                     .font(.subheadline)
@@ -238,7 +239,7 @@ struct HomeView: View {
                     .font(.caption)
                     .foregroundColor(.gray)
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 16)
+                    .padding(.vertical, 20)
                 Button(action: { showEditIntentions = true }) {
                     Label("Add Intention", systemImage: "plus.circle.fill")
                 }
@@ -246,7 +247,7 @@ struct HomeView: View {
                 .buttonStyle(.bordered)
             } else {
                 ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { _, row in
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(row.intention.title)
                                 .font(.subheadline)
@@ -262,14 +263,12 @@ struct HomeView: View {
                         SwiftUI.ProgressView(value: row.percent)
                             .tint(Color(red: 0.2, green: 0.8, blue: 0.7))
                     }
-                    .padding(.vertical, 3)
+                    .padding(.vertical, 6)
                 }
             }
         }
-        .padding(12)
-        .background(Color.white.opacity(0.06))
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .padding(16)
+        .glassCard()
     }
     
     // MARK: - B1) Smart Prompt (Slice B)
@@ -278,10 +277,11 @@ struct HomeView: View {
     private var smartPromptLine: some View {
         Text(smartPromptText)
             .font(.subheadline)
-            .foregroundColor(.white.opacity(0.85))
-            .shadow(color: .white.opacity(0.15), radius: 4)
+            .foregroundColor(.white.opacity(0.9))
+            .shadow(color: NeonPalette.neonTeal.opacity(0.2), radius: 6, x: 0, y: 2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 6)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 4)
     }
     
     private var smartPromptText: String {
@@ -294,16 +294,16 @@ struct HomeView: View {
     
     // MARK: - B2) Weekly Momentum Card (Slice B: lighter)
     
-    /// Slice B: Thinner bars, less glow; bar colors carry meaning.
+    /// Slice B: Bars with subtle teal glow; bar colors carry meaning.
     private var weeklyMomentumCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Weekly Momentum")
                 .font(.caption)
                 .foregroundColor(.gray)
             
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 ForEach(weekMomentum.days) { day in
-                    VStack(spacing: 4) {
+                    VStack(spacing: 6) {
                         if day.isFutureDay {
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(Color.clear)
@@ -311,9 +311,21 @@ struct HomeView: View {
                         } else {
                             let ratio = day.completionRatio ?? 0
                             let barHeight = max(6, CGFloat(ratio) * 48)
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(colorForMomentumTier(day.tier))
-                                .frame(width: 8, height: barHeight)
+                            let barColor = colorForMomentumTier(day.tier)
+                            ZStack(alignment: .bottom) {
+                                // Glow layer behind filled bar (soft bloom)
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(barColor)
+                                    .blur(radius: 4)
+                                    .opacity(0.5)
+                                    .frame(width: 8, height: barHeight)
+                                // Main filled bar with shadow
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(barColor)
+                                    .frame(width: 8, height: barHeight)
+                                    .shadow(color: barColor.opacity(0.6), radius: 4, x: 0, y: 2)
+                            }
+                            .frame(width: 8, height: 48)
                         }
                         Text(day.weekdayLetter)
                             .font(.caption2)
@@ -322,12 +334,10 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity)
                 }
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 10)
         }
-        .padding(12)
-        .background(Color.white.opacity(0.06))
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(red: 0.2, green: 0.7, blue: 0.6).opacity(0.15), lineWidth: 1))
+        .padding(16)
+        .glassCard()
     }
     
     private func colorForMomentumTier(_ tier: MomentumTier) -> Color {
@@ -342,13 +352,33 @@ struct HomeView: View {
     
     // MARK: - C) Mood Label Row (below Record button, Slice A)
     
+    /// Shows "Mood ?" when unset (not yet from ChatGPT or manual); else "Mood: [label]".
+    /// Tapping opens MoodEditor. When unset, shows "Set mood" affordance next to it.
     private var moodLabelRow: some View {
-        Button(action: { showMoodEditor = true }) {
-            Text("Mood: \(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday)))")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+        HStack(spacing: 8) {
+            Button(action: { showMoodEditor = true }) {
+                Text(hasMoodSet ? "Mood: \(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday)))" : "Mood ?")
+                    .font(.subheadline)
+                    .foregroundColor(hasMoodSet ? .gray : .gray.opacity(0.8))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 4)
+            }
+            .buttonStyle(.plain)
+            // When mood unset: show "Set mood" pill so user can tap to set it manually
+            if !hasMoodSet {
+                Button(action: { showMoodEditor = true }) {
+                    Text("Set mood")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(NeonPalette.neonTeal)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(NeonPalette.neonTeal.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
     }
     
     // MARK: - D) Record Check-In CTA
@@ -380,24 +410,16 @@ struct HomeView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
                 }
-                .background(recordButtonColor)
-                .cornerRadius(14)
-                .shadow(color: recordButtonColor.opacity(0.5), radius: 8)
+                .buttonStyle(RecordCheckInButtonStyle())
             case .error:
                 Button(action: { state = .idle }) {
                     Text("Try Again")
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
                 }
-                .background(recordButtonColor)
-                .cornerRadius(14)
-                .shadow(color: recordButtonColor.opacity(0.5), radius: 8)
+                .buttonStyle(RecordCheckInButtonStyle())
             }
         }
     }
@@ -407,18 +429,15 @@ struct HomeView: View {
         MoodTier.colorForMoodTier(MoodTier.moodTier(for: moodScoreToday))
     }
     
+    /// Primary CTA: Record Check-In with blue gradient, light red/orange border, glow.
     private var recordCheckInSection: some View {
         Button(action: startCheckIn) {
             Text("Record Check-In")
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
         }
-        .background(recordButtonColor)
-        .cornerRadius(14)
-        .shadow(color: recordButtonColor.opacity(0.5), radius: 8)
+        .buttonStyle(RecordCheckInButtonStyle())
     }
     
     private var recordingContent: some View {
@@ -511,8 +530,15 @@ struct HomeView: View {
             Spacer()
             Text("\(streak) days")
                 .font(.subheadline)
+                .fontWeight(.medium)
                 .foregroundColor(.white)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(Color.white.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
+        .padding(.vertical, 4)
     }
     
     // MARK: - Data Loading
