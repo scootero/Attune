@@ -15,6 +15,8 @@ struct CheckInDetailView: View {
     @State private var checkIn: CheckIn?
     /// Progress entries whose sourceCheckInId matches this check-in
     @State private var progressEntries: [ProgressEntry] = []
+    /// All progress entries for the check-in's date (same intention set) — used for cumulative percent
+    @State private var dayEntries: [ProgressEntry] = []
     /// Mood for this check-in's date (shown only if sourceCheckInId matches)
     @State private var mood: DailyMood?
     
@@ -49,9 +51,10 @@ struct CheckInDetailView: View {
             
             // Extracted progress updates
             if !progressEntries.isEmpty {
+                let dateKey = ProgressCalculator.dateKey(for: checkIn.createdAt)
                 Section("Progress Updates") {
                     ForEach(progressEntries) { entry in
-                        progressEntryRow(entry)
+                        progressEntryRow(entry, dayEntries: dayEntries, dateKey: dateKey)
                     }
                 }
             }
@@ -77,10 +80,43 @@ struct CheckInDetailView: View {
         }
     }
     
-    /// Single progress entry row with intention title if available
-    private func progressEntryRow(_ entry: ProgressEntry) -> some View {
+    /// Single progress entry row with intention title, increment, and optional percentage lines (INCREMENT only).
+    /// - Parameters:
+    ///   - entry: The progress entry to display
+    ///   - dayEntries: All entries for this check-in's date (for cumulative sum)
+    ///   - dateKey: YYYY-MM-DD for the day
+    private func progressEntryRow(_ entry: ProgressEntry, dayEntries: [ProgressEntry], dateKey: String) -> some View {
         let intention = IntentionStore.shared.loadIntention(id: entry.intentionId)
         let title = intention?.title ?? "Intention"
+        
+        // Daily goal target: weekly goals → targetValue/7, daily → targetValue (matches ProgressCalculator)
+        let dailyGoalTarget: Double? = intention.map { i in
+            i.timeframe.lowercased() == "weekly" ? i.targetValue / 7.0 : i.targetValue
+        }
+        
+        // Show percentage lines only for INCREMENT when intention has a positive goal (Option 1: no TOTAL)
+        let showPercentages = entry.updateType == "INCREMENT"
+            && dailyGoalTarget != nil
+            && (dailyGoalTarget ?? 0) > 0
+        
+        // This check-in's increment as % of daily goal
+        let incrementPercent: Double? = showPercentages && dailyGoalTarget != nil
+            ? (entry.amount / (dailyGoalTarget ?? 1)) * 100
+            : nil
+        // Sum of all INCREMENTs for this intention on this day, up to and including this entry
+        let cumulativeAmount: Double = showPercentages
+            ? ProgressCalculator.cumulativeIncrementAmountUpTo(
+                entries: dayEntries,
+                dateKey: dateKey,
+                intentionId: entry.intentionId,
+                intentionSetId: entry.intentionSetId,
+                atOrBeforeCreatedAt: entry.createdAt
+            )
+            : 0
+        // Cumulative % of daily goal, capped at 100 (per spec: do not display above 100)
+        let cumulativePercent: Double? = showPercentages && dailyGoalTarget != nil && (dailyGoalTarget ?? 0) > 0
+            ? min(100, (cumulativeAmount / (dailyGoalTarget ?? 1)) * 100)
+            : nil
         
         return VStack(alignment: .leading, spacing: 4) {
             Text(title)
@@ -89,6 +125,16 @@ struct CheckInDetailView: View {
             Text("\(entry.updateType): \(entry.amount) \(entry.unit)")
                 .font(.caption)
                 .foregroundColor(.secondary)
+            // Increment % and cumulative % (INCREMENT only; hide if no goal or goal=0)
+            if showPercentages, let incPct = incrementPercent, let cumPct = cumulativePercent {
+                Text("\(Int(incPct))% of daily goal")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("Total today: \(Int(cumPct))%")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+            }
             if let evidence = entry.evidence, !evidence.isEmpty {
                 Text("\"\(evidence)\"")
                     .font(.caption2)
@@ -126,6 +172,9 @@ struct CheckInDetailView: View {
         } else {
             mood = nil
         }
+        
+        // Day's entries for cumulative percent (same intention set as check-in)
+        dayEntries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: checkIn!.intentionSetId)
     }
     
     /// Formats date for display

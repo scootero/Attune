@@ -83,43 +83,60 @@ struct HomeView: View {
             // Cyber glassy background: teal fog glows, vignette, modern crisp look
             CyberBackground()
             
-            VStack(spacing: 0) {
-                // Header: Attune + hamburger (more padding, subtle text shadow)
-                HStack {
-                    Text("Attune")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .shadow(color: NeonPalette.neonTeal.opacity(0.3), radius: 8, x: 0, y: 2)
-                    Spacer()
-                    Button(action: { showEditIntentions = true }) {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.body)
-                            .foregroundColor(.gray)
-                            .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.12))
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1))
-                            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Header: Attune + hamburger in compact full-width bar with gradient
+                    HStack {
+                        Text("Attune")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .shadow(color: NeonPalette.neonTeal.opacity(0.3), radius: 8, x: 0, y: 2)
+                        Spacer()
+                        Button(action: { showEditIntentions = true }) {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.body)
+                                .foregroundColor(.gray)
+                                .frame(width: 36, height: 36)
+                                .background(Color.white.opacity(0.12))
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1))
+                                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                    .background {
+                        // Compact gradient bar: dark base with subtle teal glow
+                        LinearGradient(
+                            colors: [
+                                NeonPalette.darkBase.opacity(0.95),
+                                NeonPalette.darkOverlay.opacity(0.9),
+                                NeonPalette.fogTeal.opacity(0.15)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                    .ignoresSafeArea(edges: [.horizontal, .top])
+                    
+                    // Slice B: Scrollable content (more spacing for modern feel)
+                    VStack(spacing: 16) {
+                        dailySummaryStrip
+                        todaysProgressCard
+                        smartPromptLine
+                        recordCheckInCTAArea
+                        moodLabelRow
+                        weeklyMomentumCard
+                        streakSection
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 44)
-                .padding(.bottom, 12)
-                
-                // Slice B: Single-screen non-scrollable layout (more spacing for modern feel)
-                VStack(spacing: 16) {
-                    dailySummaryStrip
-                    todaysProgressCard
-                    smartPromptLine
-                    recordCheckInCTAArea
-                    moodLabelRow
-                    weeklyMomentumCard
-                    streakSection
-                }
-                .padding(.horizontal, 20)
-                Spacer(minLength: 0)
             }
+            .scrollBounceBehavior(.basedOnSize)
         }
         .navigationBarHidden(true)
         .onAppear {
@@ -357,6 +374,7 @@ struct HomeView: View {
                 )
             }
             .padding(16)
+            .contentShape(Rectangle())  // Make entire card area tappable (not just subviews)
         }
         .buttonStyle(.plain)
         .glassCard()

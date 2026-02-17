@@ -96,15 +96,20 @@ struct MomentumChartView: View {
         Calendar.current.date(byAdding: .day, value: 1, to: dayStart)?.addingTimeInterval(-1) ?? dayStart
     }
 
-    /// Empty state when no data for the day
+    /// Empty state when no momentum data for the selected day
     private var emptyChartView: some View {
         VStack(spacing: 12) {
             Image(systemName: "chart.bar.doc.plain")
                 .font(.system(size: 48))
                 .foregroundColor(.secondary.opacity(0.6))
-            Text("No check-ins this day")
+            Text("No momentum data for this day")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+            Text("Record a check-in to see progress over time")
+                .font(.caption)
+                .foregroundColor(.secondary.opacity(0.8))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 220)

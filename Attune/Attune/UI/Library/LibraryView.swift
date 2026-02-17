@@ -79,7 +79,9 @@ struct LibraryView: View {
             InsightsListView()
         case .momentum:
             // Use date provided by router (e.g., from Home tap) or default to today
-            MomentumView(selectedDate: appRouter.momentumSelectedDate ?? Date())
+            let date = appRouter.momentumSelectedDate ?? Date()
+            MomentumView(selectedDate: date)
+                .id(date)  // Force view recreate when router date changes (ensures fresh load)
         }
     }
     

@@ -11,10 +11,7 @@ import SwiftUI
 /// Main Momentum detail page: weekday picker + chart
 struct MomentumView: View {
 
-    /// Initial date to show (e.g. today when navigated from Home)
-    var initialDate: Date = Date()
-
-    /// Selected day in the week picker
+    /// Selected day in the week picker (passed from router or default to today)
     @State private var selectedDate: Date
 
     /// Week days (Mon–Sun) for the current week
@@ -107,18 +104,33 @@ struct MomentumView: View {
     }
 
     /// Loads momentum points for selected day from stores.
-    /// Uses intention set active on that date (not just current) so past days show correct data.
+    /// Uses intention set active on that date; falls back to current set when today and active lookup fails.
     private func loadPoints() {
         let dateKey = ProgressCalculator.dateKey(for: selectedDate)
-        guard let set = intentionSet(for: dateKey) else {
+        var set = intentionSet(for: dateKey)
+        
+        // Fallback: if no active set found for this date but date is today, use current set (matches Home)
+        if set == nil {
+            let todayKey = ProgressCalculator.dateKey(for: Date())
+            if dateKey == todayKey, let current = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() {
+                set = current
+            }
+        }
+        
+        guard let set = set else {
             points = []
             yAxisMax = 100
+            print("[Momentum] No intention set for dateKey=\(dateKey)")  // Debug: track when set is missing
             return
         }
+        
         let checkIns = CheckInStore.shared.loadCheckIns(intentionSetId: set.id, dateKey: dateKey)
         let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: set.id)
         let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds)
             .filter { $0.isActive }
+
+        print("[Momentum] selectedDate=\(selectedDate) dateKey=\(dateKey)")  // Debug: verify date parsing
+        print("[Momentum] set=\(set.id.prefix(6)) checkIns=\(checkIns.count) entries=\(entries.count) intentions=\(intentions.count)")  // Debug: counts
 
         points = MomentumPointAdapter.buildPoints(
             dateKey: dateKey,
@@ -128,5 +140,7 @@ struct MomentumView: View {
             entries: entries
         )
         yAxisMax = MomentumPointAdapter.yAxisMax(for: points)
+        
+        print("[Momentum] points built: \(points.count)")  // Debug: final point count
     }
 }

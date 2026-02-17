@@ -62,6 +62,37 @@ struct ProgressCalculator {
         return min(1.0, max(0.0, total / effectiveTarget))
     }
     
+    /// Cumulative INCREMENT amount for an intention on a given date, up to and including entries at or before a given timestamp.
+    /// Used by Check-In Detail to show "Total today" percent. Only sums INCREMENT entries (TOTAL entries ignored).
+    /// Entries are sorted by createdAt ascending before summing to ensure correct chronological order.
+    /// - Parameters:
+    ///   - entries: All progress entries (caller filters by dateKey/intentionId/intentionSetId, or passes day's entries)
+    ///   - dateKey: YYYY-MM-DD for the day
+    ///   - intentionId: The intention/metric
+    ///   - intentionSetId: The intention set
+    ///   - atOrBeforeCreatedAt: Only include entries whose createdAt <= this date
+    /// - Returns: Sum of INCREMENT amounts for matching entries
+    static func cumulativeIncrementAmountUpTo(
+        entries: [ProgressEntry],
+        dateKey: String,
+        intentionId: String,
+        intentionSetId: String,
+        atOrBeforeCreatedAt: Date
+    ) -> Double {
+        // Match same day, same intention, INCREMENT only, and createdAt at or before cutoff
+        let filtered = entries
+            .filter {
+                $0.dateKey == dateKey
+                && $0.intentionId == intentionId
+                && $0.intentionSetId == intentionSetId
+                && $0.updateType == "INCREMENT"
+                && $0.createdAt <= atOrBeforeCreatedAt
+            }
+        // Sort ascending so we sum in chronological order (defensive if caller passes unsorted data)
+        let sorted = filtered.sorted { $0.createdAt < $1.createdAt }
+        return sorted.reduce(0) { $0 + $1.amount }
+    }
+    
     /// Overall percent complete: average of per-intention %Complete across active intentions with targetValue > 0.
     /// Ignores intentions with targetValue <= 0.
     /// - Parameters:
