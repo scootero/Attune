@@ -144,38 +144,51 @@ class RecorderService: NSObject, ObservableObject {
         stopCurrentRecorder()
         
         // Update session status and finalize last segment
-        guard var session = currentSession else { return }
-        let sessionId = session.id
-        session.endedAt = Date()
+        guard let session = currentSession else { return } // Require an in-memory session anchor
+        let sessionId = session.id // Capture for reuse
+        let latest = SessionStore.shared.loadSession(id: sessionId) ?? session // Reload latest disk state to avoid overwriting newer worker writes
+        var mergedSession = latest // Start from disk state
+        mergedSession.endedAt = Date() // Ensure endedAt is set on the merged copy
         
         // FIX 3: Set status to "processing" ONCE - this is a hard transition
         // After this point, the session should NEVER be saved with status="recording" again
-        session.status = "processing"
+        mergedSession.status = "processing" // Preserve hard transition on the merged copy
         
         // Mark last segment as queued if it exists
-        if !session.segments.isEmpty {
-            let lastIndex = session.segments.count - 1
-            session.segments[lastIndex].endedAt = Date()
-            session.segments[lastIndex].status = "queued"
+        if let lastInMemory = session.segments.last, // Identify the segment RecorderService is finalizing
+           let mergedIndex = mergedSession.segments.firstIndex(where: { $0.id == lastInMemory.id }) { // Match by ID to avoid index drift
+            var mergedSegment = mergedSession.segments[mergedIndex] // Work on the matched segment
+            let hasTranscript = mergedSegment.transcriptText?.isEmpty == false // Check if transcript exists
+            let isDone = mergedSegment.status == "done" // Check if already done
             
-            // Get the segment ID for enqueueing
-            let segmentId = session.segments[lastIndex].id
-            
-            // Persist session state with processing status (ONCE)
-            do {
-                try SessionStore.shared.saveSession(session)
-                print("[RecorderService] ✅ Session \(AppLogger.shortId(sessionId)) transitioned to status=processing (final)")
+            if !isDone && !hasTranscript { // Only modify if not already completed
+                mergedSegment.endedAt = Date() // Finalize end time
+                mergedSegment.status = "queued" // Move to queued for transcription
+                mergedSession.segments[mergedIndex] = mergedSegment // Persist into merged session
                 
-                // Enqueue the last segment for transcription
-                transcriptionQueue?.enqueue(sessionId: session.id, segmentId: segmentId)
-                print("[RecorderService] Enqueued final segment \(segmentId) for transcription")
+                let segmentId = mergedSegment.id // Capture for enqueue
                 
-                // Start async drain process (does not block UI)
-                Task {
-                    await drainAndFinalize(sessionId: sessionId)
+                print("[RecorderService] save:stopRecording session=\(sessionId) summary=\(cappedSegmentSummary(mergedSession.segments))") // Debug summary before save
+                
+                // Persist session state with processing status (ONCE)
+                do {
+                    try SessionStore.shared.saveSession(mergedSession) // Save merged session preserving completed segments
+                    print("[RecorderService] ✅ Session \(AppLogger.shortId(sessionId)) transitioned to status=processing (final)") // Confirmation log
+                    currentSession = mergedSession // Keep in-memory session aligned with disk state
+                    
+                    // Enqueue the last segment for transcription
+                    transcriptionQueue?.enqueue(sessionId: mergedSession.id, segmentId: segmentId) // Queue the finalized segment
+                    print("[RecorderService] Enqueued final segment \(segmentId) for transcription") // Trace enqueue
+                    
+                    // Start async drain process (does not block UI)
+                    Task {
+                        await drainAndFinalize(sessionId: sessionId) // Drain after enqueue
+                    }
+                } catch {
+                    print("Failed to save final session: \(error)") // Error logging
                 }
-            } catch {
-                print("Failed to save final session: \(error)")
+            } else {
+                print("[RecorderService] stopRecording skipped modifying segment \(mergedSegment.index) (done or has transcript)") // Log skip when already done
             }
         }
         
@@ -239,11 +252,15 @@ class RecorderService: NSObject, ObservableObject {
     
     /// Starts recording a new segment
     private func startSegment(index: Int) {
-        guard let session = currentSession else { return }
+        guard let session = currentSession else { return } // Ensure we have an in-memory session to anchor the append
+        
+        let sessionId = session.id // Capture the session ID for disk lookups and logs
+        let latest = SessionStore.shared.loadSession(id: sessionId) ?? session // Reload latest session from disk to avoid overwriting newer worker writes
+        var mergedSession = latest // Work on a mutable copy that includes any worker updates
         
         // Create segment metadata
-        let segmentId = UUID().uuidString
-        let audioFileName = String(format: "segment_%03d.m4a", index)
+        let segmentId = UUID().uuidString // Unique segment identifier
+        let audioFileName = String(format: "segment_%03d.m4a", index) // 1-based filename to match live queue pattern
         
         let segment = Segment(
             id: segmentId,
@@ -252,19 +269,19 @@ class RecorderService: NSObject, ObservableObject {
             startedAt: Date(),
             audioFileName: audioFileName,
             status: "writing"
-        )
+        ) // Build new segment ready to be appended
         
         // Add segment to session
-        var updatedSession = session
-        updatedSession.segments.append(segment)
-        currentSession = updatedSession
+        mergedSession.segments.append(segment) // Append without touching existing segments
+        currentSession = mergedSession // Keep in-memory reference aligned with disk-bound data
         
         // Log segment opened
-        AppLogger.log(AppLogger.SEG, "Segment opened session=\(AppLogger.shortId(session.id)) seg=\(index - 1)")
+        AppLogger.log(AppLogger.SEG, "Segment opened session=\(AppLogger.shortId(session.id)) seg=\(index - 1)") // Trace segment creation
+        print("[RecorderService] save:startSegment session=\(sessionId) summary=\(cappedSegmentSummary(mergedSession.segments))") // Debug summary before save
         
         // Persist session with new segment
         do {
-            try SessionStore.shared.saveSession(updatedSession)
+            try SessionStore.shared.saveSession(mergedSession) // Save merged session that includes latest-from-disk state plus new segment
         } catch {
             print("Failed to save session with new segment: \(error)")
         }
@@ -281,34 +298,43 @@ class RecorderService: NSObject, ObservableObject {
     
     /// Rotates to the next segment (called by rotation timer)
     @objc private func rotateSegment() {
-        guard isRecording, var session = currentSession else { return }
+        guard isRecording, let session = currentSession else { return } // Require active recording and an in-memory anchor
         
         // Stop current recorder and finalize segment
         stopCurrentRecorder()
         
         // Update last segment to "queued" status
-        if !session.segments.isEmpty {
-            let lastIndex = session.segments.count - 1
-            session.segments[lastIndex].endedAt = Date()
-            session.segments[lastIndex].status = "queued"
+        if let lastInMemory = session.segments.last { // Only proceed if we have a segment to close
+            let sessionId = session.id // Capture ID for disk lookups
+            let latest = SessionStore.shared.loadSession(id: sessionId) ?? session // Reload latest session from disk
+            var mergedSession = latest // Start from disk state to avoid overwriting
             
-            // Get the segment ID for enqueueing
-            let segmentId = session.segments[lastIndex].id
-            let segmentIndex = session.segments[lastIndex].index
-            
-            // Log segment closed
-            AppLogger.log(AppLogger.SEG, "Segment closed session=\(AppLogger.shortId(session.id)) seg=\(segmentIndex)")
-            
-            // Persist session update
-            do {
-                try SessionStore.shared.saveSession(session)
-                currentSession = session
+            if let mergedIndex = mergedSession.segments.firstIndex(where: { $0.id == lastInMemory.id }) { // Match segment by ID
+                var mergedSegment = mergedSession.segments[mergedIndex] // Work on matched segment
+                let hasTranscript = mergedSegment.transcriptText?.isEmpty == false // Check transcript presence
+                let isDone = mergedSegment.status == "done" // Check completion
                 
-                // Enqueue segment for transcription after successful persistence
-                transcriptionQueue?.enqueue(sessionId: session.id, segmentId: segmentId)
-                print("[RecorderService] Enqueued segment \(segmentId) for transcription")
-            } catch {
-                print("Failed to save session after rotation: \(error)")
+                if !isDone && !hasTranscript { // Only modify if not already completed
+                    mergedSegment.endedAt = Date() // Finalize end time
+                    mergedSegment.status = "queued" // Move to queued for transcription
+                    mergedSession.segments[mergedIndex] = mergedSegment // Persist into merged session
+                    
+                    AppLogger.log(AppLogger.SEG, "Segment closed session=\(AppLogger.shortId(session.id)) seg=\(mergedSegment.index)") // Trace closure
+                    print("[RecorderService] save:rotateSegment session=\(sessionId) summary=\(cappedSegmentSummary(mergedSession.segments))") // Debug summary before save
+                    
+                    do {
+                        try SessionStore.shared.saveSession(mergedSession) // Save merged state
+                        currentSession = mergedSession // Keep in-memory aligned
+                        
+                        // Enqueue segment for transcription after successful persistence
+                        transcriptionQueue?.enqueue(sessionId: mergedSession.id, segmentId: mergedSegment.id) // Queue this segment
+                        print("[RecorderService] Enqueued segment \(mergedSegment.id) for transcription") // Trace enqueue
+                    } catch {
+                        print("Failed to save session after rotation: \(error)") // Error logging
+                    }
+                } else {
+                    print("[RecorderService] rotateSegment skipped modifying segment \(mergedSegment.index) (done or has transcript)") // Log skip if already completed
+                }
             }
         }
         
@@ -409,7 +435,10 @@ class RecorderService: NSObject, ObservableObject {
     
     /// Handles the beginning of an audio interruption
     private func handleInterruptionBegan(userInfo: [AnyHashable: Any]) {
-        guard isRecording, var session = currentSession else { return }
+        guard isRecording, let session = currentSession else { return } // Require active recording and session anchor
+        let sessionId = session.id // Capture session ID for disk lookups
+        let latest = SessionStore.shared.loadSession(id: sessionId) ?? session // Reload latest session to avoid overwriting worker changes
+        var mergedSession = latest // Work on merged copy
         
         // Extract interruption reason if available (for logging purposes)
         let reason: String
@@ -439,78 +468,92 @@ class RecorderService: NSObject, ObservableObject {
         stopTimers()
         
         // Track if we have any valid segments to process
-        var hasValidSegments = false
+        var hasValidSegments = false // Initialize validity tracker
         
         // Finalize current segment if it exists
-        if !session.segments.isEmpty {
-            let lastIndex = session.segments.count - 1
-            session.segments[lastIndex].endedAt = Date()
+        if let lastInMemory = session.segments.last, // Only finalize if a segment exists
+           let mergedIndex = mergedSession.segments.firstIndex(where: { $0.id == lastInMemory.id }) { // Match by ID to avoid index drift
+            var mergedSegment = mergedSession.segments[mergedIndex] // Work on matched segment
+            let hasTranscript = mergedSegment.transcriptText?.isEmpty == false // Check transcript presence
+            let isDone = mergedSegment.status == "done" // Check completion
             
-            // Check if audio file exists and has content before enqueueing
-            let audioFileName = session.segments[lastIndex].audioFileName
-            let audioURL = AppPaths.audioFileURL(sessionId: session.id, audioFileName: audioFileName)
-            
-            if FileManager.default.fileExists(atPath: audioURL.path),
-               let attrs = try? FileManager.default.attributesOfItem(atPath: audioURL.path),
-               let fileSize = attrs[.size] as? Int64, fileSize > 0 {
-                // File exists and has content → enqueue for transcription
-                session.segments[lastIndex].status = "queued"
-                let segmentId = session.segments[lastIndex].id
-                hasValidSegments = true
+            if !isDone && !hasTranscript { // Only modify if not already completed
+                mergedSegment.endedAt = Date() // Finalize end time
                 
-                AppLogger.log(AppLogger.SEG, "Segment finalized after interruption session=\(AppLogger.shortId(session.id)) seg=\(lastIndex) status=queued")
+                // Check if audio file exists and has content before enqueueing
+                let audioFileName = mergedSegment.audioFileName // Use stored filename
+                let audioURL = AppPaths.audioFileURL(sessionId: session.id, audioFileName: audioFileName) // Resolve path
                 
-                // Enqueue for transcription after persisting
-                transcriptionQueue?.enqueue(sessionId: session.id, segmentId: segmentId)
+                if FileManager.default.fileExists(atPath: audioURL.path),
+                   let attrs = try? FileManager.default.attributesOfItem(atPath: audioURL.path),
+                   let fileSize = attrs[.size] as? Int64, fileSize > 0 { // Validate audio presence
+                    // File exists and has content → enqueue for transcription
+                    mergedSegment.status = "queued" // Move to queued for later processing
+                    let segmentId = mergedSegment.id // Capture ID for enqueue
+                    mergedSession.segments[mergedIndex] = mergedSegment // Persist changes locally
+                    hasValidSegments = true // Note presence of valid work
+                    
+                    AppLogger.log(AppLogger.SEG, "Segment finalized after interruption session=\(AppLogger.shortId(session.id)) seg=\(mergedSegment.index) status=queued") // Trace finalization
+                    
+                    // Enqueue for transcription after persisting
+                    transcriptionQueue?.enqueue(sessionId: mergedSession.id, segmentId: segmentId) // Queue the segment
+                } else {
+                    // No file or empty → mark failed (but don't fail the entire session)
+                    mergedSegment.status = "failed" // Mark as failed due to missing/empty audio
+                    mergedSegment.error = "Audio file missing or empty after interruption" // Capture error
+                    mergedSession.segments[mergedIndex] = mergedSegment // Persist locally
+                    
+                    AppLogger.log(AppLogger.ERR, "Segment failed after interruption session=\(AppLogger.shortId(session.id)) seg=\(mergedSegment.index) reason=no audio") // Log failure
+                }
             } else {
-                // No file or empty → mark failed (but don't fail the entire session)
-                session.segments[lastIndex].status = "failed"
-                session.segments[lastIndex].error = "Audio file missing or empty after interruption"
-                
-                AppLogger.log(AppLogger.ERR, "Segment failed after interruption session=\(AppLogger.shortId(session.id)) seg=\(lastIndex) reason=no audio")
+                print("[RecorderService] interruption skip segment \(mergedSegment.index) (done or has transcript)") // Log skip when completed
             }
         }
         
         // FIX 3: Update session status with hard transition (never revert to "recording")
-        session.endedAt = Date()
+        mergedSession.endedAt = Date() // Finalize session end time on merged copy
         
         // If we have valid segments, treat this as a successful recording that was interrupted
         // Set status to "processing" so it will be transcribed and finalized normally
-        if hasValidSegments {
+        if hasValidSegments { // If we captured any valid work
             // FIX 3: Hard transition to "processing" - never save as "recording" again
-            session.status = "processing"
+            mergedSession.status = "processing" // Move session to processing on merged copy
             // Store interruption info in lastError for reference, but don't treat as failure
-            session.lastError = "Recording interrupted by \(reason) - saved successfully"
+            mergedSession.lastError = "Recording interrupted by \(reason) - saved successfully" // Preserve interruption note
             
-            AppLogger.log(AppLogger.REC, "Session interrupted but saved session=\(AppLogger.shortId(session.id)) status=processing segments=\(session.segments.count)")
+            AppLogger.log(AppLogger.REC, "Session interrupted but saved session=\(AppLogger.shortId(session.id)) status=processing segments=\(mergedSession.segments.count)") // Trace session status change
+            print("[RecorderService] save:interruption session=\(sessionId) summary=\(cappedSegmentSummary(mergedSession.segments))") // Debug summary before save
             
             // Persist session with processing status (ONCE)
             do {
-                try SessionStore.shared.saveSession(session)
-                print("[RecorderService] ✅ Session \(AppLogger.shortId(session.id)) transitioned to status=processing after interruption (final)")
-                AppLogger.log(AppLogger.STORE, "Session saved after interruption session=\(AppLogger.shortId(session.id)) status=processing")
+                try SessionStore.shared.saveSession(mergedSession) // Save merged state
+                currentSession = mergedSession // Keep in-memory aligned
+                print("[RecorderService] ✅ Session \(AppLogger.shortId(session.id)) transitioned to status=processing after interruption (final)") // Confirmation log
+                AppLogger.log(AppLogger.STORE, "Session saved after interruption session=\(AppLogger.shortId(session.id)) status=processing") // Store log
                 
                 // Start async drain and finalize process (same as normal stop)
-                let sessionId = session.id
+                let sessionId = mergedSession.id // Capture for async
                 Task {
-                    await drainAndFinalize(sessionId: sessionId)
+                    await drainAndFinalize(sessionId: sessionId) // Drain after interruption
                 }
             } catch {
-                AppLogger.log(AppLogger.ERR, "Failed to persist session after interruption session=\(AppLogger.shortId(session.id)) error=\(error.localizedDescription)")
+                AppLogger.log(AppLogger.ERR, "Failed to persist session after interruption session=\(AppLogger.shortId(session.id)) error=\(error.localizedDescription)") // Error log
             }
         } else {
             // No valid segments → mark as error (nothing to save)
-            session.status = "error"
-            session.lastError = "Interruption: \(reason) - no valid audio captured"
+            mergedSession.status = "error" // Mark session as errored
+            mergedSession.lastError = "Interruption: \(reason) - no valid audio captured" // Capture reason
             
-            AppLogger.log(AppLogger.ERR, "Session interrupted with no valid audio session=\(AppLogger.shortId(session.id)) status=error")
+            AppLogger.log(AppLogger.ERR, "Session interrupted with no valid audio session=\(AppLogger.shortId(session.id)) status=error") // Trace error path
+            print("[RecorderService] save:interruption-no-valid session=\(sessionId) summary=\(cappedSegmentSummary(mergedSession.segments))") // Debug summary before save
             
             // Persist session with error status
             do {
-                try SessionStore.shared.saveSession(session)
-                AppLogger.log(AppLogger.STORE, "Session saved after interruption session=\(AppLogger.shortId(session.id)) status=error")
+                try SessionStore.shared.saveSession(mergedSession) // Save merged error state
+                currentSession = mergedSession // Keep in-memory aligned
+                AppLogger.log(AppLogger.STORE, "Session saved after interruption session=\(AppLogger.shortId(session.id)) status=error") // Store log
             } catch {
-                AppLogger.log(AppLogger.ERR, "Failed to persist session after interruption session=\(AppLogger.shortId(session.id)) error=\(error.localizedDescription)")
+                AppLogger.log(AppLogger.ERR, "Failed to persist session after interruption session=\(AppLogger.shortId(session.id)) error=\(error.localizedDescription)") // Error log
             }
         }
         
@@ -532,6 +575,25 @@ class RecorderService: NSObject, ObservableObject {
         
         // Do not auto-resume - user must manually start new recording
     }
+}
+
+// MARK: - Debug helpers
+
+private func describeSegments(_ segments: [Segment]) -> String { // Builds a readable description for each segment
+    return segments.map { segment in // Map each segment to a short string
+        let transcriptChars = segment.transcriptText?.count ?? 0 // Count transcript length safely
+        return "seg \(segment.index) status=\(segment.status) transcriptChars=\(transcriptChars) audio=\(segment.audioFileName)" // Compose description for this segment
+    }.joined(separator: " | ") // Join all descriptions with separators
+}
+
+private func cappedSegmentSummary(_ segments: [Segment]) -> String { // Limits summary to head/tail to keep logs short
+    let total = segments.count // Total segment count
+    if total <= 10 { // If small, show all
+        return describeSegments(segments) // Return full description
+    }
+    let head = Array(segments.prefix(5)) // Take first five segments
+    let tail = Array(segments.suffix(5)) // Take last five segments
+    return describeSegments(head) + " ... " + describeSegments(tail) // Combine head and tail with ellipsis
 }
 
 // MARK: - AVAudioRecorderDelegate

@@ -15,8 +15,7 @@ private enum SessionsSubTab {
 }
 
 struct LibraryView: View {
-    /// Selected tab: Sessions, Segments, or Insights
-    @State private var selectedTab: LibraryTab = .sessions
+    @EnvironmentObject var appRouter: AppRouter
     
     /// When Sessions is selected: All-day or Check-ins sub-tab
     @State private var sessionsSubTab: SessionsSubTab = .allDay
@@ -30,17 +29,18 @@ struct LibraryView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Top-level segmented picker
-                Picker("View", selection: $selectedTab) {
+                // Top-level segmented picker (Sessions, Segments, Insights, Momentum)
+                Picker("View", selection: $appRouter.selectedLibraryTab) {
                     Text("Sessions").tag(LibraryTab.sessions)
                     Text("Segments").tag(LibraryTab.segments)
                     Text("Insights").tag(LibraryTab.insights)
+                    Text("Momentum").tag(LibraryTab.momentum)
                 }
                 .pickerStyle(.segmented)
                 .padding()
                 
                 // When Sessions tab: show All-day | Check-ins sub-picker
-                if selectedTab == .sessions {
+                if appRouter.selectedLibraryTab == .sessions {
                     Picker("Sessions content", selection: $sessionsSubTab) {
                         Text("All-day").tag(SessionsSubTab.allDay)
                         Text("Check-ins").tag(SessionsSubTab.checkIns)
@@ -53,7 +53,7 @@ struct LibraryView: View {
                 // Content based on selected tab
                 contentView
             }
-            .navigationTitle("Library")
+            .navigationTitle(appRouter.selectedLibraryTab == .momentum ? "Momentum" : "Library")
             .onAppear {
                 loadData()
             }
@@ -66,7 +66,7 @@ struct LibraryView: View {
     /// Content for current tab selection
     @ViewBuilder
     private var contentView: some View {
-        switch selectedTab {
+        switch appRouter.selectedLibraryTab {
         case .sessions:
             sessionsContentView
         case .segments:
@@ -77,6 +77,9 @@ struct LibraryView: View {
             }
         case .insights:
             InsightsListView()
+        case .momentum:
+            // Use date provided by router (e.g., from Home tap) or default to today
+            MomentumView(selectedDate: appRouter.momentumSelectedDate ?? Date())
         }
     }
     
@@ -120,13 +123,15 @@ struct LibraryView: View {
     }
 }
 
-/// Represents the three tabs in Library view
+/// Represents the tabs in Library view
 enum LibraryTab {
     case sessions
     case segments
     case insights
+    case momentum
 }
 
 #Preview {
     LibraryView()
+        .environmentObject(AppRouter())
 }

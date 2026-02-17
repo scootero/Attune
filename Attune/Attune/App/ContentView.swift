@@ -7,10 +7,13 @@
 
 import SwiftUI
 
-// ContentView now simply loads the RootTabView (the main app shell)
+// ContentView creates AppRouter and passes it down so Home can navigate to Library → Momentum.
 struct ContentView: View {
+    @StateObject private var appRouter = AppRouter()
+
     var body: some View {
         RootTabView()
+            .environmentObject(appRouter)
     }
 }
 

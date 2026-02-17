@@ -193,12 +193,17 @@ class TranscriptionQueue: ObservableObject {
                     
                     // FIX: Mark segments with missing audio as failed so they become terminal.
                     // Otherwise session stays "processing" forever (recovery skips them, nothing finalizes).
-                    if !audioExists {
-                        session.segments[segmentIndex].status = "failed"
-                        session.segments[segmentIndex].error = "Audio file not found"
-                        sessionModified = true
-                        totalMarkedMissingAudio += 1
-                        AppLogger.log(AppLogger.QUE, "[RECOVERY] Segment \(segment.index) marked failed session=\(AppLogger.shortId(session.id)) reason=missing_audio")
+                    if !audioExists { // Only act when audio is missing
+                        let hasTranscriptAlready = segment.transcriptText?.isEmpty == false // Check if transcript exists
+                        let isDoneAlready = segment.status == "done" // Check if status is done
+                        if isDoneAlready || hasTranscriptAlready { // Skip if segment is already complete
+                            continue // Do not mark missing audio for completed segments
+                        }
+                        session.segments[segmentIndex].status = "failed" // Mark as failed to finalize
+                        session.segments[segmentIndex].error = "Audio file not found" // Capture missing audio reason
+                        sessionModified = true // Track modification
+                        totalMarkedMissingAudio += 1 // Increment counter
+                        AppLogger.log(AppLogger.QUE, "[RECOVERY] Segment \(segment.index) marked failed session=\(AppLogger.shortId(session.id)) reason=missing_audio") // Log decision
                     }
                 }
             }
@@ -363,6 +368,8 @@ class TranscriptionQueue: ObservableObject {
             session.segments[segmentIndex] = segment
             
             // Save session before deleting audio
+            let transcriptChars = transcript.count // Count transcript length for logging
+            print("[TranscriptionQueue] save:done session=\(workItem.sessionId) seg=\(segment.index) transcriptChars=\(transcriptChars) audio=\(segment.audioFileName)") // Debug summary before save/delete
             try SessionStore.shared.saveSession(session)
             
             // Log successful save with status confirmation (helps debug status persistence issues)
@@ -410,6 +417,7 @@ class TranscriptionQueue: ObservableObject {
                 session.segments[segmentIndex] = segment
                 
                 // Save session
+                print("[TranscriptionQueue] save:done-no-speech session=\(workItem.sessionId) seg=\(segment.index) transcriptChars=0 audio=\(segment.audioFileName)") // Debug summary before save/delete for silence
                 do {
                     try SessionStore.shared.saveSession(session)
                     // Log successful save with status confirmation

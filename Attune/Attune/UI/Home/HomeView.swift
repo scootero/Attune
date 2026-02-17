@@ -45,6 +45,7 @@ private struct IntentionProgressRow: Identifiable {
 }
 
 struct HomeView: View {
+    @EnvironmentObject var appRouter: AppRouter
     @StateObject private var checkInRecorder = CheckInRecorderService.shared
     @State private var state: CheckInState = .idle
     @State private var todaysProgress: [IntentionProgressRow] = []
@@ -294,59 +295,94 @@ struct HomeView: View {
     
     // MARK: - B2) Weekly Momentum Card (Slice B: lighter)
     
-    /// Slice B: Bars with subtle teal glow; bar colors carry meaning.
+    /// Slice B: Bars with red→yellow→green gradient by progress; tap navigates to Library → Momentum tab.
     private var weeklyMomentumCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Weekly Momentum")
-                .font(.caption)
-                .foregroundColor(.gray)
-            
-            HStack(spacing: 8) {
-                ForEach(weekMomentum.days) { day in
-                    VStack(spacing: 6) {
-                        if day.isFutureDay {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(Color.clear)
-                                .frame(width: 8, height: 16)
-                        } else {
-                            let ratio = day.completionRatio ?? 0
-                            let barHeight = max(6, CGFloat(ratio) * 48)
-                            let barColor = colorForMomentumTier(day.tier)
-                            ZStack(alignment: .bottom) {
-                                // Glow layer behind filled bar (soft bloom)
+        Button(action: {
+            appRouter.navigateToMomentum(date: Date())  // Jump to Library → Momentum showing today
+        }) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Weekly Momentum")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                
+                HStack(spacing: 8) {
+                    ForEach(weekMomentum.days) { day in
+                        VStack(spacing: 6) {
+                            if day.isFutureDay {
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(barColor)
-                                    .blur(radius: 4)
-                                    .opacity(0.5)
-                                    .frame(width: 8, height: barHeight)
-                                // Main filled bar with shadow
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(barColor)
-                                    .frame(width: 8, height: barHeight)
-                                    .shadow(color: barColor.opacity(0.6), radius: 4, x: 0, y: 2)
+                                    .fill(Color.clear)
+                                    .frame(width: 8, height: 16)
+                            } else {
+                                let ratio = day.completionRatio ?? 0
+                                let barHeight = max(6, CGFloat(ratio) * 48)
+                                let barColor = colorForProgressRatio(ratio)
+                                ZStack(alignment: .bottom) {
+                                    // Glow layer behind filled bar (soft bloom)
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(barColor)
+                                        .blur(radius: 4)
+                                        .opacity(0.5)
+                                        .frame(width: 8, height: barHeight)
+                                    // Main filled bar with shadow
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(barColor)
+                                        .frame(width: 8, height: barHeight)
+                                        .shadow(color: barColor.opacity(0.6), radius: 4, x: 0, y: 2)
+                                }
+                                .frame(width: 8, height: 48)
                             }
-                            .frame(width: 8, height: 48)
+                            Text(day.weekdayLetter)
+                                .font(.caption2)
+                                .foregroundColor(.gray)
                         }
-                        Text(day.weekdayLetter)
-                            .font(.caption2)
-                            .foregroundColor(.gray)
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
                 }
+                .padding(.vertical, 10)
+                
+                // Tap affordance: small chevron + faint gradient edge to communicate "tap for details"
+                HStack {
+                    Spacer()
+                    Image(systemName: "chevron.up")
+                        .font(.caption2)
+                        .foregroundColor(NeonPalette.neonTeal.opacity(0.7))
+                }
+                .padding(.top, 4)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [Color.clear, NeonPalette.neonTeal.opacity(0.08)]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
-            .padding(.vertical, 10)
+            .padding(16)
         }
-        .padding(16)
+        .buttonStyle(.plain)
         .glassCard()
     }
     
-    private func colorForMomentumTier(_ tier: MomentumTier) -> Color {
-        switch tier {
-        case .veryLow: return Color(red: 0.9, green: 0.3, blue: 0.25)
-        case .low: return Color(red: 0.95, green: 0.5, blue: 0.2)
-        case .neutral: return Color.gray
-        case .good: return Color(red: 0.3, green: 0.7, blue: 0.5)
-        case .great: return Color(red: 0.2, green: 0.8, blue: 0.5)
+    /// Bar color by progress ratio: 0%=red glow, partial=yellow, 80%+=green, 100%=bright green.
+    private func colorForProgressRatio(_ ratio: Double) -> Color {
+        let red = Color(red: 0.95, green: 0.25, blue: 0.2)
+        let orange = Color(red: 0.95, green: 0.5, blue: 0.2)
+        let yellow = Color(red: 0.95, green: 0.75, blue: 0.2)
+        let yellowGreen = Color(red: 0.5, green: 0.8, blue: 0.3)
+        let green = Color(red: 0.2, green: 0.9, blue: 0.4)
+        let superGreen = Color(red: 0.15, green: 0.95, blue: 0.5)
+
+        switch ratio {
+        case 0: return red
+        case ..<0.25:
+            return red.mix(with: orange, by: ratio / 0.25)
+        case 0.25..<0.5:
+            return orange.mix(with: yellow, by: (ratio - 0.25) / 0.25)
+        case 0.5..<0.8:
+            return yellow.mix(with: yellowGreen, by: (ratio - 0.5) / 0.3)
+        case 0.8..<1.0:
+            return yellowGreen.mix(with: green, by: (ratio - 0.8) / 0.2)
+        default:
+            return superGreen
         }
     }
     
@@ -903,4 +939,5 @@ struct HomeView: View {
 
 #Preview {
     HomeView()
+        .environmentObject(AppRouter())
 }

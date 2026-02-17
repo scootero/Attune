@@ -3,53 +3,58 @@
 //  Attune
 //
 //  Bottom tab bar with Home, All Day, Library, Settings, and Progress tabs.
-//  Wires shared instances (RecorderService + TranscriptionQueue).
+//  Uses AppRouter so Home momentum card can switch to Library → Momentum tab.
 //
 
 import SwiftUI
 
 struct RootTabView: View {
-    
+    @EnvironmentObject var appRouter: AppRouter
+
     // Track whether recovery has been performed to avoid running it multiple times
     @State private var hasPerformedRecovery = false
-    
+
     init() {
         // Wire up dependency: inject TranscriptionQueue into RecorderService
-        // This allows RecorderService to enqueue segments when they're closed
         RecorderService.shared.transcriptionQueue = TranscriptionQueue.shared
     }
-    
+
     var body: some View {
-        TabView {
-            // Tab 1: Home — stub for future daily intentions
+        TabView(selection: $appRouter.selectedRootTab) {
+            // Tab 1: Home — daily intentions, momentum card taps to Library → Momentum
             HomeView()
                 .tabItem {
                     Label("Home", systemImage: "house.fill")
                 }
+                .tag(RootTab.home)
             
-            // Tab 2: All Day — continuous recording screen (renamed from Record; UI only)
+            // Tab 2: All Day — continuous recording screen
             HomeRecordView()
                 .tabItem {
                     Label("All Day", systemImage: "record.circle")
                 }
+                .tag(RootTab.allDay)
             
-            // Tab 3: Library — browse sessions and segments
+            // Tab 3: Library — browse sessions, segments, insights, momentum
             LibraryView()
                 .tabItem {
                     Label("Library", systemImage: "books.vertical.fill")
                 }
+                .tag(RootTab.library)
             
             // Tab 4: Settings — app settings and logs
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
+                .tag(RootTab.settings)
             
-            // Tab 5: Progress — stub for future goals/tracking
+            // Tab 5: Progress — goals and tracking
             ProgressView()
                 .tabItem {
                     Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
                 }
+                .tag(RootTab.progress)
         }
         .onAppear {
             // Perform recovery on first appearance only
@@ -85,4 +90,5 @@ struct RootTabView: View {
 
 #Preview {
     RootTabView()
+        .environmentObject(AppRouter())
 }
