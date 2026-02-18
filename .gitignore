@@ -1,3 +1,5 @@
 .DS_Store
 Attune/Attune/AI/Secrets.swift
 /Attune/Attune/AI/Secrets.swift
+xcuserdata/
+*.xcuserstate

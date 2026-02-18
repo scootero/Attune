@@ -49,12 +49,14 @@ struct RootTabView: View {
                 }
                 .tag(RootTab.settings)
             
-            // Tab 5: Progress — goals and tracking
-            ProgressView()
+            // Tab 5: Momentum — charted daily progress now lives here
+            NavigationStack { // Provide navigation container for Momentum when used as root tab
+                MomentumView(selectedDate: appRouter.momentumSelectedDate ?? Date()) // Show Momentum screen and seed date from router when available
+            }
                 .tabItem {
-                    Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
+                    Label("Momentum", systemImage: "chart.line.uptrend.xyaxis") // Rename tab to Momentum while reusing chart icon
                 }
-                .tag(RootTab.progress)
+                .tag(RootTab.progress) // Keep enum tag unchanged to avoid churn elsewhere
         }
         .onAppear {
             // Perform recovery on first appearance only

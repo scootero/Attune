@@ -5,113 +5,111 @@
 //  Progress tab: Daily Totals (last 7 days) and Per Goal views. Slice 6.
 //
 
-import SwiftUI
+import SwiftUI // Import SwiftUI for view definitions
 
-private enum ProgressTab: String, CaseIterable {
-    case dailyTotals = "Daily Totals"
-    case perGoal = "Per Goal"
+fileprivate enum ProgressTab: String, CaseIterable { // Make enum fileprivate so ProgressContentView can access it within this file
+    case dailyTotals = "Daily Totals" // Tab for daily totals list
+    case perGoal = "Per Goal" // Tab for per-goal list
 }
 
 /// Route value for DayDetail
-private struct DayDetailRoute: Hashable {
-    let dateKey: String
+fileprivate struct DayDetailRoute: Hashable { // Filewide visibility so ProgressContentView can route to day details
+    let dateKey: String // Date key identifying the selected day
 }
 
 /// Route value for IntentionDetail (uses id to look up from intentionRows)
-private struct IntentionDetailRoute: Hashable {
-    let intentionId: String
+fileprivate struct IntentionDetailRoute: Hashable { // Filewide visibility so ProgressContentView can route to intention details
+    let intentionId: String // Intention identifier used for lookup
 }
 
-struct ProgressView: View {
-    @State private var selectedTab: ProgressTab = .dailyTotals
-    @State private var dayRows: [DayRow] = []
-    @State private var intentionRows: [IntentionRow] = []
+struct ProgressContentView: View { // Hosts the Progress UI without its own NavigationStack so Library can embed it
+    @State private var selectedTab: ProgressTab = .dailyTotals // Track which progress tab is selected
+    @State private var dayRows: [DayRow] = [] // Cached daily rows for the Daily Totals tab
+    @State private var intentionRows: [IntentionRow] = [] // Cached intention rows for the Per Goal tab
     
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                Picker("View", selection: $selectedTab) {
-                    ForEach(ProgressTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding()
-                
-                switch selectedTab {
-                case .dailyTotals:
-                    dailyTotalsContent
-                case .perGoal:
-                    perGoalContent
+    var body: some View { // Main body for the embeddable progress content
+        VStack(spacing: 0) { // Stack picker and tab content vertically with no spacing
+            Picker("View", selection: $selectedTab) { // Segmented control to switch between tabs
+                ForEach(ProgressTab.allCases, id: \.self) { tab in // Iterate through available tabs
+                    Text(tab.rawValue).tag(tab) // Label each segment and bind selection
                 }
             }
-            .navigationTitle("Progress")
-            .navigationDestination(for: DayDetailRoute.self) { route in
-                DayDetailView(dateKey: route.dateKey)
+            .pickerStyle(.segmented) // Use segmented control style
+            .padding() // Add standard padding around the picker
+            
+            switch selectedTab { // Render content based on selected tab
+            case .dailyTotals: // Daily Totals tab selected
+                dailyTotalsContent // Show daily totals list
+            case .perGoal: // Per Goal tab selected
+                perGoalContent // Show per-goal list
             }
-            .navigationDestination(for: IntentionDetailRoute.self) { route in
-                IntentionDetailRouteView(intentionId: route.intentionId, intentionRows: intentionRows)
-            }
-            .onAppear {
-                loadData()
-            }
+        }
+        .navigationTitle("Progress") // Set the navigation title for the embedded content
+        .navigationDestination(for: DayDetailRoute.self) { route in // Register destination for day detail navigation
+            DayDetailView(dateKey: route.dateKey) // Show day detail for the selected date
+        }
+        .navigationDestination(for: IntentionDetailRoute.self) { route in // Register destination for intention detail navigation
+            IntentionDetailRouteView(intentionId: route.intentionId, intentionRows: intentionRows) // Show intention detail using cached rows
+        }
+        .onAppear { // Load data when the view appears
+            loadData() // Refresh both day and intention rows
         }
     }
     
     // MARK: - Daily Totals
     
-    private var dailyTotalsContent: some View {
-        List {
-                ForEach(dayRows) { row in
-                NavigationLink(value: DayDetailRoute(dateKey: row.dateKey)) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(formatDate(row.date))
-                                .font(.headline)
-                            if let mood = row.moodLabel, !mood.isEmpty {
-                                Text(mood)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+    private var dailyTotalsContent: some View { // List showing recent daily totals
+        List { // Use List for rows
+                ForEach(dayRows) { row in // Iterate through daily rows
+                NavigationLink(value: DayDetailRoute(dateKey: row.dateKey)) { // Navigate to day detail on tap
+                    HStack { // Layout date and percent horizontally
+                        VStack(alignment: .leading, spacing: 4) { // Left column with date and mood
+                            Text(formatDate(row.date)) // Display formatted date
+                                .font(.headline) // Use headline font for date
+                            if let mood = row.moodLabel, !mood.isEmpty { // Only show mood when available
+                                Text(mood) // Display mood label
+                                    .font(.caption) // Use caption font for mood
+                                    .foregroundColor(.secondary) // Secondary color for mood text
                             }
                         }
-                        Spacer()
-                        Text("\(Int(row.overallPercent * 100))%")
-                            .font(.headline.monospacedDigit())
-                            .foregroundColor(.secondary)
+                        Spacer() // Push percent to the trailing edge
+                        Text("\(Int(row.overallPercent * 100))%") // Show overall percent for the day
+                            .font(.headline.monospacedDigit()) // Use monospaced digits for alignment
+                            .foregroundColor(.secondary) // Secondary color for percent text
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 4) // Add vertical padding to the row
                 }
             }
         }
     }
     
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
+    private func formatDate(_ date: Date) -> String { // Helper to format dates for list display
+        let formatter = DateFormatter() // Create date formatter
+        formatter.dateStyle = .medium // Medium date style (e.g., Feb 17, 2026)
+        return formatter.string(from: date) // Return formatted date string
     }
     
     // MARK: - Per Goal
     
-    private var perGoalContent: some View {
-        Group {
-            if intentionRows.isEmpty {
-                ContentUnavailableView(
-                    "No intentions",
-                    systemImage: "target",
-                    description: Text("Add intentions on the Home tab to track progress per goal.")
+    private var perGoalContent: some View { // List showing per-goal targets
+        Group { // Group to handle empty vs populated states
+            if intentionRows.isEmpty { // When no intentions exist
+                ContentUnavailableView( // Show empty state view
+                    "No intentions", // Title for empty state
+                    systemImage: "target", // Icon for empty state
+                    description: Text("Add intentions on the Home tab to track progress per goal.") // Guidance text for user
                 )
-            } else {
-                List {
-                    ForEach(intentionRows) { row in
-                        NavigationLink(value: IntentionDetailRoute(intentionId: row.intention.id)) {
-                            HStack {
-                                Text(row.intention.title)
-                                    .font(.body)
-                                Spacer()
-                                Text("\(Int(row.intention.targetValue)) \(row.intention.unit)/\(row.intention.timeframe)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+            } else { // When intentions exist
+                List { // Show intentions list
+                    ForEach(intentionRows) { row in // Iterate through intention rows
+                        NavigationLink(value: IntentionDetailRoute(intentionId: row.intention.id)) { // Navigate to intention detail on tap
+                            HStack { // Layout title and target
+                                Text(row.intention.title) // Show intention title
+                                    .font(.body) // Body font for title
+                                Spacer() // Push target to trailing edge
+                                Text("\(Int(row.intention.targetValue)) \(row.intention.unit)/\(row.intention.timeframe)") // Show target and timeframe
+                                    .font(.caption) // Caption font for target
+                                    .foregroundColor(.secondary) // Secondary color for target text
                             }
                         }
                     }
@@ -122,12 +120,20 @@ struct ProgressView: View {
     
     // MARK: - Data
     
-    private func loadData() {
-        dayRows = ProgressDataHelper.loadDayRows()
-        intentionRows = ProgressDataHelper.loadIntentionRows()
+    private func loadData() { // Load data for both tabs
+        dayRows = ProgressDataHelper.loadDayRows() // Populate day rows from helper
+        intentionRows = ProgressDataHelper.loadIntentionRows() // Populate intention rows from helper
     }
 }
 
-#Preview {
-    ProgressView()
+struct ProgressView: View { // Thin wrapper to host ProgressContentView inside its own NavigationStack when used standalone
+    var body: some View { // Body for standalone Progress tab usage
+        NavigationStack { // Provide navigation container for the progress screen
+            ProgressContentView() // Embed the reusable progress content
+        }
+    }
+}
+
+#Preview { // Preview for Xcode canvas
+    ProgressView() // Preview the standalone Progress view
 }

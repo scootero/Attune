@@ -27,14 +27,14 @@ struct LibraryView: View {
     @State private var checkIns: [CheckIn] = []
     
     var body: some View {
-        NavigationView {
+        NavigationStack {  // Use NavigationStack so ProgressContentView's navigationDestination works (NavigationView does not support it)
             VStack(spacing: 0) {
                 // Top-level segmented picker (Sessions, Segments, Insights, Momentum)
                 Picker("View", selection: $appRouter.selectedLibraryTab) {
                     Text("Sessions").tag(LibraryTab.sessions)
                     Text("Segments").tag(LibraryTab.segments)
                     Text("Insights").tag(LibraryTab.insights)
-                    Text("Momentum").tag(LibraryTab.momentum)
+                    Text("Progress").tag(LibraryTab.momentum) // Rename tab label to Progress while keeping enum for minimal churn
                 }
                 .pickerStyle(.segmented)
                 .padding()
@@ -53,7 +53,7 @@ struct LibraryView: View {
                 // Content based on selected tab
                 contentView
             }
-            .navigationTitle(appRouter.selectedLibraryTab == .momentum ? "Momentum" : "Library")
+            .navigationTitle(appRouter.selectedLibraryTab == .momentum ? "Progress" : "Library") // Show Progress title when the repurposed tab is selected
             .onAppear {
                 loadData()
             }
@@ -78,10 +78,7 @@ struct LibraryView: View {
         case .insights:
             InsightsListView()
         case .momentum:
-            // Use date provided by router (e.g., from Home tap) or default to today
-            let date = appRouter.momentumSelectedDate ?? Date()
-            MomentumView(selectedDate: date)
-                .id(date)  // Force view recreate when router date changes (ensures fresh load)
+            ProgressContentView() // Show Progress content inside Library for the renamed tab
         }
     }
     

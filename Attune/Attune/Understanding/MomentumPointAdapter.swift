@@ -27,6 +27,8 @@ struct MomentumPointAdapter {
         checkIns: [CheckIn],
         entries: [ProgressEntry]
     ) -> [MomentumPoint] {
+        let checkInIds = Set(checkIns.map { $0.id }) // Debug: collect check-in ids to measure linkage
+        let linkedEntriesCount = entries.filter { checkInIds.contains($0.sourceCheckInId) }.count // Debug: how many entries are linked to a known check-in
         // Try primary path: check-ins with linked entries
         let fromCheckIns = buildPointsFromCheckIns(
             dateKey: dateKey,
@@ -35,15 +37,20 @@ struct MomentumPointAdapter {
             checkIns: checkIns,
             entries: entries
         )
-        if !fromCheckIns.isEmpty { return fromCheckIns }
+        if !fromCheckIns.isEmpty { // Debug: path succeeded using check-ins
+            print("[Momentum] adapterPath=checkIns checkIns=\(checkIns.count) entries=\(entries.count) linkedEntries=\(linkedEntriesCount)") // Debug: log primary path usage
+            return fromCheckIns // Debug: return check-in derived points
+        }
 
         // Fallback: entries only (use entry.createdAt as timestamp)
-        return buildPointsFromEntriesOnly(
+        let fromEntriesOnly = buildPointsFromEntriesOnly(
             dateKey: dateKey,
             intentionSet: intentionSet,
             intentions: intentions,
             entries: entries
         )
+        print("[Momentum] adapterPath=entriesOnly checkIns=\(checkIns.count) entries=\(entries.count) linkedEntries=\(linkedEntriesCount)") // Debug: log fallback path usage
+        return fromEntriesOnly // Debug: return entries-only points
     }
 
     /// Primary: one point per (check-in, intention) when check-ins have linked entries.

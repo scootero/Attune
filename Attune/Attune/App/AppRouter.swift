@@ -18,7 +18,7 @@ enum RootTab: Int, CaseIterable {
     case progress = 4  // Root tab for Progress
 }
 
-/// App-level routing: tab selection so Home can navigate to Library Momentum.
+/// App-level routing: tab selection so Home can navigate to the Momentum tab.
 @MainActor
 final class AppRouter: ObservableObject {
     /// Currently selected root tab so TabView can bind to it
@@ -30,10 +30,9 @@ final class AppRouter: ObservableObject {
     /// Optional selected date for Momentum so Home can pass the day we should show
     @Published var momentumSelectedDate: Date? = nil
 
-    /// Call from Home momentum card: switch to Library and show Momentum tab.
+    /// Call from Home momentum card: switch to root Momentum tab and seed its date.
     func navigateToMomentum(date: Date) {
-        selectedLibraryTab = .momentum  // Switch Library sub-tab to Momentum
         momentumSelectedDate = date  // Remember which day to show in Momentum
-        selectedRootTab = .library  // Switch root tab to Library
+        selectedRootTab = .progress  // Switch root tab to the Momentum screen (formerly Progress slot)
     }
 }
