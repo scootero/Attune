@@ -15,6 +15,8 @@ struct SettingsView: View {
     @State private var exportURL: URL?
     @State private var showingExportError = false
     @State private var exportErrorMessage = ""
+    @State private var isReminderEnabled = ReminderPreferences.isReminderEnabled // Bind toggle to persisted enabled flag so user can turn daily reminders on/off.
+    @State private var reminderTime = ReminderPreferences.reminderTimeDate // Bind DatePicker to persisted reminder time so user can customize notification time.
     
     var body: some View {
         NavigationView {
@@ -54,6 +56,30 @@ struct SettingsView: View {
                     Text("Export all extractions, corrections, topics, and sessions as JSON files for backup or training purposes.")
                 }
                 
+                // Notification reminder section
+                Section {
+                    Toggle("Enable Daily Reminder", isOn: $isReminderEnabled) // Provide an in-app toggle so users can disable this reminder flow without changing all system notifications.
+                        .onChange(of: isReminderEnabled) { _, newValue in // Persist and reschedule immediately whenever toggle changes.
+                            ReminderPreferences.isReminderEnabled = newValue // Save toggle state so preference survives app relaunch.
+                            if newValue { // Only request permission when user explicitly enables reminder feature.
+                                PermissionsHelper.requestNotificationPermissionsIfNeeded() // Ask for notification access if we haven't asked before.
+                            }
+                            DailyReminderNotificationService.shared.refreshReminderForToday() // Refresh pending request so disabling clears it and enabling recreates it when eligible.
+                        }
+                    DatePicker("Daily Reminder Time", selection: $reminderTime, displayedComponents: .hourAndMinute) // Let user choose hour/minute for reminder notifications.
+                        .datePickerStyle(.compact) // Keep settings row compact and native-looking in list layout.
+                        .disabled(!isReminderEnabled) // Disable time picker UI when reminder feature is turned off to prevent confusing inactive edits.
+                        .onChange(of: reminderTime) { _, newValue in // Persist and reschedule reminder immediately whenever user changes time.
+                            ReminderPreferences.reminderTimeDate = newValue // Save selected reminder time to UserDefaults-backed preferences.
+                            PermissionsHelper.requestNotificationPermissionsIfNeeded() // Ensure iOS permission has been requested before scheduling at new time.
+                            DailyReminderNotificationService.shared.refreshReminderForToday() // Recompute and reschedule today's reminder using the updated time.
+                        }
+                } header: {
+                    Text("Notifications") // Group reminder controls under a clear Notifications header.
+                } footer: {
+                    Text("Attune sends a reminder at this time when you have not checked in yet or are below 50% of your daily intentions.") // Explain exactly when reminder triggers to avoid user confusion.
+                }
+                
                 // Logs section
                 Section {
                     NavigationLink(destination: LogsView()) {
@@ -71,6 +97,10 @@ struct SettingsView: View {
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
+            .onAppear {
+                isReminderEnabled = ReminderPreferences.isReminderEnabled // Reload persisted reminder enabled state when settings screen appears.
+                reminderTime = ReminderPreferences.reminderTimeDate // Reload persisted reminder time when settings screen appears.
+            }
             .sheet(isPresented: $showingExportSheet) {
                 // Share sheet to export the ZIP file
                 if let url = exportURL {

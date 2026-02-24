@@ -9,12 +9,31 @@
 import SwiftUI
 
 /// State of the check-in recording flow
-private enum CheckInState {
+private enum CheckInState: Equatable {
     case idle
     case recording
     case processing
     case saved(transcript: String)
     case error(message: String)
+    
+    /// Manual Equatable implementation for enum with associated values
+    /// Compares both the case and associated values for equality
+    static func == (lhs: CheckInState, rhs: CheckInState) -> Bool {
+        switch (lhs, rhs) {
+        case (.idle, .idle):
+            return true
+        case (.recording, .recording):
+            return true
+        case (.processing, .processing):
+            return true
+        case (.saved(let lhsTranscript), .saved(let rhsTranscript)):
+            return lhsTranscript == rhsTranscript
+        case (.error(let lhsMessage), .error(let rhsMessage)):
+            return lhsMessage == rhsMessage
+        default:
+            return false
+        }
+    }
 }
 
 /// Highlight kind for check-in row feedback (green success, red failure)
@@ -85,7 +104,7 @@ struct HomeView: View {
             
             ScrollView {
                 VStack(spacing: 0) {
-                    // Header: Attune + hamburger in compact full-width bar with gradient
+                    // Header: Attune title only (no hamburger; moved to Today's Progress card)
                     HStack {
                         Text("Attune")
                             .font(.largeTitle)
@@ -93,16 +112,6 @@ struct HomeView: View {
                             .foregroundColor(.white)
                             .shadow(color: NeonPalette.neonTeal.opacity(0.3), radius: 8, x: 0, y: 2)
                         Spacer()
-                        Button(action: { showEditIntentions = true }) {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.body)
-                                .foregroundColor(.gray)
-                                .frame(width: 36, height: 36)
-                                .background(Color.white.opacity(0.12))
-                                .clipShape(Circle())
-                                .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1))
-                                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
-                        }
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
@@ -144,6 +153,10 @@ struct HomeView: View {
             // Request mic + speech permissions when Home loads (instead of on first record).
             // Only shows dialogs when status is .undetermined; already granted = no-op.
             PermissionsHelper.requestRecordingPermissionsIfNeeded()
+            // Request notification permission once so daily reminder notifications can be delivered.
+            PermissionsHelper.requestNotificationPermissionsIfNeeded()
+            // Pre-create directories so they don't need to be created on button tap (reduces lag)
+            try? AppPaths.ensureDirectoriesExist()
         }
         .sheet(isPresented: $showEditIntentions) {
             EditIntentionsView()
@@ -242,14 +255,32 @@ struct HomeView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                 Spacer()
-                Button(action: { showEditIntentions = true }) {
-                    Image(systemName: "arrow.right")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .frame(width: 28, height: 28)
-                        .background(Color.white.opacity(0.1))
-                        .clipShape(Circle())
+                // Larger retro-style CTA replaces small arrow/hamburger icons for clearer intent.
+                Button(action: { showEditIntentions = true }) { // Opens the same Edit Intentions sheet as before.
+                    Label("Add / Edit", systemImage: "plus.circle.fill") // Explicit text makes the action understandable for new users.
+                        .font(.system(size: 15, weight: .bold, design: .rounded)) // Bigger rounded font for a playful retro vibe.
+                        .foregroundColor(Color(red: 0.17, green: 0.06, blue: 0.20)) // Dark plum text to contrast against bright gradient.
+                        .padding(.horizontal, 14) // Extra horizontal padding to create a button-like pill shape.
+                        .padding(.vertical, 9) // Extra vertical padding to make the control noticeably larger.
+                        .background( // Retro neon gradient to make the action visually cool and obvious.
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.00, green: 0.53, blue: 0.29), // Warm orange for retro arcade feel.
+                                    Color(red: 0.97, green: 0.39, blue: 0.67), // Magenta midpoint for saturated retro styling.
+                                    Color(red: 0.57, green: 0.45, blue: 0.98)  // Purple tail to complete the neon blend.
+                                ],
+                                startPoint: .topLeading, // Start light at top-left for glossy button depth.
+                                endPoint: .bottomTrailing // End darker at bottom-right for dimensional shading.
+                            )
+                        )
+                        .clipShape(Capsule()) // Capsule keeps the control clearly button-y and touch-friendly.
+                        .overlay( // Bright outline helps the button pop on the dark glass card.
+                            Capsule()
+                                .stroke(Color.white.opacity(0.45), lineWidth: 1.2) // Subtle retro highlight border.
+                        )
+                        .shadow(color: Color(red: 0.97, green: 0.39, blue: 0.67).opacity(0.45), radius: 8, x: 0, y: 3) // Glow reinforces neon retro style.
                 }
+                .buttonStyle(.plain) // Preserves custom styling without default button tinting.
             }
             
             if todaysProgress.isEmpty {
@@ -313,25 +344,30 @@ struct HomeView: View {
     // MARK: - B2) Weekly Momentum Card (Slice B: lighter)
     
     /// Slice B: Bars with red→yellow→green gradient by progress; tap navigates to Library → Momentum tab.
+    /// Day labels aligned on same baseline; bars bottom-aligned; slightly larger bars and text.
     private var weeklyMomentumCard: some View {
         Button(action: {
             appRouter.navigateToMomentum(date: Date())  // Jump to Library → Momentum showing today
         }) {
+            // Slightly larger typography for card title and day labels
             VStack(alignment: .leading, spacing: 10) {
                 Text("Weekly Momentum")
-                    .font(.caption)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
                     .foregroundColor(.gray)
                 
-                HStack(spacing: 8) {
+                // HStack: bars + labels; alignment .bottom so all bars share bottom baseline
+                HStack(alignment: .bottom, spacing: 10) {
                     ForEach(weekMomentum.days) { day in
                         VStack(spacing: 6) {
+                            // Bar container: ZStack alignment .bottom = bars grow from bottom
                             if day.isFutureDay {
                                 RoundedRectangle(cornerRadius: 3)
                                     .fill(Color.clear)
-                                    .frame(width: 8, height: 16)
+                                    .frame(width: 12, height: 56)
                             } else {
                                 let ratio = day.completionRatio ?? 0
-                                let barHeight = max(6, CGFloat(ratio) * 48)
+                                let barHeight = max(8, CGFloat(ratio) * 56)  // Slightly larger: 12pt wide, 56pt max
                                 let barColor = colorForProgressRatio(ratio)
                                 ZStack(alignment: .bottom) {
                                     // Glow layer behind filled bar (soft bloom)
@@ -339,23 +375,25 @@ struct HomeView: View {
                                         .fill(barColor)
                                         .blur(radius: 4)
                                         .opacity(0.5)
-                                        .frame(width: 8, height: barHeight)
-                                    // Main filled bar with shadow
+                                        .frame(width: 12, height: barHeight)
+                                    // Main filled bar (sits at bottom of container)
                                     RoundedRectangle(cornerRadius: 3)
                                         .fill(barColor)
-                                        .frame(width: 8, height: barHeight)
+                                        .frame(width: 12, height: barHeight)
                                         .shadow(color: barColor.opacity(0.6), radius: 4, x: 0, y: 2)
                                 }
-                                .frame(width: 8, height: 48)
+                                .frame(width: 12, height: 56)  // Fixed container so all bars align at bottom
                             }
+                            // Day label: fixed width so M T W T F S S align on same baseline
                             Text(day.weekdayLetter)
-                                .font(.caption2)
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.gray)
+                                .frame(width: 12, alignment: .center)
                         }
                         .frame(maxWidth: .infinity)
                     }
                 }
-                .padding(.vertical, 10)
+                .padding(.vertical, 12)
                 
                 // Tap affordance: small chevron + faint gradient edge to communicate "tap for details"
                 HStack {
@@ -408,14 +446,25 @@ struct HomeView: View {
     
     /// Shows "Mood ?" when unset (not yet from ChatGPT or manual); else "Mood: [label]".
     /// Tapping opens MoodEditor. When unset, shows "Set mood" affordance next to it.
+    /// Mood state is per-dateKey so each day resets naturally (no extra persistence needed).
     private var moodLabelRow: some View {
         HStack(spacing: 8) {
             Button(action: { showMoodEditor = true }) {
-                Text(hasMoodSet ? "Mood: \(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday)))" : "Mood ?")
-                    .font(.subheadline)
-                    .foregroundColor(hasMoodSet ? .gray : .gray.opacity(0.8))
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 4)
+                Group {
+                    if hasMoodSet {
+                        Text("Mood: \(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday)))")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    } else {
+                        // Styled "Mood ?" when unset: rounded font + teal accent (cooler, more noticeable)
+                        Text("Mood ?")
+                            .font(.system(.subheadline, design: .rounded))
+                            .fontWeight(.medium)
+                            .foregroundStyle(NeonPalette.neonTeal.opacity(0.9))
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 4)
             }
             .buttonStyle(.plain)
             // When mood unset: show "Set mood" pill so user can tap to set it manually
@@ -459,7 +508,12 @@ struct HomeView: View {
             case .processing:
                 processingContent
             case .saved:
-                Button(action: { state = .idle }) {
+                Button(action: {
+                    // Provide immediate haptic feedback for state reset
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
+                    state = .idle
+                }) {
                     Text("Record Check-In")
                         .font(.title2)
                         .fontWeight(.bold)
@@ -467,7 +521,12 @@ struct HomeView: View {
                 }
                 .buttonStyle(RecordCheckInButtonStyle())
             case .error:
-                Button(action: { state = .idle }) {
+                Button(action: {
+                    // Provide immediate haptic feedback for retry
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
+                    state = .idle
+                }) {
                     Text("Try Again")
                         .font(.title2)
                         .fontWeight(.bold)
@@ -485,13 +544,21 @@ struct HomeView: View {
     
     /// Primary CTA: Record Check-In with blue gradient, light red/orange border, glow.
     private var recordCheckInSection: some View {
-        Button(action: startCheckIn) {
+        Button(action: {
+            // Provide immediate haptic feedback so user knows tap was registered
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+            // Execute the action immediately on main thread
+            startCheckIn()
+        }) {
             Text("Record Check-In")
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(.white)
         }
         .buttonStyle(RecordCheckInButtonStyle())
+        // Disable button while already recording to prevent double-taps
+        .disabled(state == .recording || state == .processing)
     }
     
     private var recordingContent: some View {
@@ -676,6 +743,7 @@ struct HomeView: View {
         }
         
         todaysProgress = rows
+        DailyReminderNotificationService.shared.refreshReminderForToday() // Re-evaluate today's reminder whenever progress data changes.
     }
     
     /// Slice A: Compute intention state counts for Daily Summary (Not Started / In Progress / Complete)
@@ -726,7 +794,9 @@ struct HomeView: View {
     
     /// Slice 7: Persists user-resolved ambiguous updates. totalToday → TOTAL, increment → INCREMENT.
     private func applyAmbiguityResolutions(_ resolutions: [AmbiguityResolution], context: AmbiguitySheetData) {
-        for r in resolutions {
+        let ambiguityCheckInCreatedAt = CheckInStore.shared.loadCheckIn(id: context.checkInId)?.createdAt ?? Date() // fallback to now if check-in missing; used for time resolution
+        
+        for r in resolutions { // process each user-chosen resolution
             let updateType: String
             switch r.choice {
             case .totalToday: updateType = "TOTAL"
@@ -743,12 +813,29 @@ struct HomeView: View {
                     unit: r.update.unit,
                     confidence: r.update.clampedConfidence,
                     evidence: r.update.evidence,
-                    sourceCheckInId: context.checkInId
+                    sourceCheckInId: context.checkInId,
+                    tookPlaceAt: resolveTookPlaceAt(update: r.update, checkInCreatedAt: ambiguityCheckInCreatedAt) // compute effective time using loaded check-in timestamp fallback
                 )
             } catch {
                 AppLogger.log(AppLogger.ERR, "Ambiguity resolve save failed id=\(AppLogger.shortId(r.update.intentionId)) error=\"\(error.localizedDescription)\"")
             }
         }
+    }
+    
+    /// Resolves the effective occurrence Date for a progress update using local time components when explicit. // centralizes fallback behavior
+    private func resolveTookPlaceAt(update: CheckInUpdate, checkInCreatedAt: Date) -> Date { // returns final Date used for ordering/plotting
+        let calendar = Calendar.current // use current calendar to respect user locale/timezone
+        if update.timeInterpretation == "explicit_time", // only construct explicit time when LLM marked it as such
+           let localTime = update.tookPlaceLocalTime { // ensure components exist
+            var components = calendar.dateComponents([.year, .month, .day], from: checkInCreatedAt) // reuse the check-in's calendar day
+            components.hour = localTime.hour24 // set hour from parsed components
+            components.minute = localTime.minute // set minute from parsed components
+            components.second = 0 // normalize seconds to top of minute
+            if let date = calendar.date(from: components) { // attempt to build Date in local zone
+                return date // return explicit same-day time when available
+            }
+        }
+        return checkInCreatedAt // fallback for just-now/unspecified or when build fails
     }
     
     /// Loads streak on background queue to avoid blocking main thread.
@@ -768,10 +855,20 @@ struct HomeView: View {
     
     private func startCheckIn() {
         do {
-            _ = try IntentionSetStore.shared.loadOrCreateCurrentIntentionSet()
+            // Use cached intention set (already loaded in onAppear, so this should be fast)
+            // If not cached, this will load synchronously but should be rare
+            guard let _ = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else {
+                state = .error(message: "Could not load intentions")
+                return
+            }
+            
+            // Start recording (this is the main operation that changes hardware state)
             _ = try checkInRecorder.startRecording()
+            
+            // Update state to recording (this triggers UI update immediately)
             state = .recording
         } catch {
+            // If any error occurs, show error state
             state = .error(message: error.localizedDescription)
         }
     }
@@ -831,15 +928,18 @@ struct HomeView: View {
             }
             
             let result = await CheckInExtractorService.extract(
-                transcript: transcript,
-                intentions: intentions,
-                todaysTotals: todaysTotals,
-                checkInId: checkInId
+                transcript: transcript, // Send transcript text to GPT extractor
+                intentions: intentions, // Provide current intentions for mapping
+                todaysTotals: todaysTotals, // Supply today's totals for context
+                checkInId: checkInId // Pass ID for logging/debugging
             )
             
             // Use AI updates, or fallback parser when AI fails/returns empty
             let updatesToUse: [CheckInUpdate]
             if result.updates.isEmpty {
+#if DEBUG
+                AppLogger.log(AppLogger.AI, "checkin_fallback_debug transcript_chars=\(transcript.count) ai_updates=0 checkin_id=\(AppLogger.shortId(checkInId))") // Debug: note when fallback triggers
+#endif
                 updatesToUse = CheckInFallbackParser.parseFallbackUpdates(transcript: transcript, intentions: intentions)
             } else {
                 updatesToUse = result.updates
@@ -866,7 +966,7 @@ struct HomeView: View {
             
             // Apply clear updates immediately; log count and each applied update
             AppLogger.log(AppLogger.AI, "checkin_apply parsed_updates_count=\(clearUpdates.count)")
-            for update in clearUpdates {
+            for update in clearUpdates { // apply non-ambiguous updates immediately
                 do {
                     _ = try ProgressStore.shared.appendProgressEntry(
                         dateKey: dateKey,
@@ -877,7 +977,8 @@ struct HomeView: View {
                         unit: update.unit,
                         confidence: update.clampedConfidence,
                         evidence: update.evidence,
-                        sourceCheckInId: checkInId
+                        sourceCheckInId: checkInId,
+                        tookPlaceAt: resolveTookPlaceAt(update: update, checkInCreatedAt: checkIn.createdAt) // resolve explicit or fallback time for plotting
                     )
                     // Log applied update with new total for debugging
                     let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: intentionSet.id)

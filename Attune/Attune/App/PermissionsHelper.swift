@@ -9,6 +9,7 @@
 
 import AVFoundation
 import Speech
+import UserNotifications
 
 /// Requests microphone and speech recognition permissions when Home loads.
 /// Only triggers system permission dialogs when the user hasn't been asked yet (.undetermined).
@@ -19,6 +20,17 @@ enum PermissionsHelper {
     static func requestRecordingPermissionsIfNeeded() {
         requestMicrophoneIfNeeded()
         requestSpeechRecognitionIfNeeded()
+    }
+    
+    /// Requests local notification permission if status is .notDetermined so the app can send reminders.
+    static func requestNotificationPermissionsIfNeeded() {
+        let notificationCenter = UNUserNotificationCenter.current() // Use the shared notification center to read/request notification permissions.
+        notificationCenter.getNotificationSettings { settings in // Read current notification authorization status before requesting anything.
+            guard settings.authorizationStatus == .notDetermined else { return } // Only request once when iOS has not asked the user yet.
+            notificationCenter.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in // Ask for visible alert, sound, and badge for reminder notifications.
+                // Result is intentionally ignored here because reminder scheduling separately checks permission status.
+            }
+        }
     }
 
     /// Requests microphone permission if status is .undetermined.

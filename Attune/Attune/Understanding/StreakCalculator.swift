@@ -3,7 +3,8 @@
 //  Attune
 //
 //  Computes streak: consecutive days (from today backwards) where day qualifies.
-//  Day qualifies if: overallCompletion >= 0.8 AND (≥1 check-in OR any progress entry).
+//  Day qualifies if: at least one check-in was recorded that calendar day.
+//  Uses local calendar (user timezone). Multiple check-ins in one day count as 1 day.
 //  Uses last 30 days max. Slice 5.
 //
 
@@ -12,19 +13,17 @@ import Foundation
 /// Computes streak from historical data.
 struct StreakCalculator {
     
-    /// Threshold for "day complete" (80%)
-    private static let completionThreshold = 0.8
-    
     /// Max days to look back
     private static let maxDaysToCheck = 30
     
     /// Computes streak count: consecutive qualifying days from today backwards.
+    /// Qualification: at least one check-in on that calendar day (same as Home page "recorded check-in").
     /// - Parameters:
-    ///   - allIntentionSets: All intention sets (to find which was active on each day)
-    ///   - intentionsBySetId: Map of intentionSetId -> [Intention]
-    ///   - entriesBySetAndDate: Map of "setId|dateKey" -> [ProgressEntry]
+    ///   - allIntentionSets: All intention sets (kept for API compatibility; no longer used for qualification)
+    ///   - intentionsBySetId: Map of intentionSetId -> [Intention] (kept for API compatibility)
+    ///   - entriesBySetAndDate: Map of "setId|dateKey" -> [ProgressEntry] (kept for API compatibility)
     ///   - checkInsBySetAndDate: Map of "setId|dateKey" -> [CheckIn]
-    ///   - overridesByDate: Map of dateKey -> (intentionId -> override amount). Slice 7.
+    ///   - overridesByDate: Map of dateKey -> (intentionId -> override amount) (kept for API compatibility)
     /// - Returns: Number of consecutive qualifying days (0 if today doesn't qualify)
     static func computeStreak(
         allIntentionSets: [IntentionSet],
@@ -36,41 +35,22 @@ struct StreakCalculator {
         let calendar = Calendar.current
         var streak = 0
         
+        // Build set of dateKeys that have at least one check-in (any intention set)
+        var dateKeysWithCheckIns: Set<String> = []
+        for (key, checkIns) in checkInsBySetAndDate where !checkIns.isEmpty {
+            // Key format: "setId|dateKey"
+            if let pipeIndex = key.firstIndex(of: "|") {
+                let dateKey = String(key[key.index(after: pipeIndex)...])
+                dateKeysWithCheckIns.insert(dateKey)
+            }
+        }
+        
         for dayOffset in 0..<maxDaysToCheck {
             guard let date = calendar.date(byAdding: .day, value: -dayOffset, to: Date()) else { break }
             let dateKey = AppPaths.dateKey(from: date)
             
-            guard let activeSet = intentionSetActive(on: dateKey, from: allIntentionSets) else {
-                // No set active on this day — doesn't qualify
-                if dayOffset == 0 {
-                    return 0
-                }
-                break
-            }
-            
-            let entriesKey = "\(activeSet.id)|\(dateKey)"
-            let checkInsKey = entriesKey
-            let entries = entriesBySetAndDate[entriesKey] ?? []
-            let checkIns = checkInsBySetAndDate[checkInsKey] ?? []
-            
-            let hasActivity = !checkIns.isEmpty || !entries.isEmpty
-            guard hasActivity else {
-                if dayOffset == 0 { return 0 }
-                break
-            }
-            
-            let intentions = intentionsBySetId[activeSet.id] ?? []
-            let overrides = overridesByDate[dateKey] ?? [:]
-            var totalsByIntentionId: [String: Double] = [:]
-            for intention in intentions {
-                let override = overrides[intention.id]
-                let total = totalForIntention(entries: entries, dateKey: dateKey, intentionId: intention.id, intentionSetId: activeSet.id, overrideAmount: override)
-                totalsByIntentionId[intention.id] = total
-            }
-            
-            let overall = ProgressCalculator.overallPercentComplete(intentions: intentions, totalsByIntentionId: totalsByIntentionId)
-            
-            guard overall >= completionThreshold else {
+            // Day qualifies if it has at least one check-in (same definition as Home "recorded check-in")
+            guard dateKeysWithCheckIns.contains(dateKey) else {
                 if dayOffset == 0 { return 0 }
                 break
             }

@@ -198,6 +198,11 @@ struct DayDetailView: View {
                     .foregroundColor(.secondary)
                     .lineLimit(2)
             }
+        if let tookPlaceAt = entry.tookPlaceAt, tookPlaceAt != entry.createdAt { // show explicit occurrence time only when it differs from recorded time
+            Text("Took place at \(tookPlaceAt, format: .dateTime.hour().minute())") // surface user-stated time in local format
+                .font(.caption2) // small caption to avoid clutter
+                .foregroundColor(Color(uiColor: .tertiaryLabel)) // subtle color to keep hierarchy
+        }
             if let checkIn = data?.checkIns.first(where: { $0.id == entry.sourceCheckInId }) {
                 Text("From check-in at \(checkIn.createdAt, format: .dateTime.hour().minute())")
                     .font(.caption2)

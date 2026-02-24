@@ -208,6 +208,7 @@ struct GlassCardModifier: ViewModifier {
             .background(
                 // Dark tint overlay for glass effect
                 NeonPalette.darkOverlay.opacity(0.35)
+                    .allowsHitTesting(false) // Keep the tint layer visual-only so touches pass through to child controls.
             )
             .background(
                 // UltraThinMaterial blur layer (frosted glass)
@@ -219,6 +220,7 @@ struct GlassCardModifier: ViewModifier {
                 GlassTextureOverlay()
                     .blendMode(.overlay)
                     .opacity(0.7)
+                    .allowsHitTesting(false) // Prevent texture overlay from swallowing button touches.
             )
             .overlay(
                 // Edge lighting stroke (crisp top-left highlight for glassy shine)
@@ -235,16 +237,19 @@ struct GlassCardModifier: ViewModifier {
                         ),
                         lineWidth: 1.5
                     )
+                    .allowsHitTesting(false) // Keep edge-light stroke purely visual and non-interactive.
             )
             .overlay(
                 // Perimeter subtle stroke (all edges, glass border)
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(NeonPalette.glassStrokePrimary, lineWidth: 1)
+                    .allowsHitTesting(false) // Ensure perimeter stroke does not block taps to child controls.
             )
             .overlay(
                 // Teal glow accent on bottom edge (subtle cyan halo)
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(NeonPalette.neonTeal.opacity(0.08), lineWidth: 0.5)
+                    .allowsHitTesting(false) // Keep bottom glow layer visual-only for reliable hit testing.
             )
             .overlay(
                 // Bottom inner shadow gradient overlay (adds depth at bottom edge)
@@ -261,6 +266,7 @@ struct GlassCardModifier: ViewModifier {
                     .frame(height: 50)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .allowsHitTesting(false) // Avoid inner-shadow overlay from intercepting interactions.
             )
             .shadow(color: NeonPalette.bloomShadow.opacity(0.5), radius: 16, x: 0, y: 6)   // Teal bloom (stronger)
             .shadow(color: NeonPalette.bloomShadow.opacity(0.2), radius: 24, x: 0, y: 8)  // Outer soft glow
@@ -315,8 +321,11 @@ struct RecordCheckInButtonStyle: ButtonStyle {
                     .stroke(NeonPalette.recordButtonBorder, lineWidth: 1.5)
                     .shadow(color: NeonPalette.recordButtonBorder.opacity(0.6), radius: 6, x: 0, y: 0)
             )
+            // Use immediate spring animation for more responsive feel (no delay)
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+            // Reduce opacity slightly when pressed for additional visual feedback
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
     }
 }
 

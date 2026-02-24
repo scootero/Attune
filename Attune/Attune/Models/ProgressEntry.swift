@@ -18,6 +18,14 @@ struct ProgressEntry: Codable, Identifiable {
     /// When this entry was created
     let createdAt: Date
     
+    /// Optional explicit time the progress actually took place (nil = use createdAt) // allows storing user-stated clock time without breaking old entries
+    let tookPlaceAt: Date? // optional explicit occurrence time; nil means fall back to createdAt
+    
+    /// Effective time used for chronology; defaults to createdAt when tookPlaceAt is nil // ensures charts and ordering always have a reliable timestamp
+    var effectiveTookPlaceAt: Date { // computed property to centralize fallback logic
+        tookPlaceAt ?? createdAt // prefer tookPlaceAt if set, else use createdAt for backward compatibility
+    }
+    
     /// Date key in YYYY-MM-DD format (local date for grouping)
     let dateKey: String
     
@@ -47,7 +55,8 @@ struct ProgressEntry: Codable, Identifiable {
     
     init(
         id: String = UUID().uuidString,
-        createdAt: Date = Date(),
+        createdAt: Date = Date(), // default to now so old call sites remain valid
+        tookPlaceAt: Date? = nil, // optional parameter; nil keeps behavior unchanged unless explicit time provided
         dateKey: String,
         intentionSetId: String,
         intentionId: String,
@@ -59,7 +68,8 @@ struct ProgressEntry: Codable, Identifiable {
         sourceCheckInId: String
     ) {
         self.id = id
-        self.createdAt = createdAt
+        self.createdAt = createdAt // store creation time for legacy and fallback behavior
+        self.tookPlaceAt = tookPlaceAt // persist explicit occurrence time when provided (else nil)
         self.dateKey = dateKey
         self.intentionSetId = intentionSetId
         self.intentionId = intentionId

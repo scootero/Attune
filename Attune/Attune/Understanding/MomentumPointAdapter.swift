@@ -39,7 +39,7 @@ struct MomentumPointAdapter {
         )
         if !fromCheckIns.isEmpty { // Debug: path succeeded using check-ins
             print("[Momentum] adapterPath=checkIns checkIns=\(checkIns.count) entries=\(entries.count) linkedEntries=\(linkedEntriesCount)") // Debug: log primary path usage
-            return fromCheckIns // Debug: return check-in derived points
+            return deduplicateByMinuteBucket(from: fromCheckIns) // Combine same-intention same-minute duplicates, keep max %
         }
 
         // Fallback: entries only (use entry.createdAt as timestamp)
@@ -50,7 +50,40 @@ struct MomentumPointAdapter {
             entries: entries
         )
         print("[Momentum] adapterPath=entriesOnly checkIns=\(checkIns.count) entries=\(entries.count) linkedEntries=\(linkedEntriesCount)") // Debug: log fallback path usage
-        return fromEntriesOnly // Debug: return entries-only points
+        return deduplicateByMinuteBucket(from: fromEntriesOnly) // Combine same-intention same-minute duplicates, keep max %
+    }
+
+    /// Buckets points by (intentionId, minute) and keeps one bar per bucket with max percent.
+    /// Fixes stacked bars when multiple check-ins for same intention occur within the same minute.
+    /// Uses max percent within bucket (robust when users repeat themselves).
+    private static func deduplicateByMinuteBucket(from points: [MomentumPoint]) -> [MomentumPoint] {
+        let cal = Calendar.current
+        // Group by (intentionId, minute-bucket). Bucket = year, month, day, hour, minute (truncate seconds).
+        var bucketToPoints: [String: [MomentumPoint]] = [:]
+        for point in points {
+            let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: point.date)
+            guard let bucketDate = cal.date(from: comps) else { continue }
+            let key = "\(point.intentionId)-\(bucketDate.timeIntervalSince1970)"
+            bucketToPoints[key, default: []].append(point)
+        }
+        // For each bucket: keep single point with max percent; use bucket timestamp as date for consistent x-position.
+        var result: [MomentumPoint] = []
+        for (_, group) in bucketToPoints {
+            guard let best = group.max(by: { $0.percent < $1.percent }) else { continue }
+            let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: best.date)
+            let bucketDate = cal.date(from: comps) ?? best.date
+            let stableId = "\(best.intentionId)-\(Int(bucketDate.timeIntervalSince1970))"
+            result.append(MomentumPoint(
+                id: stableId,
+                date: bucketDate,
+                intentionId: best.intentionId,
+                intentionTitle: best.intentionTitle,
+                colorIndex: best.colorIndex,
+                percent: best.percent,
+                timeOffsetSeconds: best.timeOffsetSeconds
+            ))
+        }
+        return result.sorted { $0.date < $1.date }
     }
 
     /// Primary: one point per (check-in, intention) when check-ins have linked entries.
@@ -63,59 +96,45 @@ struct MomentumPointAdapter {
     ) -> [MomentumPoint] {
         let intentionIndexById = Dictionary(
             uniqueKeysWithValues: intentions.enumerated().map { ($1.id, $0) }
-        )
-        let entriesByCheckIn = Dictionary(grouping: entries) { $0.sourceCheckInId }
-            .mapValues { $0.sorted { $0.createdAt < $1.createdAt } }
+        ) // map intention ids to color indexes
+        let checkInIds = Set(checkIns.map { $0.id }) // set for linked-entry filtering
+        let linkedEntries = entries.filter { checkInIds.contains($0.sourceCheckInId) } // only use entries tied to provided check-ins
+        let sortedEntries = linkedEntries.sorted { $0.effectiveTookPlaceAt < $1.effectiveTookPlaceAt } // enforce global chronological order by effective time
 
-        var points: [MomentumPoint] = []
-        var totalsByIntention: [String: Double] = [:]
+        var points: [MomentumPoint] = [] // accumulated chart points
+        var totalsByIntention: [String: Double] = [:] // running totals for percent calculations
 
-        for checkIn in checkIns {
-            guard let checkInEntries = entriesByCheckIn[checkIn.id], !checkInEntries.isEmpty else {
-                continue
+        for entry in sortedEntries { // walk entries in chronological order
+            switch entry.updateType { // update cumulative totals
+            case "TOTAL":
+                totalsByIntention[entry.intentionId] = entry.amount // set total directly
+            case "INCREMENT":
+                totalsByIntention[entry.intentionId] = (totalsByIntention[entry.intentionId] ?? 0) + entry.amount // add increment
+            default:
+                break // ignore unknown types
             }
-            for entry in checkInEntries {
-                switch entry.updateType {
-                case "TOTAL":
-                    totalsByIntention[entry.intentionId] = entry.amount
-                case "INCREMENT":
-                    totalsByIntention[entry.intentionId] = (totalsByIntention[entry.intentionId] ?? 0) + entry.amount
-                default:
-                    break
-                }
+            guard let intention = intentions.first(where: { $0.id == entry.intentionId }), // find intention metadata
+                  intention.targetValue > 0 else { continue } // skip if no target to compute percent
+            let total = totalsByIntention[entry.intentionId] ?? 0 // current cumulative total
+            let effectiveTarget: Double // denominator for percent
+            if intention.timeframe.lowercased() == "weekly" { // weekly targets divide across days
+                effectiveTarget = intention.targetValue / 7.0 // daily target for weekly intentions
+            } else {
+                effectiveTarget = intention.targetValue // daily target for non-weekly
             }
-            let updatedIntentions = checkInEntries.map { $0.intentionId }
-            let withPercent: [(intentionId: String, percent: Double)] = updatedIntentions.compactMap { intentionId in
-                guard let intention = intentions.first(where: { $0.id == intentionId }),
-                      intention.targetValue > 0 else { return nil }
-                let total = totalsByIntention[intentionId] ?? 0
-                let effectiveTarget: Double
-                if intention.timeframe.lowercased() == "weekly" {
-                    effectiveTarget = intention.targetValue / 7.0
-                } else {
-                    effectiveTarget = intention.targetValue
-                }
-                let percent = (total / effectiveTarget) * 100.0
-                return (intentionId, percent)
-            }
-            let sorted = withPercent.sorted { $0.percent > $1.percent }
-            let offsets: [Double] = [60, 30, 0]
-            for (idx, item) in sorted.enumerated() {
-                let offset = idx < offsets.count ? offsets[idx] : 0
-                let intention = intentions.first(where: { $0.id == item.intentionId })!
-                let colorIdx = intentionIndexById[intention.id] ?? 0
-                points.append(MomentumPoint(
-                    id: "\(checkIn.id)-\(intention.id)",
-                    date: checkIn.createdAt,
-                    intentionId: intention.id,
-                    intentionTitle: intention.title,
-                    colorIndex: colorIdx,
-                    percent: item.percent,
-                    timeOffsetSeconds: offset
-                ))
-            }
+            let percent = (total / effectiveTarget) * 100.0 // compute completion percent
+            let colorIdx = intentionIndexById[intention.id] ?? 0 // color index for chart styling
+            points.append(MomentumPoint(
+                id: "\(entry.id)-\(intention.id)", // unique point id combining entry and intention
+                date: entry.effectiveTookPlaceAt, // use effective occurrence time for plotting
+                intentionId: intention.id, // intention identifier
+                intentionTitle: intention.title, // intention title
+                colorIndex: colorIdx, // color index for rendering
+                percent: percent, // current percent complete
+                timeOffsetSeconds: 0 // no offset needed when using actual occurrence times
+            ))
         }
-        return points
+        return points // return chronologically built points
     }
 
     /// Fallback: entries only. Use entry.createdAt as timestamp; group by minute to batch.
@@ -127,42 +146,42 @@ struct MomentumPointAdapter {
     ) -> [MomentumPoint] {
         let intentionIndexById = Dictionary(
             uniqueKeysWithValues: intentions.enumerated().map { ($1.id, $0) }
-        )
-        let sortedEntries = entries.sorted { $0.createdAt < $1.createdAt }
-        var points: [MomentumPoint] = []
-        var totalsByIntention: [String: Double] = [:]
+        ) // map intention ids to color indexes
+        let sortedEntries = entries.sorted { $0.effectiveTookPlaceAt < $1.effectiveTookPlaceAt } // enforce chronological order by effective time
+        var points: [MomentumPoint] = [] // accumulated chart points
+        var totalsByIntention: [String: Double] = [:] // running totals for percent calculations
 
-        for entry in sortedEntries {
-            switch entry.updateType {
+        for entry in sortedEntries { // walk entries chronologically
+            switch entry.updateType { // update cumulative totals
             case "TOTAL":
-                totalsByIntention[entry.intentionId] = entry.amount
+                totalsByIntention[entry.intentionId] = entry.amount // overwrite with total
             case "INCREMENT":
-                totalsByIntention[entry.intentionId] = (totalsByIntention[entry.intentionId] ?? 0) + entry.amount
+                totalsByIntention[entry.intentionId] = (totalsByIntention[entry.intentionId] ?? 0) + entry.amount // add increment
             default:
-                break
+                break // ignore unknown types
             }
-            guard let intention = intentions.first(where: { $0.id == entry.intentionId }),
-                  intention.targetValue > 0 else { continue }
-            let total = totalsByIntention[entry.intentionId] ?? 0
-            let effectiveTarget: Double
-            if intention.timeframe.lowercased() == "weekly" {
-                effectiveTarget = intention.targetValue / 7.0
+            guard let intention = intentions.first(where: { $0.id == entry.intentionId }), // look up intention metadata
+                  intention.targetValue > 0 else { continue } // skip if target missing
+            let total = totalsByIntention[entry.intentionId] ?? 0 // current cumulative total
+            let effectiveTarget: Double // denominator for percent
+            if intention.timeframe.lowercased() == "weekly" { // weekly intentions convert to daily target
+                effectiveTarget = intention.targetValue / 7.0 // daily target for weekly
             } else {
-                effectiveTarget = intention.targetValue
+                effectiveTarget = intention.targetValue // daily target for non-weekly
             }
-            let percent = (total / effectiveTarget) * 100.0
-            let colorIdx = intentionIndexById[intention.id] ?? 0
+            let percent = (total / effectiveTarget) * 100.0 // compute percent complete
+            let colorIdx = intentionIndexById[intention.id] ?? 0 // color index for rendering
             points.append(MomentumPoint(
-                id: "\(entry.id)-\(intention.id)",
-                date: entry.createdAt,
-                intentionId: intention.id,
-                intentionTitle: intention.title,
-                colorIndex: colorIdx,
-                percent: percent,
-                timeOffsetSeconds: 0
+                id: "\(entry.id)-\(intention.id)", // unique point id for entry-intention pair
+                date: entry.effectiveTookPlaceAt, // use effective occurrence time for plotting
+                intentionId: intention.id, // intention identifier
+                intentionTitle: intention.title, // intention title
+                colorIndex: colorIdx, // color index for chart
+                percent: percent, // percent complete
+                timeOffsetSeconds: 0 // no offset because actual times already separate points
             ))
         }
-        return points
+        return points // return chronologically built points
     }
 
     /// Returns dates for Mon–Sun of the week containing the given date.

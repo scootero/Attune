@@ -30,4 +30,29 @@ struct MomentumPalette {
         let safeIndex = index % intentionColors.count
         return intentionColors[safeIndex]
     }
+
+    // MARK: - Progress-based color (Day chart only)
+
+    /// Returns color from progress percent (0–100+). Clamps >100 to 100 for mapping.
+    /// 0%→red, 50%→yellow, 50%+→green. Bar fill comes from point.percent in the view (colorIndex unchanged).
+    static func colorForProgress(_ pct: Double) -> Color {
+        let t = min(pct / 100.0, 1.0) // Clamp for color mapping
+        if t <= 0.5 {
+            // 0.0–0.5: red → yellow
+            let u = t / 0.5
+            return Color(
+                red: 0.95, // Red and yellow share same R
+                green: 0.25 + u * 0.5, // 0.25 → 0.75
+                blue: 0.2
+            )
+        } else {
+            // 0.5–1.0: yellow → green
+            let u = (t - 0.5) / 0.5
+            return Color(
+                red: 0.95 - u * 0.65, // 0.95 → 0.3
+                green: 0.75 + u * 0.05, // 0.75 → 0.8
+                blue: 0.2 + u * 0.2   // 0.2 → 0.4
+            )
+        }
+    }
 }

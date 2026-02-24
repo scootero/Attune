@@ -29,6 +29,39 @@ struct CheckInUpdate: Codable {
     /// Optional short snippet from transcript as evidence
     let evidence: String?
     
+    /// Optional local clock time components (24h) for when the update occurred // allows resolving same-day time without absolute timestamp
+    let tookPlaceLocalTime: TookPlaceLocalTime? // nil means use createdAt for timing
+    
+    /// Interpretation of the time reference: explicit clock, just-now, or unspecified // guides resolution to a Date
+    let timeInterpretation: String? // accepted values: explicit_time, just_now, unspecified
+    
+    /// Helper for local time components extracted from LLM output // keeps time parsing structured
+    struct TookPlaceLocalTime: Codable { // nested to namespace time fields with context
+        let hour24: Int // 0-23 hour component in local time
+        let minute: Int // 0-59 minute component in local time
+    }
+    
+    /// Custom initializer providing defaults for new optional time fields // keeps older call sites compiling unchanged
+    init(
+        intentionId: String,
+        updateType: String,
+        amount: Double,
+        unit: String,
+        confidence: Double,
+        evidence: String?,
+        tookPlaceLocalTime: TookPlaceLocalTime? = nil,
+        timeInterpretation: String? = nil
+    ) {
+        self.intentionId = intentionId // store intention identifier
+        self.updateType = updateType // store update type (INCREMENT/TOTAL)
+        self.amount = amount // store numeric amount
+        self.unit = unit // store measurement unit
+        self.confidence = confidence // store confidence score
+        self.evidence = evidence // store optional evidence snippet
+        self.tookPlaceLocalTime = tookPlaceLocalTime // store optional local time components
+        self.timeInterpretation = timeInterpretation // store how time should be interpreted
+    }
+    
     /// Validates updateType is INCREMENT or TOTAL; returns nil if invalid
     var validatedUpdateType: String? {
         (updateType == "INCREMENT" || updateType == "TOTAL") ? updateType : nil

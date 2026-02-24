@@ -53,16 +53,20 @@ class CheckInRecorderService: NSObject, ObservableObject {
             throw CheckInRecorderError.alreadyRecording
         }
         
-        // Reuse same audio session config as continuous recording
-        try configureAudioSession()
-        
-        // Ensure CheckInAudio directory exists
-        try AppPaths.ensureDirectoriesExist()
-        
         // Generate id now; used for both filename and CheckIn.id
         let checkInId = UUID().uuidString
         let audioFileName = "\(checkInId).m4a"
         let audioURL = AppPaths.checkInAudioFileURL(fileName: audioFileName)
+        
+        // Ensure CheckInAudio directory exists (fast no-op if already exists)
+        // This is called here as a safety check, but should already be created in HomeView.onAppear
+        let checkInAudioDir = AppPaths.checkInAudioDir
+        if !FileManager.default.fileExists(atPath: checkInAudioDir.path) {
+            try FileManager.default.createDirectory(at: checkInAudioDir, withIntermediateDirectories: true)
+        }
+        
+        // Reuse same audio session config as continuous recording
+        try configureAudioSession()
         
         currentCheckInId = checkInId
         

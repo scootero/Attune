@@ -77,22 +77,60 @@ struct CheckInFallbackParser {
             }
         }
         
-        // Workout: "workout", "worked out", "gym"
-        let hasWorkout = lower.contains("workout") || lower.contains("worked out") || lower.contains("gym")
-        if hasWorkout,
-           let intention = intentions.first(where: { $0.title.lowercased().contains("workout") || $0.title.lowercased().contains("gym") }),
-           minutesIdx < minutesAmounts.count,
-           intention.unit.lowercased().contains("min") {
-            let amount = minutesAmounts[minutesIdx]
-            minutesIdx += 1
-            updates.append(CheckInUpdate(
-                intentionId: intention.id,
-                updateType: "INCREMENT",
-                amount: amount,
-                unit: "minutes",
-                confidence: Self.fallbackConfidence,
-                evidence: nil
-            ))
+        // Workout: broadened keywords for exercise variants
+        let workoutKeywords = ["workout", "worked out", "gym", "exercise", "trained", "training", "run", "running", "jog", "jogging", "lift", "lifting", "weights", "weightlifting", "strength", "cardio", "hiit", "treadmill", "squat", "deadlift", "bench"] // List of substrings that imply workout-related activity
+        let hasWorkout = workoutKeywords.contains(where: { lower.contains($0) }) // Detect workout mentions in transcript
+        let matchedKeyword = workoutKeywords.first(where: { lower.contains($0) }) // Capture first matching workout keyword for debug logs
+        if hasWorkout { // Only proceed when workout language is present
+            let intention = intentions.first { intention in // Find a matching workout intention
+                let titleLower = intention.title.lowercased() // Lowercase title for substring checks
+                let aliasesLower = intention.aliases.map { $0.lowercased() } // Lowercase aliases for substring checks
+                let titleHit = workoutKeywords.contains(where: { titleLower.contains($0) }) // Match title against workout keywords
+                let aliasHit = aliasesLower.contains(where: { alias in workoutKeywords.contains(where: { alias.contains($0) }) }) // Match any alias against workout keywords
+                return titleHit || aliasHit // Accept intention if title or alias signals workout
+            } // End intention search
+
+            if let intention = intention { // Proceed only when a workout intention is found
+                let unitLower = intention.unit.lowercased() // Normalize unit for comparisons
+                var amountToUse: Double? // Holder for chosen amount
+                var minutesConsumed = false // Track whether we consumed a parsed minutes value
+
+                if minutesIdx < minutesAmounts.count { // Use parsed minutes when available
+                    amountToUse = minutesAmounts[minutesIdx] // Set amount from parsed minutes
+                    minutesIdx += 1 // Advance minutes index to avoid reusing same match
+                    minutesConsumed = true // Record that we used a parsed value
+#if DEBUG
+                    AppLogger.log(AppLogger.AI, "checkin_fallback_debug workout_keyword=\(matchedKeyword ?? "unknown") amount_source=extracted_minutes amount=\(amountToUse ?? 0)") // Debug: log parsed minutes usage
+#endif
+                } else if unitLower.contains("min") { // Fallback for minute-based intentions without explicit numbers
+                    let fallbackAmount = intention.targetValue > 0 ? intention.targetValue : 30 // Prefer targetValue; else default to 30 minutes
+                    amountToUse = fallbackAmount // Set amount from fallback
+#if DEBUG
+                    AppLogger.log(AppLogger.AI, "checkin_fallback_debug workout_keyword=\(matchedKeyword ?? "unknown") amount_source=\(intention.targetValue > 0 ? "target_default" : "hard_default_30") amount=\(amountToUse ?? 0)") // Debug: log which minute fallback amount was chosen
+#endif
+                } else if unitLower.contains("session") || unitLower == "times" || unitLower.contains("workout") { // Handle session-like units
+                    amountToUse = 1 // Default one session when no numeric amount is stated
+#if DEBUG
+                    AppLogger.log(AppLogger.AI, "checkin_fallback_debug workout_keyword=\(matchedKeyword ?? "unknown") amount_source=session_default_1 amount=1") // Debug: log session default fallback
+#endif
+                } // Other units are skipped to preserve current behavior
+
+                if let amount = amountToUse { // Only append update when we have an amount
+                    updates.append(CheckInUpdate( // Build fallback update payload
+                        intentionId: intention.id, // Apply to matched workout intention
+                        updateType: "INCREMENT", // Fallback always increments
+                        amount: amount, // Use parsed or fallback amount
+                        unit: unitLower.contains("min") ? "minutes" : intention.unit, // Use minutes for minute-based, otherwise original unit
+                        confidence: Self.fallbackConfidence, // Use existing fallback confidence
+                        evidence: nil // No evidence snippet in fallback
+                    )) // Append constructed update
+                } else { // No valid amount derived
+                    _ = minutesConsumed // No-op to satisfy compiler for unused flag in this branch
+#if DEBUG
+                    AppLogger.log(AppLogger.AI, "checkin_fallback_debug workout_keyword=\(matchedKeyword ?? "unknown") amount_source=none reason=unsupported_unit") // Debug: log when no amount could be derived
+#endif
+                }
+            }
         }
         
         // Read: "read"

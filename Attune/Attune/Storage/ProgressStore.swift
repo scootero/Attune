@@ -104,9 +104,11 @@ final class ProgressStore {
         unit: String,
         confidence: Double,
         evidence: String? = nil,
-        sourceCheckInId: String
+        sourceCheckInId: String,
+        tookPlaceAt: Date? = nil // optional explicit occurrence time; nil keeps legacy behavior via fallback
     ) throws -> ProgressEntry {
         let entry = ProgressEntry(
+            tookPlaceAt: tookPlaceAt, // pass through explicit occurrence time so model can compute effectiveTookPlaceAt (must precede dateKey in initializer)
             dateKey: dateKey,
             intentionSetId: intentionSetId,
             intentionId: intentionId,
