@@ -101,7 +101,7 @@ struct EditIntentionsView: View {
                             .listRowBackground(Color.clear) // let glass card show
                             
                             ForEach($draftIntentions) { $draft in // iterate with binding so inline edits write through
-                                VStack(spacing: 8) { // stack summary + optional editor
+                                VStack(spacing: 6) { // tighter spacing keeps expanded rows visually compact for faster scanning
                                     Button(action: { toggleEditExpansion(for: draft.id) }) { // tap to expand/collapse edit card
                                         IntentionSummaryRow( // summary row retained for quick scan
                                             draft: draft, // pass current draft
@@ -127,6 +127,17 @@ struct EditIntentionsView: View {
                                             onUnitChanged: { triggerDirtyCheck() }, // recompute dirty on unit changes
                                             hapticEngine: hapticEngine // shared generator
                                         )
+                                        .padding(10) // keep one clean primary panel around expanded edit controls
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 16, style: .continuous) // single rounded glass panel for the expanded editor
+                                                .fill(NeonPalette.darkOverlay.opacity(0.38)) // subtle dark fill avoids heavy stacked-card look
+                                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) // keep lightweight glass blur for consistency
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16, style: .continuous) // thin border gives definition without neon framing
+                                                .stroke(Color.white.opacity(0.12), lineWidth: 1) // soft edge line keeps panel readable on dark background
+                                        )
+                                        .shadow(color: NeonPalette.darkShadow.opacity(0.2), radius: 4, x: 0, y: 2) // very soft shadow to avoid expensive/heavy depth effects
                                         .transition(.opacity.combined(with: .move(edge: .top))) // smooth show/hide
                                     }
                                 }
@@ -219,8 +230,18 @@ struct EditIntentionsView: View {
     
     private var canSave: Bool {
         hasChanges // requires real changes
-        && !validIntentionsForSave.isEmpty // requires at least one valid intention
+        && ( // allow either normal non-empty saves or explicit "clear all" saves
+            !validIntentionsForSave.isEmpty // standard path: at least one valid intention remains
+            || isClearingAllIntentions // special path: user removed every intention and wants to persist empty set
+        ) // close save eligibility gate
     } // end canSave
+    
+    /// True when user removed every intention from a previously non-empty baseline.
+    private var isClearingAllIntentions: Bool {
+        baselineDrafts.isEmpty == false // only treat as "clear all" if there were intentions before
+        && draftIntentions.isEmpty // all existing drafts have been deleted
+        && addDraft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty // no pending new title in add card
+    } // end isClearingAllIntentions
     
     /// Returns intentions to persist (existing + add card when valid).
     private var validIntentionsForSave: [DraftIntention] {
@@ -363,10 +384,10 @@ struct EditIntentionsView: View {
     /// Saves: end current set, create new IntentionSet with new/updated intentions
     private func saveAndDismiss() {
         let valid = validIntentionsForSave // gather cleaned intentions
-        guard !valid.isEmpty else { // ensure at least one intention
-            dismiss() // nothing to save, dismiss
-            return // stop
-        }
+        guard !valid.isEmpty || isClearingAllIntentions else { // allow save when clearing all; otherwise nothing valid to persist
+            dismiss() // no persistable intention changes, so close sheet
+            return // stop early
+        } // end guard
         
         do {
             // 1. Save each intention (create or update) and collect IDs
@@ -478,28 +499,26 @@ private struct InlineIntentionEditor: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) { // stack fields with tight spacing
-            HStack {
-                TextField("Title", text: $draft.title) // title input
-                    .textFieldStyle(.plain) // plain style for glass aesthetic
-                    .foregroundColor(.white) // white text for dark bg
-                    .padding(.horizontal, 12) // inset
-                    .padding(.vertical, 10) // vertical pad
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(NeonPalette.darkOverlay.opacity(0.55)) // darker fill so inputs sit inside glass card without glowing too bright
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.white.opacity(0.18), lineWidth: 1) // slightly brighter stroke to separate input from card glass
-                    )
-                    .onChange(of: draft.title) { _, _ in // title change hook
-                        onValueChanged() // mark dirty
-                    }
-            }
+        VStack(alignment: .leading, spacing: 10) { // compact stack keeps controls closer for quicker scanning/editing
+            TextField("Title", text: $draft.title) // title input
+                .textFieldStyle(.plain) // plain style for glass aesthetic
+                .foregroundColor(.white) // white text for dark bg
+                .padding(.horizontal, 12) // inset
+                .padding(.vertical, 9) // slightly tighter vertical padding for faster visual rhythm
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(NeonPalette.darkOverlay.opacity(0.42)) // simple glass fill keeps input lightweight inside the main panel
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1) // thin subtle border avoids inset-card appearance
+                )
+                .onChange(of: draft.title) { _, _ in // title change hook
+                    onValueChanged() // mark dirty
+                }
             
-            VStack(alignment: .leading, spacing: 10) { // value + slider
-                HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) { // tighter value group reduces empty vertical gaps
+                HStack(spacing: 10) { // tighter horizontal spacing keeps related controls visually grouped
                     Slider(
                         value: $draft.targetValue, // bind to numeric value
                         in: valueConfig.minValue...valueConfig.maxValue, // range by unit
@@ -517,7 +536,7 @@ private struct InlineIntentionEditor: View {
                     }
                     
                     Text("\(Self.displayString(for: draft.targetValue)) \(displayUnitAbbreviation)") // live value label
-                        .font(.system(size: 20, weight: .bold)) // bold for emphasis
+                        .font(.system(size: 18, weight: .semibold)) // slightly smaller type reduces visual heaviness in compact editor
                         .foregroundColor(NeonPalette.neonTeal) // teal numeric readout to mirror Home progress cards
                         .monospacedDigit() // monospaced for stability
                         .onTapGesture { // allow manual focus via tap
@@ -529,21 +548,21 @@ private struct InlineIntentionEditor: View {
                     .keyboardType(.decimalPad) // numeric keyboard
                     .multilineTextAlignment(.center) // center align
                     .padding(.horizontal, 12) // inset
-                    .padding(.vertical, 10) // vertical pad
+                    .padding(.vertical, 9) // slightly tighter vertical padding for compact input density
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(NeonPalette.darkOverlay.opacity(0.55)) // darker glass fill to blend with card background while keeping text legible
+                            .fill(NeonPalette.darkOverlay.opacity(0.42)) // simple glass fill keeps the field readable without card-within-card feel
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.white.opacity(0.18), lineWidth: 1) // slightly brighter stroke for crisp edges on dark inputs
+                            .stroke(Color.white.opacity(0.14), lineWidth: 1) // thinner, softer stroke keeps inputs light and minimal
                     )
                     .onChange(of: manualValueText) { _, newValue in // parse manual edits
                         applyManualValueInput(newValue) // sync numeric value
                     }
             }
             
-            HStack(spacing: 12) {
+            HStack(spacing: 10) { // tighter unit/timeframe row improves scan speed
                 Picker("Unit", selection: $draft.unit) { // unit picker
                     ForEach(DraftIntention.unitOptions, id: \.self) { unit in
                         Text(unit).tag(unit) // unit option
@@ -565,8 +584,7 @@ private struct InlineIntentionEditor: View {
                 }
             }
         }
-        .padding(16) // slightly larger padding to breathe inside thicker glass treatment
-        .glassCard() // reuse Home glass modifier for cohesive blur, texture, strokes, and shadows
+        .padding(12) // compact internal padding keeps edit panel dense and fast to read
     }
     
     /// Config derived from unit.
@@ -686,7 +704,7 @@ private struct AddIntentionCard: View {
             }
             
             if isExpanded { // show body when expanded
-                VStack(spacing: 12) {
+                VStack(spacing: 10) { // tighter spacing keeps expanded add editor compact
                     RecordIntentionsSection(onIntentionsParsed: { parsed in // embed record UI
                         onParsed(parsed) // populate add draft fields
                         recordStatus = parsed.isEmpty ? "No intentions found." : "Parsed into Add card. Review then Save." // status message
@@ -701,16 +719,7 @@ private struct AddIntentionCard: View {
                         hapticEngine: hapticEngine // shared haptic
                     )
                 }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(NeonPalette.darkOverlay.opacity(0.4))
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                )
+                .padding(.top, 2) // keep add-card expansion airy without adding another nested panel layer
                 .transition(.opacity.combined(with: .move(edge: .top))) // smooth expand/collapse
             }
         }
@@ -812,31 +821,14 @@ private struct IntentionCardBackground: View {
     let variation: IntentionCardVariation
     
     var body: some View {
-        RoundedRectangle(cornerRadius: 18, style: .continuous) // slightly larger radius to mimic Home glass cards
-            .fill(NeonPalette.darkOverlay.opacity(0.42)) // dark translucent fill so foggy teal background softly shows through
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous)) // frosted blur layer to match glass treatment
-            .overlay(
-                GlassTextureOverlay() // reuse Home texture for premium glass feel
-                    .blendMode(.overlay) // blend texture without overpowering tint
-                    .opacity(0.65) // keep texture subtle for readability
-            )
+        RoundedRectangle(cornerRadius: 18, style: .continuous) // maintain rounded list tile shape for touch targets
+            .fill(NeonPalette.darkOverlay.opacity(0.4)) // simple dark glass fill keeps rows readable without heavy layering
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous)) // single blur layer preserves glass look with lower visual weight
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(gradient: Gradient(colors: [
-                            Color.white.opacity(0.35), // brighter top-left edge highlight
-                            Color.white.opacity(0.08), // fade toward bottom-right
-                            Color.white.opacity(0.0) // fully fade to keep glass soft
-                        ]), startPoint: .topLeading, endPoint: .bottomTrailing),
-                        lineWidth: 1.4 // thin edge light similar to Home cards
-                    )
+                    .stroke(variation.borderColor.opacity(0.7), lineWidth: 0.9) // lighter thin border avoids embossed multi-frame appearance
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(variation.borderColor, lineWidth: 1) // retain per-card tint via variation border
-            )
-            .shadow(color: NeonPalette.bloomShadow.opacity(0.38), radius: 14, x: 0, y: 6) // teal bloom shadow to lift card off background
-            .shadow(color: NeonPalette.darkShadow.opacity(0.55), radius: 10, x: 0, y: 4) // dark shadow for depth on dark background
+            .shadow(color: NeonPalette.darkShadow.opacity(0.22), radius: 5, x: 0, y: 2) // one soft shadow keeps depth subtle and lightweight
     }
 }
 
@@ -887,7 +879,7 @@ private struct RecordIntentionsPillStyle: ButtonStyle {
                 )
             )
             .clipShape(Capsule()) // pill/oval shape
-            .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4) // soft lift shadow
+            .shadow(color: Color.black.opacity(0.14), radius: 4, x: 0, y: 2) // flatter shadow keeps CTA crisp without heavy glow
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }

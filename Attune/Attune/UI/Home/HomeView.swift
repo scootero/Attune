@@ -261,38 +261,48 @@ struct HomeView: View {
                     .fontWeight(.semibold) // slightly bold for emphasis
                     .foregroundColor(.white) // white text on dark glass
                 Spacer() // push actions to the trailing edge
-                HStack(spacing: 10) { // header actions
-                    Button(action: { showEditIntentions = true }) { // opens Edit Intentions sheet
-                        Label("Add / Edit", systemImage: "plus.circle.fill") // clear label for add/edit
-                            .font(.system(size: 15, weight: .bold, design: .rounded)) // rounded bold font
-                            .foregroundColor(Color(red: 0.17, green: 0.06, blue: 0.20)) // dark text for contrast on gradient
-                            .padding(.horizontal, 12) // slightly tighter to avoid wrapping
-                            .padding(.vertical, 8) // balanced vertical padding
-                            .background(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 1.00, green: 0.53, blue: 0.29),
-                                        Color(red: 0.97, green: 0.39, blue: 0.67),
-                                        Color(red: 0.57, green: 0.45, blue: 0.98)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+                HStack(spacing: 8) { // tighten header actions so controls stay compact and horizontal
+                    if isUpdateProgressMode { // in update mode, show only update controls (hide Add/Edit)
+                        pillActionButton( // cancel action pill styled with muted retro red gradient
+                            title: "Cancel", // visible cancel label in the pill
+                            gradient: [Color(red: 0.70, green: 0.27, blue: 0.30), Color(red: 0.62, green: 0.23, blue: 0.22)], // red-themed gradient
+                            glow: Color(red: 0.85, green: 0.32, blue: 0.34), // subtle red glow color
+                            action: cancelUpdateProgressMode // restore original values and exit update mode
+                        )
+                        pillActionButton( // save action pill styled with muted retro green gradient
+                            title: "Save", // visible save label in the pill
+                            gradient: [Color(red: 0.22, green: 0.60, blue: 0.42), Color(red: 0.17, green: 0.52, blue: 0.44)], // green/teal-themed gradient
+                            glow: Color(red: 0.28, green: 0.74, blue: 0.54), // subtle green glow color
+                            action: saveUpdateProgressMode // persist overrides and exit update mode
+                        )
+                    } else { // in normal mode, show only Add/Edit to reduce layout pressure
+                        Button(action: { showEditIntentions = true }) { // opens Edit Intentions sheet
+                            Label("Add / Edit", systemImage: "plus.circle.fill") // clear label for add/edit
+                                .font(.system(size: 15, weight: .bold, design: .rounded)) // rounded bold font
+                                .foregroundColor(Color(red: 0.17, green: 0.06, blue: 0.20)) // dark text for contrast on gradient
+                                .padding(.horizontal, 12) // slightly tighter to avoid wrapping
+                                .padding(.vertical, 8) // balanced vertical padding
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 1.00, green: 0.53, blue: 0.29),
+                                            Color(red: 0.97, green: 0.39, blue: 0.67),
+                                            Color(red: 0.57, green: 0.45, blue: 0.98)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
                                 )
-                            )
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.white.opacity(0.45), lineWidth: 1.2)
-                            )
-                            .shadow(color: Color(red: 0.97, green: 0.39, blue: 0.67).opacity(0.45), radius: 8, x: 0, y: 3)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    if isUpdateProgressMode { // slider edit mode pills
-                        pillActionButton(title: "Cancel", background: Color(red: 0.75, green: 0.28, blue: 0.28).opacity(0.7), action: cancelUpdateProgressMode)
-                        pillActionButton(title: "Save", background: Color(red: 0.24, green: 0.65, blue: 0.36).opacity(0.7), action: saveUpdateProgressMode)
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.45), lineWidth: 1.2)
+                                )
+                                .shadow(color: Color(red: 0.97, green: 0.39, blue: 0.67).opacity(0.45), radius: 8, x: 0, y: 3)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -327,6 +337,7 @@ struct HomeView: View {
                         if isUpdateProgressMode { // slider mode rendering
                             let value = sliderValues[row.intention.id] ?? row.total // working total
                             let percent = percentForTotal(value, intention: row.intention) // derived percent 0...1
+                            let goalValue = row.intention.timeframe.lowercased() == "weekly" ? (row.intention.targetValue / 7.0) : row.intention.targetValue // keep displayed goal aligned with percent math (weekly goals shown as per-day target)
                             VStack(alignment: .leading, spacing: 6) { // stack slider + value
                                 Slider(
                                     value: Binding( // two-way bind percent to dictionary-stored totals
@@ -342,7 +353,7 @@ struct HomeView: View {
                                 
                                 HStack {
                                     Spacer()
-                                    Text("\(displayValue(value)) \(row.intention.unit)") // show unit value under slider
+                                    Text("\(displayValue(value)) / \(displayValue(goalValue)) \(row.intention.unit)") // show live current units and goal units together (e.g., 10 / 20 pages)
                                         .font(.caption) // small caption
                                         .foregroundColor(.white.opacity(0.9)) // slightly muted white
                                 }
@@ -588,22 +599,38 @@ struct HomeView: View {
         return max(baseCap, currentTotal) // ensure current value is always within range
     }
     
-    /// Small pill-style action button for header controls.
-    private func pillActionButton(title: String, background: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(background)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
+    /// Small pill-style action button for header controls with explicit size to avoid text collapsing.
+    private func pillActionButton( // shared helper for Save/Cancel styling in update mode
+        title: String, // label text shown inside the pill
+        gradient: [Color], // gradient colors for the retro/glassy look
+        glow: Color, // glow tint that matches button intent (red/green)
+        action: @escaping () -> Void // action to run when button is tapped
+    ) -> some View {
+        Button(action: action) { // wrap label in a plain-styled button for predictable layout
+            Text(title) // render visible button title text
+                .font(.system(size: 14, weight: .bold, design: .rounded)) // keep text readable and compact
+                .foregroundColor(.white.opacity(0.95)) // high-contrast text on colored gradient
+                .lineLimit(1) // force single-line titles
+                .minimumScaleFactor(0.9) // allow slight downscale instead of truncation
+                .frame(minWidth: 72) // prevent narrow collapse that can look like vertical bars
+                .frame(height: 36) // enforce consistent pill height
+                .padding(.horizontal, 10) // horizontal breathing room around text
+                .background(
+                    LinearGradient( // apply red/green gradient theme for action intent
+                        colors: gradient, // use caller-provided gradient palette
+                        startPoint: .topLeading, // diagonal gradient start
+                        endPoint: .bottomTrailing // diagonal gradient end
+                    )
                 )
+                .clipShape(Capsule()) // maintain pill silhouette
+                .overlay(
+                    Capsule() // subtle border to match existing Add/Edit treatment
+                        .stroke(Color.white.opacity(0.30), lineWidth: 1) // low-opacity white border
+                )
+                .shadow(color: glow.opacity(0.28), radius: 8, x: 0, y: 3) // subtle action-colored glow
+                .fixedSize(horizontal: true, vertical: false) // keep intrinsic horizontal size for text
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain) // avoid default button compression/tint behavior
     }
     
     /// Computes percent (0...1) from a total using existing timeframe rules.
