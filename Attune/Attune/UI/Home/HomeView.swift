@@ -95,6 +95,12 @@ struct HomeView: View {
     @State private var weekMomentum: WeekMomentum = WeekMomentum(days: [])
     /// Slice A: For future smart prompt (Slice B). Lowest-progress intention title or fallback.
     @State private var lowestProgressIntentionTitle: String = "What's one thing you want to move forward today?"
+    /// When true, the progress card enters slider mode for manual overrides.
+    @State private var isUpdateProgressMode: Bool = false // tracks whether we are showing sliders instead of bars
+    /// Current slider values keyed by intention id while in update mode.
+    @State private var sliderValues: [String: Double] = [:] // holds the working total for each intention while editing
+    /// Original totals snapshot for cancel restore.
+    @State private var originalTotals: [String: Double] = [:] // keeps baseline totals so Cancel can restore without saving
     
     var body: some View {
         NavigationView {
@@ -250,37 +256,81 @@ struct HomeView: View {
     private var todaysProgressCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Today's Progress")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                Spacer()
-                // Larger retro-style CTA replaces small arrow/hamburger icons for clearer intent.
-                Button(action: { showEditIntentions = true }) { // Opens the same Edit Intentions sheet as before.
-                    Label("Add / Edit", systemImage: "plus.circle.fill") // Explicit text makes the action understandable for new users.
-                        .font(.system(size: 15, weight: .bold, design: .rounded)) // Bigger rounded font for a playful retro vibe.
-                        .foregroundColor(Color(red: 0.17, green: 0.06, blue: 0.20)) // Dark plum text to contrast against bright gradient.
-                        .padding(.horizontal, 14) // Extra horizontal padding to create a button-like pill shape.
-                        .padding(.vertical, 9) // Extra vertical padding to make the control noticeably larger.
-                        .background( // Retro neon gradient to make the action visually cool and obvious.
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 1.00, green: 0.53, blue: 0.29), // Warm orange for retro arcade feel.
-                                    Color(red: 0.97, green: 0.39, blue: 0.67), // Magenta midpoint for saturated retro styling.
-                                    Color(red: 0.57, green: 0.45, blue: 0.98)  // Purple tail to complete the neon blend.
-                                ],
-                                startPoint: .topLeading, // Start light at top-left for glossy button depth.
-                                endPoint: .bottomTrailing // End darker at bottom-right for dimensional shading.
-                            )
-                        )
-                        .clipShape(Capsule()) // Capsule keeps the control clearly button-y and touch-friendly.
-                        .overlay( // Bright outline helps the button pop on the dark glass card.
-                            Capsule()
-                                .stroke(Color.white.opacity(0.45), lineWidth: 1.2) // Subtle retro highlight border.
-                        )
-                        .shadow(color: Color(red: 0.97, green: 0.39, blue: 0.67).opacity(0.45), radius: 8, x: 0, y: 3) // Glow reinforces neon retro style.
+                Text("Today's Progress") // title for the progress card header
+                    .font(.subheadline) // keep subheadline size for compact header
+                    .fontWeight(.semibold) // slightly bold for emphasis
+                    .foregroundColor(.white) // white text on dark glass
+                Spacer() // push actions to the trailing edge
+                if isUpdateProgressMode { // when in slider edit mode
+                    HStack(spacing: 10) { // group Save/Cancel
+                        Button("Cancel") { // cancel button
+                            cancelUpdateProgressMode() // revert slider edits and exit mode
+                        }
+                        .font(.subheadline.weight(.semibold)) // match header weight
+                        .foregroundColor(.white) // keep high contrast
+                        .buttonStyle(.plain) // avoid default button tint
+                        
+                        Button("Save") { // save button
+                            saveUpdateProgressMode() // commit overrides and exit
+                        }
+                        .font(.subheadline.weight(.semibold)) // match weight
+                        .foregroundColor(.white) // high contrast
+                        .buttonStyle(.plain) // custom style
+                    }
+                } else { // default non-edit mode
+                    HStack(spacing: 10) { // group primary actions
+                        // Larger retro-style CTA replaces small arrow/hamburger icons for clearer intent.
+                        Button(action: { showEditIntentions = true }) { // opens Edit Intentions sheet
+                            Label("Add / Edit", systemImage: "plus.circle.fill") // clear label for add/edit
+                                .font(.system(size: 15, weight: .bold, design: .rounded)) // rounded bold font
+                                .foregroundColor(Color(red: 0.17, green: 0.06, blue: 0.20)) // dark text for contrast on gradient
+                                .padding(.horizontal, 14) // horizontal padding for capsule shape
+                                .padding(.vertical, 9) // vertical padding for tap target
+                                .background( // gradient fill matching existing design
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 1.00, green: 0.53, blue: 0.29), // warm orange start
+                                            Color(red: 0.97, green: 0.39, blue: 0.67), // magenta midpoint
+                                            Color(red: 0.57, green: 0.45, blue: 0.98)  // purple tail
+                                        ],
+                                        startPoint: .topLeading, // gradient direction
+                                        endPoint: .bottomTrailing // gradient direction
+                                    )
+                                )
+                                .clipShape(Capsule()) // capsule silhouette
+                                .overlay( // outline for separation
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.45), lineWidth: 1.2) // subtle white stroke
+                                )
+                                .shadow(color: Color(red: 0.97, green: 0.39, blue: 0.67).opacity(0.45), radius: 8, x: 0, y: 3) // glow shadow
+                        }
+                        .buttonStyle(.plain) // Preserves custom styling without default button tinting.
+                        
+                        Button(action: { enterUpdateProgressMode() }) { // enters slider update mode
+                            Label("Update Progress", systemImage: "slider.horizontal.3") // label for manual progress
+                                .font(.system(size: 15, weight: .bold, design: .rounded)) // rounded bold font
+                                .foregroundColor(.white) // white text on teal gradient
+                                .padding(.horizontal, 14) // capsule spacing
+                                .padding(.vertical, 9) // capsule spacing
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            NeonPalette.neonTeal, // teal start color
+                                            NeonPalette.neonTeal.opacity(0.75) // softened end color
+                                        ],
+                                        startPoint: .leading, // gradient direction
+                                        endPoint: .trailing // gradient direction
+                                    )
+                                )
+                                .clipShape(Capsule()) // pill shape
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.35), lineWidth: 1) // light outline for separation
+                                )
+                        }
+                        .buttonStyle(.plain) // custom styling
+                    }
                 }
-                .buttonStyle(.plain) // Preserves custom styling without default button tinting.
             }
             
             if todaysProgress.isEmpty {
@@ -295,24 +345,49 @@ struct HomeView: View {
                 .font(.caption)
                 .buttonStyle(.bordered)
             } else {
-                ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { _, row in
-                    VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { _, row in // render each intention row
+                    VStack(alignment: .leading, spacing: 6) { // slightly more spacing for slider mode
                         HStack {
-                            Text(row.intention.title)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                            Spacer()
-                            Text("\(Int(row.percent * 100))%")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .monospacedDigit()
-                                .foregroundColor(.white)
+                            Text(row.intention.title) // intention title label
+                                .font(.subheadline) // match card style
+                                .fontWeight(.medium) // medium weight for readability
+                                .foregroundColor(.white) // white text on dark bg
+                            Spacer() // push percent to trailing edge
+                            Text("\(Int(currentPercent(for: row) * 100))%") // percent based on slider or stored total
+                                .font(.subheadline) // match size
+                                .fontWeight(.medium) // medium weight
+                                .monospacedDigit() // stable digit width
+                                .foregroundColor(.white) // white text
                         }
-                        SwiftUI.ProgressView(value: row.percent)
-                            .tint(Color(red: 0.2, green: 0.8, blue: 0.7))
+                        
+                        if isUpdateProgressMode { // slider mode rendering
+                            let value = sliderValues[row.intention.id] ?? row.total // pick slider value or baseline total
+                            VStack(alignment: .leading, spacing: 6) { // stack slider + value
+                                Slider(
+                                    value: Binding( // two-way bind slider to dictionary
+                                        get: { sliderValues[row.intention.id] ?? row.total }, // getter uses stored value or baseline
+                                        set: { newValue in // setter updates map
+                                            sliderValues[row.intention.id] = newValue // persist slider position
+                                        }
+                                    ),
+                                    in: 0...max(row.intention.targetValue * 2, max(10, row.total * 2)), // allow headroom up to 2x target/current
+                                    step: sliderStep(for: row.intention) // unit-aware step size
+                                )
+                                .tint(Color(red: 0.2, green: 0.8, blue: 0.7)) // neon teal tint for consistency
+                                
+                                HStack {
+                                    Text("\(displayValue(value)) \(row.intention.unit)") // show unit value under slider
+                                        .font(.caption) // small caption
+                                        .foregroundColor(.white.opacity(0.9)) // slightly muted white
+                                    Spacer() // align left
+                                }
+                            }
+                        } else { // default progress bar rendering
+                            SwiftUI.ProgressView(value: row.percent) // standard progress bar
+                                .tint(Color(red: 0.2, green: 0.8, blue: 0.7)) // teal tint
+                        }
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 6) // vertical spacing between rows
                 }
             }
         }
@@ -440,6 +515,71 @@ struct HomeView: View {
         default:
             return superGreen
         }
+    }
+    
+    /// Enters slider-based update progress mode, initializing slider state.
+    private func enterUpdateProgressMode() {
+        originalTotals = Dictionary(uniqueKeysWithValues: todaysProgress.map { ($0.intention.id, $0.total) }) // snapshot current totals for cancel
+        sliderValues = originalTotals // seed sliders with current totals
+        isUpdateProgressMode = true // toggle mode on
+    }
+    
+    /// Cancels update mode and restores original displayed totals without saving.
+    private func cancelUpdateProgressMode() {
+        sliderValues = originalTotals // restore slider values
+        isUpdateProgressMode = false // exit mode
+        loadTodaysProgress() // refresh to ensure UI reflects persisted state
+        loadIntentionsBreakdown() // recompute counts from live data
+    }
+    
+    /// Saves overrides for each intention based on slider values, then exits mode.
+    private func saveUpdateProgressMode() {
+        guard let intentionSet = currentIntentionSet else { // ensure we have a set
+            isUpdateProgressMode = false // bail out to safe state
+            return // nothing to save
+        }
+        let dateKey = ProgressCalculator.dateKey(for: Date()) // today’s date key
+        for row in todaysProgress { // iterate intentions shown
+            let value = sliderValues[row.intention.id] ?? row.total // use slider or existing total
+            let override = ManualProgressOverride( // build override payload
+                dateKey: dateKey, // apply to today
+                intentionId: row.intention.id, // target intention
+                amount: value, // slider total
+                unit: row.intention.unit // preserve unit for display
+            )
+            try? OverrideStore.shared.setOverride(override) // persist override; silent fail to avoid blocking UI
+        }
+        isUpdateProgressMode = false // exit mode
+        loadTodaysProgress() // refresh data to reflect overrides
+        loadIntentionsBreakdown() // recompute counts
+    }
+    
+    /// Computes current percent for a row using live or slider value.
+    private func currentPercent(for row: IntentionProgressRow) -> Double {
+        let value = sliderValues[row.intention.id] ?? row.total // choose slider or stored total
+        return ProgressCalculator.percentComplete( // compute percent with existing logic
+            total: value, // current value
+            targetValue: row.intention.targetValue, // intention target
+            timeframe: row.intention.timeframe // daily/weekly
+        )
+    }
+    
+    /// Unit-aware slider step for smoother control.
+    private func sliderStep(for intention: Intention) -> Double {
+        switch intention.unit.lowercased() { // unit switch
+        case "minutes": return 5 // 5-minute steps
+        case "pages": return 1 // per page
+        case "steps": return 500 // per 500 steps
+        default: return 1 // general fallback
+        }
+    }
+    
+    /// Displays numeric value without trailing decimals when possible.
+    private func displayValue(_ value: Double) -> String {
+        if value.rounded() == value { // integer check
+            return String(Int(value)) // int display
+        }
+        return String(format: "%.1f", value) // one decimal for readability
     }
     
     // MARK: - C) Mood Label Row (below Record button, Slice A)
@@ -744,15 +884,23 @@ struct HomeView: View {
         
         todaysProgress = rows
         DailyReminderNotificationService.shared.refreshReminderForToday() // Re-evaluate today's reminder whenever progress data changes.
+        
+        if isUpdateProgressMode { // keep slider state in sync when data refreshes during update mode
+            originalTotals = Dictionary(uniqueKeysWithValues: rows.map { ($0.intention.id, $0.total) }) // snapshot latest totals
+            for row in rows { // walk rows
+                sliderValues[row.intention.id] = row.total // align sliders to refreshed totals
+            }
+        }
     }
     
     /// Slice A: Compute intention state counts for Daily Summary (Not Started / In Progress / Complete)
     private func loadIntentionsBreakdown() {
         var inProgress = 0, complete = 0, notStarted = 0
-        for row in todaysProgress {
-            if row.percent >= 1.0 { complete += 1 }
-            else if row.percent > 0 { inProgress += 1 }
-            else { notStarted += 1 }
+        for row in todaysProgress { // iterate current progress rows
+            let pct = currentPercent(for: row) // use current value (slider-aware)
+            if pct >= 1.0 { complete += 1 } // count complete
+            else if pct > 0 { inProgress += 1 } // count in-progress
+            else { notStarted += 1 } // count not started
         }
         intentionsInProgressCount = inProgress
         intentionsCompleteCount = complete
