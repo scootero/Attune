@@ -261,74 +261,38 @@ struct HomeView: View {
                     .fontWeight(.semibold) // slightly bold for emphasis
                     .foregroundColor(.white) // white text on dark glass
                 Spacer() // push actions to the trailing edge
-                if isUpdateProgressMode { // when in slider edit mode
-                    HStack(spacing: 10) { // group Save/Cancel
-                        Button("Cancel") { // cancel button
-                            cancelUpdateProgressMode() // revert slider edits and exit mode
-                        }
-                        .font(.subheadline.weight(.semibold)) // match header weight
-                        .foregroundColor(.white) // keep high contrast
-                        .buttonStyle(.plain) // avoid default button tint
-                        
-                        Button("Save") { // save button
-                            saveUpdateProgressMode() // commit overrides and exit
-                        }
-                        .font(.subheadline.weight(.semibold)) // match weight
-                        .foregroundColor(.white) // high contrast
-                        .buttonStyle(.plain) // custom style
+                HStack(spacing: 10) { // header actions
+                    Button(action: { showEditIntentions = true }) { // opens Edit Intentions sheet
+                        Label("Add / Edit", systemImage: "plus.circle.fill") // clear label for add/edit
+                            .font(.system(size: 15, weight: .bold, design: .rounded)) // rounded bold font
+                            .foregroundColor(Color(red: 0.17, green: 0.06, blue: 0.20)) // dark text for contrast on gradient
+                            .padding(.horizontal, 12) // slightly tighter to avoid wrapping
+                            .padding(.vertical, 8) // balanced vertical padding
+                            .background(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.00, green: 0.53, blue: 0.29),
+                                        Color(red: 0.97, green: 0.39, blue: 0.67),
+                                        Color(red: 0.57, green: 0.45, blue: 0.98)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.white.opacity(0.45), lineWidth: 1.2)
+                            )
+                            .shadow(color: Color(red: 0.97, green: 0.39, blue: 0.67).opacity(0.45), radius: 8, x: 0, y: 3)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
-                } else { // default non-edit mode
-                    HStack(spacing: 10) { // group primary actions
-                        // Larger retro-style CTA replaces small arrow/hamburger icons for clearer intent.
-                        Button(action: { showEditIntentions = true }) { // opens Edit Intentions sheet
-                            Label("Add / Edit", systemImage: "plus.circle.fill") // clear label for add/edit
-                                .font(.system(size: 15, weight: .bold, design: .rounded)) // rounded bold font
-                                .foregroundColor(Color(red: 0.17, green: 0.06, blue: 0.20)) // dark text for contrast on gradient
-                                .padding(.horizontal, 14) // horizontal padding for capsule shape
-                                .padding(.vertical, 9) // vertical padding for tap target
-                                .background( // gradient fill matching existing design
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 1.00, green: 0.53, blue: 0.29), // warm orange start
-                                            Color(red: 0.97, green: 0.39, blue: 0.67), // magenta midpoint
-                                            Color(red: 0.57, green: 0.45, blue: 0.98)  // purple tail
-                                        ],
-                                        startPoint: .topLeading, // gradient direction
-                                        endPoint: .bottomTrailing // gradient direction
-                                    )
-                                )
-                                .clipShape(Capsule()) // capsule silhouette
-                                .overlay( // outline for separation
-                                    Capsule()
-                                        .stroke(Color.white.opacity(0.45), lineWidth: 1.2) // subtle white stroke
-                                )
-                                .shadow(color: Color(red: 0.97, green: 0.39, blue: 0.67).opacity(0.45), radius: 8, x: 0, y: 3) // glow shadow
-                        }
-                        .buttonStyle(.plain) // Preserves custom styling without default button tinting.
-                        
-                        Button(action: { enterUpdateProgressMode() }) { // enters slider update mode
-                            Label("Update Progress", systemImage: "slider.horizontal.3") // label for manual progress
-                                .font(.system(size: 15, weight: .bold, design: .rounded)) // rounded bold font
-                                .foregroundColor(.white) // white text on teal gradient
-                                .padding(.horizontal, 14) // capsule spacing
-                                .padding(.vertical, 9) // capsule spacing
-                                .background(
-                                    LinearGradient(
-                                        colors: [
-                                            NeonPalette.neonTeal, // teal start color
-                                            NeonPalette.neonTeal.opacity(0.75) // softened end color
-                                        ],
-                                        startPoint: .leading, // gradient direction
-                                        endPoint: .trailing // gradient direction
-                                    )
-                                )
-                                .clipShape(Capsule()) // pill shape
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.white.opacity(0.35), lineWidth: 1) // light outline for separation
-                                )
-                        }
-                        .buttonStyle(.plain) // custom styling
+                    .buttonStyle(.plain)
+                    
+                    if isUpdateProgressMode { // slider edit mode pills
+                        pillActionButton(title: "Cancel", background: Color(red: 0.75, green: 0.28, blue: 0.28).opacity(0.7), action: cancelUpdateProgressMode)
+                        pillActionButton(title: "Save", background: Color(red: 0.24, green: 0.65, blue: 0.36).opacity(0.7), action: saveUpdateProgressMode)
                     }
                 }
             }
@@ -361,25 +325,26 @@ struct HomeView: View {
                         }
                         
                         if isUpdateProgressMode { // slider mode rendering
-                            let value = sliderValues[row.intention.id] ?? row.total // pick slider value or baseline total
+                            let value = sliderValues[row.intention.id] ?? row.total // working total
+                            let percent = percentForTotal(value, intention: row.intention) // derived percent 0...1
                             VStack(alignment: .leading, spacing: 6) { // stack slider + value
                                 Slider(
-                                    value: Binding( // two-way bind slider to dictionary
-                                        get: { sliderValues[row.intention.id] ?? row.total }, // getter uses stored value or baseline
-                                        set: { newValue in // setter updates map
-                                            sliderValues[row.intention.id] = newValue // persist slider position
+                                    value: Binding( // two-way bind percent to dictionary-stored totals
+                                        get: { percentForTotal(sliderValues[row.intention.id] ?? row.total, intention: row.intention) },
+                                        set: { newPercent in
+                                            sliderValues[row.intention.id] = totalForPercent(newPercent, intention: row.intention)
                                         }
                                     ),
-                                    in: 0...sliderUpperBound(for: row.intention, currentTotal: row.total), // unit-aware cap with current total guard
-                                    step: sliderStep(for: row.intention) // unit-aware step size
+                                    in: 0...1, // percent-based slider
+                                    step: 0.01 // fine-grained percent steps
                                 )
                                 .tint(Color(red: 0.2, green: 0.8, blue: 0.7)) // neon teal tint for consistency
                                 
                                 HStack {
+                                    Spacer()
                                     Text("\(displayValue(value)) \(row.intention.unit)") // show unit value under slider
                                         .font(.caption) // small caption
                                         .foregroundColor(.white.opacity(0.9)) // slightly muted white
-                                    Spacer() // align left
                                 }
                             }
                         } else { // default progress bar rendering
@@ -388,6 +353,37 @@ struct HomeView: View {
                         }
                     }
                     .padding(.vertical, 6) // vertical spacing between rows
+                }
+                
+                if !isUpdateProgressMode { // place Update Progress button below list in normal mode
+                    HStack {
+                        Spacer()
+                        Button(action: { enterUpdateProgressMode() }) {
+                            Label("Update Progress", systemImage: "slider.horizontal.3")
+                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            NeonPalette.neonTeal,
+                                            NeonPalette.neonTeal.opacity(0.75)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                                )
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
         }
@@ -590,6 +586,42 @@ struct HomeView: View {
             baseCap = max(100, target * 3, currentTotal * 3) // dynamic default
         }
         return max(baseCap, currentTotal) // ensure current value is always within range
+    }
+    
+    /// Small pill-style action button for header controls.
+    private func pillActionButton(title: String, background: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(background)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    /// Computes percent (0...1) from a total using existing timeframe rules.
+    private func percentForTotal(_ total: Double, intention: Intention) -> Double {
+        let effectiveTarget = intention.timeframe.lowercased() == "weekly"
+            ? intention.targetValue / 7.0
+            : intention.targetValue
+        guard effectiveTarget > 0 else { return 0 }
+        return min(1.0, max(0.0, total / effectiveTarget))
+    }
+    
+    /// Computes total from a percent (0...1) using existing timeframe rules.
+    private func totalForPercent(_ percent: Double, intention: Intention) -> Double {
+        let clamped = min(1.0, max(0.0, percent))
+        let effectiveTarget = intention.timeframe.lowercased() == "weekly"
+            ? intention.targetValue / 7.0
+            : intention.targetValue
+        return max(0, clamped * effectiveTarget)
     }
     
     /// Displays numeric value without trailing decimals when possible.
