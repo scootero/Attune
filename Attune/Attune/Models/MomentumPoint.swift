@@ -26,6 +26,9 @@ struct MomentumPoint: Identifiable {
     /// Color index for palette lookup (or use intentionId for stable mapping)
     let colorIndex: Int
 
+    /// Recording/check-in identifier when available (used to keep bars from the same recording grouped together visually)
+    let recordingId: String?
+
     /// Percent accomplished (0–100+; can exceed 100 for "bonus" display)
     let percent: Double
 
@@ -39,6 +42,7 @@ struct MomentumPoint: Identifiable {
         intentionId: String,
         intentionTitle: String,
         colorIndex: Int,
+        recordingId: String? = nil,
         percent: Double,
         timeOffsetSeconds: Double = 0
     ) {
@@ -47,6 +51,7 @@ struct MomentumPoint: Identifiable {
         self.intentionId = intentionId
         self.intentionTitle = intentionTitle
         self.colorIndex = colorIndex
+        self.recordingId = recordingId
         self.percent = percent
         self.timeOffsetSeconds = timeOffsetSeconds
     }

@@ -63,7 +63,8 @@ struct MomentumPointAdapter {
         for point in points {
             let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: point.date)
             guard let bucketDate = cal.date(from: comps) else { continue }
-            let key = "\(point.intentionId)-\(bucketDate.timeIntervalSince1970)"
+            let recordingPart = point.recordingId ?? "noRec" // Use recording id when present so buckets remain stable per source
+            let key = "\(point.intentionId)-\(recordingPart)-\(bucketDate.timeIntervalSince1970)"
             bucketToPoints[key, default: []].append(point)
         }
         // For each bucket: keep single point with max percent; use bucket timestamp as date for consistent x-position.
@@ -72,13 +73,15 @@ struct MomentumPointAdapter {
             guard let best = group.max(by: { $0.percent < $1.percent }) else { continue }
             let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: best.date)
             let bucketDate = cal.date(from: comps) ?? best.date
-            let stableId = "\(best.intentionId)-\(Int(bucketDate.timeIntervalSince1970))"
+            let recordingPart = best.recordingId ?? "noRec"
+            let stableId = "\(best.intentionId)-\(recordingPart)-\(Int(bucketDate.timeIntervalSince1970))"
             result.append(MomentumPoint(
                 id: stableId,
                 date: bucketDate,
                 intentionId: best.intentionId,
                 intentionTitle: best.intentionTitle,
                 colorIndex: best.colorIndex,
+                recordingId: best.recordingId,
                 percent: best.percent,
                 timeOffsetSeconds: best.timeOffsetSeconds
             ))
@@ -130,6 +133,7 @@ struct MomentumPointAdapter {
                 intentionId: intention.id, // intention identifier
                 intentionTitle: intention.title, // intention title
                 colorIndex: colorIdx, // color index for rendering
+                recordingId: entry.sourceCheckInId, // keep track of recording/check-in for grouping bars from same session
                 percent: percent, // current percent complete
                 timeOffsetSeconds: 0 // no offset needed when using actual occurrence times
             ))
@@ -177,6 +181,7 @@ struct MomentumPointAdapter {
                 intentionId: intention.id, // intention identifier
                 intentionTitle: intention.title, // intention title
                 colorIndex: colorIdx, // color index for chart
+                recordingId: nil, // entries-only path lacks check-in linkage
                 percent: percent, // percent complete
                 timeOffsetSeconds: 0 // no offset because actual times already separate points
             ))

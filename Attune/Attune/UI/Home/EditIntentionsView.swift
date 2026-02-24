@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit // needed for haptic feedback generator used in slider snapping
 
 /// Editable draft of an intention (mutable for form binding)
 struct DraftIntention: Identifiable {
@@ -48,15 +49,25 @@ struct EditIntentionsView: View {
     @Environment(\.dismiss) private var dismiss
     
     /// Draft intentions (max 10, from DraftIntention.maxCount)
-    @State private var draftIntentions: [DraftIntention] = []
+    @State private var draftIntentions: [DraftIntention] = [] // holds current working list for existing intentions
     /// True while loading draft from disk on background (avoids blocking main thread)
-    @State private var isLoadingDraft = true
-    /// Optional status message for record-intentions actions (e.g., cap reached)
-    @State private var recordStatusMessage: String?
+    @State private var isLoadingDraft = true // gates UI until initial load completes
     /// Stores the draft id selected from swipe-to-delete so alert can confirm intent.
-    @State private var pendingDeleteDraftId: String?
+    @State private var pendingDeleteDraftId: String? // tracks which row user wants to delete
     /// Stores a friendly title for the delete confirmation alert message.
-    @State private var pendingDeleteDraftTitle: String = ""
+    @State private var pendingDeleteDraftTitle: String = "" // makes delete prompt human-friendly
+    /// Inline Add card working draft (separate from existing list).
+    @State private var addDraft: DraftIntention = DraftIntention.empty() // captures new intention fields before commit
+    /// Whether the Add card is expanded.
+    @State private var isAddExpanded: Bool = false // ensures only one card expanded at a time per spec
+    /// Currently expanded existing intention id, if any.
+    @State private var expandedEditId: String? // mutually exclusive with add card expansion
+    /// Baseline snapshot of drafts for dirty-state detection.
+    @State private var baselineDrafts: [DraftIntention] = [] // original loaded drafts for change comparison
+    /// Baseline snapshot of add draft for dirty-state detection.
+    @State private var baselineAddDraft: DraftIntention = DraftIntention.empty() // original add-card state (empty)
+    /// Shared haptic generator for slider snaps.
+    private let hapticEngine = UIImpactFeedbackGenerator(style: .light) // reused to avoid reallocating per snap
     
     var body: some View {
         NavigationStack {
@@ -72,72 +83,59 @@ struct EditIntentionsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        RecordIntentionsSection(onIntentionsParsed: { parsed in // injects record flow above manual list
-                            let remaining = DraftIntention.maxCount - draftIntentions.count // compute available slots
-                            guard remaining > 0 else { // guard when already at cap
-                                recordStatusMessage = "You've reached the maximum of \(DraftIntention.maxCount) intentions. Remove one to add more." // user-facing cap message
-                                return // exit because nothing can be added
-                            } // end guard
-                            let toAdd = parsed.prefix(remaining).map { $0.toDraftIntention() } // cap additions and map to drafts
-                            draftIntentions.insert(contentsOf: toAdd, at: 0) // insert at top so new recorded intentions appear first
-                            if parsed.count > toAdd.count { // detect truncation by cap
-                                recordStatusMessage = "Added \(toAdd.count) intentions; reached the cap of \(DraftIntention.maxCount)." // explain partial add
-                            } else { // full add path
-                                recordStatusMessage = "Added \(toAdd.count) intentions from recording." // success message
-                            } // end if
-                        }) // end RecordIntentionsSection
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16)) // tighter top padding for compact CTA
-                        .listRowBackground(Color.clear) // no row background; CTA is self-contained
-                        .listRowSeparator(.hidden) // hide separator for cleaner CTA area
+                        AddIntentionCard( // inline Add card per spec
+                            draft: $addDraft, // bind to add draft state
+                            isExpanded: $isAddExpanded, // controls expansion
+                            disableAdd: draftIntentions.count >= DraftIntention.maxCount, // enforce max cap
+                            onExpand: { collapseAllForAdd() }, // ensure only one expanded at a time
+                            onParsed: { parsed in applyParsedToAddDraft(parsed) }, // route record parse into add draft
+                            hapticEngine: hapticEngine, // share haptic generator
+                            onDirty: { triggerDirtyCheck() } // recompute dirty when add card changes
+                        )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // keep card breathing room
+                        .listRowSeparator(.hidden) // hide separators for glass cards
+                        .listRowBackground(Color.clear) // let glass card show
                         
-                        if let recordStatusMessage { // show status when available
-                            Text(recordStatusMessage) // display status text
-                                .font(.footnote) // use small font for helper text
-                                .foregroundColor(.secondary) // subtle color to avoid clutter
-                        } // end optional status
-                        
-                        ForEach($draftIntentions) { $draft in // iterate editable rows with stable bindings // keeps each row bound directly to its draft model
-                            IntentionEditRow( // render the editable row content itself // row now owns its card styling for smoother typing updates
-                                draft: $draft, // pass the two-way draft binding into the row // allows instant field edits without extra mapping
-                                variation: IntentionCardVariation.forId(draft.id) // pick a stable faded color set from id // prevents color jumping during re-renders
-                            )
-                                .listRowBackground(Color.clear) // clear list row background since card now draws inside the row // reduces list background composition work
-                                .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16)) // keep visible gap between cards // slightly larger separation improves scanability
-                                .listRowSeparator(.hidden) // hide separators so card spacing remains clean // avoids visual clutter
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) { // keep explicit swipe-to-delete behavior on each row // matches requested interaction
+                        ForEach($draftIntentions) { $draft in // iterate with binding so inline edits write through
+                            VStack(spacing: 8) { // stack summary + optional editor
+                                Button(action: { toggleEditExpansion(for: draft.id) }) { // tap to expand/collapse edit card
+                                    IntentionSummaryRow( // summary row retained for quick scan
+                                        draft: draft, // pass current draft
+                                        variation: IntentionCardVariation.forId(draft.id) // deterministic palette
+                                    )
+                                }
+                                .buttonStyle(.plain) // keep custom styling
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) { // deletion affordance
                                     Button(role: .destructive) {
-                                        pendingDeleteDraftId = draft.id // capture which row is pending deletion // used by confirmation alert
-                                        let trimmedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines) // trim title for clean alert copy // avoids weird spacing in prompt
-                                        pendingDeleteDraftTitle = trimmedTitle.isEmpty ? "this intention" : "\"\(trimmedTitle)\"" // show fallback when title is empty // keeps prompt user-friendly
+                                        pendingDeleteDraftId = draft.id // track row for alert
+                                        let trimmedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines) // normalize title
+                                        pendingDeleteDraftTitle = trimmedTitle.isEmpty ? "this intention" : "\"\(trimmedTitle)\"" // friendly prompt
                                     } label: {
-                                        Label("Delete", systemImage: "trash") // standard destructive affordance label // makes action intent obvious
+                                        Label("Delete", systemImage: "trash") // icon for delete
                                     }
                                 }
-                        }
-                        .transaction { transaction in // tune transaction behavior for this row collection // helps prevent micro-jank while editing text
-                            transaction.animation = nil // disable implicit row animations during state changes // reduces per-keystroke layout animation cost
-                        }
-                        
-                        if draftIntentions.count < DraftIntention.maxCount {
-                            Button(action: addDraft) {
-                                Label("Add Intention", systemImage: "plus.circle.fill")
+                                
+                                if expandedEditId == draft.id { // show editor only for active row
+                                    InlineIntentionEditor( // inline editor with slider + fields
+                                        draft: $draft, // bind to this row
+                                        variation: IntentionCardVariation.forId(draft.id), // palette reuse
+                                        onValueChanged: { triggerDirtyCheck() }, // recompute dirty when edits occur
+                                        onUnitChanged: { triggerDirtyCheck() }, // recompute dirty on unit changes
+                                        hapticEngine: hapticEngine // shared generator
+                                    )
+                                }
                             }
+                            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // spacing for glass cards
+                            .listRowSeparator(.hidden) // hide separators under glass
+                            .listRowBackground(Color.clear) // transparent background for gradient
                         }
                     }
                     .scrollContentBackground(.hidden) // allow custom background
                     .listStyle(.plain) // plain list keeps spacing predictable and lighter to render while typing
                     .scrollDismissesKeyboard(.interactively) // let drag gestures dismiss keyboard smoothly // reduces abrupt keyboard/layout interactions
                     .background(
-                        // Very subtle gradient wash; barely visible, adds depth
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(.systemGroupedBackground),
-                                Color(.systemGroupedBackground).opacity(0.94)
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .ignoresSafeArea()
+                        CyberBackground() // reuse cyber-glass gradient to match Home aesthetic
+                            .ignoresSafeArea() // extend behind list
                     )
                 }
             }
@@ -146,7 +144,7 @@ struct EditIntentionsView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismiss()
+                        cancelChanges() // restore baseline then dismiss
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -182,13 +180,58 @@ struct EditIntentionsView: View {
     }
     
     private var canSave: Bool {
-        draftIntentions.contains { !$0.title.trimmingCharacters(in: .whitespaces).isEmpty }
-    }
+        hasChanges // requires real changes
+        && !validIntentionsForSave.isEmpty // requires at least one valid intention
+    } // end canSave
     
-    private func addDraft() {
-        guard draftIntentions.count < DraftIntention.maxCount else { return }
-        draftIntentions.append(DraftIntention.empty())
-    }
+    /// Returns intentions to persist (existing + add card when valid).
+    private var validIntentionsForSave: [DraftIntention] {
+        let trimmedExisting = draftIntentions.compactMap { draft -> DraftIntention? in // walk existing rows
+            let trimmedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines) // normalize title
+            guard !trimmedTitle.isEmpty else { return nil } // skip empty titles
+            var cleaned = draft // copy to mutate safely
+            cleaned.title = trimmedTitle // store trimmed title
+            return cleaned // keep valid row
+        }
+        var results = trimmedExisting // start with existing
+        let addTitle = addDraft.title.trimmingCharacters(in: .whitespacesAndNewlines) // check add draft title
+        if !addTitle.isEmpty { // only include when non-empty
+            var cleanedAdd = addDraft // copy for mutation
+            cleanedAdd.title = addTitle // store trimmed title
+            results.append(cleanedAdd) // append new intention
+        }
+        return results // final list
+    } // end validIntentionsForSave
+    
+    /// Detects whether any changes exist compared to baseline snapshots.
+    private var hasChanges: Bool {
+        // Check add draft change
+        if isDraftDifferent(addDraft, baselineAddDraft) { // compare add card to baseline
+            return true // changed
+        }
+        // Check deletions or insertions
+        if draftIntentions.count != baselineDrafts.count { // length mismatch signals change
+            return true // changed
+        }
+        // Compare each baseline draft against current by id
+        let currentById = Dictionary(uniqueKeysWithValues: draftIntentions.map { ($0.id, $0) }) // map current
+        for base in baselineDrafts { // iterate baseline items
+            guard let current = currentById[base.id] else { return true } // missing item means deletion
+            if isDraftDifferent(current, base) { // field difference
+                return true // changed
+            }
+        }
+        return false // no differences detected
+    } // end hasChanges
+    
+    /// Field-wise comparison for dirty tracking.
+    private func isDraftDifferent(_ lhs: DraftIntention, _ rhs: DraftIntention) -> Bool {
+        lhs.id != rhs.id // id difference counts as change
+        || lhs.title != rhs.title // title change
+        || lhs.targetValue != rhs.targetValue // target change
+        || lhs.unit != rhs.unit // unit change
+        || lhs.timeframe.lowercased() != rhs.timeframe.lowercased() // timeframe change with normalization
+    } // end isDraftDifferent
     
     private func deleteDraft(at offsets: IndexSet) {
         draftIntentions.remove(atOffsets: offsets)
@@ -200,7 +243,50 @@ struct EditIntentionsView: View {
         draftIntentions.removeAll { $0.id == pendingDeleteDraftId }
         self.pendingDeleteDraftId = nil
         self.pendingDeleteDraftTitle = ""
+        triggerDirtyCheck() // mark dirty after deletion
     }
+    
+    /// Ensures only the Add card is expanded.
+    private func collapseAllForAdd() {
+        expandedEditId = nil // collapse any open edit row
+        isAddExpanded = true // expand add card
+    } // end collapseAllForAdd
+    
+    /// Toggles expansion for a specific intention id while collapsing others.
+    private func toggleEditExpansion(for id: String) {
+        if expandedEditId == id { // if already open
+            expandedEditId = nil // collapse
+        } else {
+            isAddExpanded = false // collapse add card
+            expandedEditId = id // expand target row
+        }
+    } // end toggleEditExpansion
+    
+    /// Applies parsed intentions into the Add card fields (first parsed only).
+    private func applyParsedToAddDraft(_ parsed: [ParsedIntention]) {
+        guard let first = parsed.first else { return } // nothing to apply
+        isAddExpanded = true // open add card to show populated fields
+        expandedEditId = nil // ensure exclusivity
+        addDraft.title = first.title.trimmingCharacters(in: .whitespacesAndNewlines) // set parsed title
+        addDraft.unit = (first.unit?.isEmpty == false ? first.unit! : "times") // default to times
+        addDraft.targetValue = max(0, first.target ?? 1) // default to 1 if missing
+        triggerDirtyCheck() // recompute dirty state after population
+    } // end applyParsedToAddDraft
+    
+    /// Forces a refresh of dirty-state dependent UI.
+    private func triggerDirtyCheck() {
+        // No-op body; accessing hasChanges recomputes via state reads.
+        _ = hasChanges // touch computed property to mark dependency
+    } // end triggerDirtyCheck
+    
+    /// Restores drafts to baseline and dismisses without saving.
+    private func cancelChanges() {
+        draftIntentions = baselineDrafts // revert existing drafts
+        addDraft = baselineAddDraft // revert add card
+        expandedEditId = nil // collapse editors
+        isAddExpanded = false // collapse add card
+        dismiss() // close sheet
+    } // end cancelChanges
     
     /// Loads current intentions as draft on background queue; completion runs on main.
     /// Uses EditIntentionsDraftLoader to avoid blocking main thread during sheet open.
@@ -220,6 +306,11 @@ struct EditIntentionsView: View {
                         timeframe: r.timeframe
                     )
                 }
+                baselineDrafts = draftIntentions // capture baseline for dirty tracking
+                addDraft = DraftIntention.empty() // reset add card to empty on load
+                baselineAddDraft = addDraft // align baseline add draft id with current add draft
+                expandedEditId = nil // collapse edits on load
+                isAddExpanded = false // collapse add card on load
                 isLoadingDraft = false
             }
         }
@@ -227,18 +318,10 @@ struct EditIntentionsView: View {
     
     /// Saves: end current set, create new IntentionSet with new/updated intentions
     private func saveAndDismiss() {
-        // Filter to non-empty titles
-        let valid = draftIntentions
-            .map { d in
-                var c = d
-                c.title = c.title.trimmingCharacters(in: .whitespaces)
-                return c
-            }
-            .filter { !$0.title.isEmpty }
-        
-        guard !valid.isEmpty else {
-            dismiss()
-            return
+        let valid = validIntentionsForSave // gather cleaned intentions
+        guard !valid.isEmpty else { // ensure at least one intention
+            dismiss() // nothing to save, dismiss
+            return // stop
         }
         
         do {
@@ -255,10 +338,341 @@ struct EditIntentionsView: View {
             
             AppLogger.log(AppLogger.STORE, "EditIntentions saved IntentionSet with \(intentionIds.count) intentions")
             
+            baselineDrafts = draftIntentions // update baseline to latest saved existing drafts
+            addDraft = DraftIntention.empty() // clear add card after save
+            baselineAddDraft = addDraft // align baseline add draft with cleared add draft
+            isAddExpanded = false // collapse add card post-save
+            expandedEditId = nil // collapse edits post-save
+            
             dismiss()
         } catch {
             AppLogger.log(AppLogger.ERR, "EditIntentions save failed error=\"\(error.localizedDescription)\"")
         }
+    }
+}
+
+/// Compact summary row that previews intention title, value, unit, and timeframe.
+private struct IntentionSummaryRow: View {
+    /// Draft model used to render the row summary.
+    let draft: DraftIntention
+    /// Stable color variation used for gentle card tinting.
+    let variation: IntentionCardVariation
+    
+    var body: some View {
+        HStack(spacing: 12) { // horizontal layout keeps details scannable in a dense list
+            VStack(alignment: .leading, spacing: 6) { // text stack groups title and metadata
+                Text(displayTitle) // primary intention title text with empty fallback
+                    .font(.headline) // clear hierarchy for quick scanning
+                    .foregroundColor(.primary) // system-adaptive text color
+                Text("\(displayValue) \(displayUnit) • \(displayTimeframe)") // concise metadata line with value + unit + cadence
+                    .font(.subheadline) // secondary text scale for supporting details
+                    .foregroundColor(.secondary) // reduced emphasis while remaining readable
+            }
+            Spacer() // push chevron to trailing edge for affordance clarity
+            Image(systemName: "chevron.right") // communicates that tapping opens editor details
+                .font(.footnote.weight(.semibold)) // subtle but visible chevron sizing
+                .foregroundColor(.secondary) // low-emphasis icon tone
+        }
+        .padding(12) // internal spacing for comfortable tap target and visual breathing room
+        .background(IntentionCardBackground(variation: variation)) // reuse existing soft card background style
+        .contentShape(RoundedRectangle(cornerRadius: 16)) // preserve full rounded hit area for reliable taps
+    }
+    
+    /// Title fallback for drafts with empty text.
+    private var displayTitle: String {
+        let trimmed = draft.title.trimmingCharacters(in: .whitespacesAndNewlines) // trim whitespace to decide if title is visually empty
+        return trimmed.isEmpty ? "Untitled Intention" : trimmed // show friendly placeholder when no title exists yet
+    }
+    
+    /// Value display that avoids trailing decimals for whole numbers.
+    private var displayValue: String {
+        if draft.targetValue.rounded() == draft.targetValue { // detect whole numbers so we can avoid ".0"
+            return String(Int(draft.targetValue)) // compact integer display for cleaner summaries
+        }
+        return String(draft.targetValue) // preserve decimal detail when needed
+    }
+    
+    /// Unit fallback for safety if unit is somehow blank.
+    private var displayUnit: String {
+        let trimmed = draft.unit.trimmingCharacters(in: .whitespacesAndNewlines) // normalize whitespace before display
+        return trimmed.isEmpty ? "units" : trimmed // fallback keeps summary readable even with malformed data
+    }
+    
+    /// Human-friendly timeframe display string.
+    private var displayTimeframe: String {
+        draft.timeframe.lowercased() == "weekly" ? "weekly" : "daily" // normalize unexpected values to daily for consistent copy
+    }
+}
+
+/// Unit-aware slider configuration for inline editors.
+private struct IntentionValueConfig {
+    let minValue: Double // inclusive minimum
+    let maxValue: Double // inclusive maximum
+    let stepSize: Double // slider step
+    let defaultValue: Double // default when unit changes
+}
+
+/// Inline editor used for both Add card and expanded edit rows.
+private struct InlineIntentionEditor: View {
+    @Binding var draft: DraftIntention // binding to mutate draft in parent
+    let variation: IntentionCardVariation // color palette
+    let onValueChanged: () -> Void // notifies parent to recompute dirty state
+    let onUnitChanged: () -> Void // notifies parent to recompute dirty state on unit changes
+    let hapticEngine: UIImpactFeedbackGenerator // shared haptic generator
+    
+    @State private var manualValueText: String // text backing for manual entry
+    @State private var isSyncingManualText: Bool = false // guards feedback loops
+    private let snapThreshold: Double = 2 // within 2 units of multiple-of-10 triggers snap
+    
+    init(draft: Binding<DraftIntention>, variation: IntentionCardVariation, onValueChanged: @escaping () -> Void, onUnitChanged: @escaping () -> Void, hapticEngine: UIImpactFeedbackGenerator) {
+        self._draft = draft // store binding
+        self.variation = variation // store palette
+        self.onValueChanged = onValueChanged // store callback
+        self.onUnitChanged = onUnitChanged // store callback
+        self.hapticEngine = hapticEngine // store haptic generator
+        _manualValueText = State(initialValue: Self.displayString(for: draft.wrappedValue.targetValue)) // seed text from value
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) { // stack fields with tight spacing
+            HStack {
+                TextField("Title", text: $draft.title) // title input
+                    .textFieldStyle(.plain) // plain style for glass aesthetic
+                    .foregroundColor(.white) // white text for dark bg
+                    .padding(.horizontal, 12) // inset
+                    .padding(.vertical, 10) // vertical pad
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.08)) // subtle glass fill
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.14), lineWidth: 1) // thin stroke
+                    )
+                    .onChange(of: draft.title) { _, _ in // title change hook
+                        onValueChanged() // mark dirty
+                    }
+            }
+            
+            VStack(alignment: .leading, spacing: 10) { // value + slider
+                HStack(spacing: 12) {
+                    Slider(
+                        value: $draft.targetValue, // bind to numeric value
+                        in: valueConfig.minValue...valueConfig.maxValue, // range by unit
+                        step: valueConfig.stepSize, // step size
+                        onEditingChanged: { isEditing in // snap only on release
+                            if !isEditing { // release moment
+                                applySoftSnap() // snap to nearby multiple of 10
+                            }
+                        }
+                    )
+                    .tint(Color(red: 0.17, green: 0.75, blue: 0.84)) // teal slider tint for cyber look
+                    .onChange(of: draft.targetValue) { _, newValue in // sync text as slider moves
+                        syncManualText(from: newValue) // update manual field
+                        onValueChanged() // propagate dirty state
+                    }
+                    
+                    Text("\(Self.displayString(for: draft.targetValue)) \(displayUnitAbbreviation)") // live value label
+                        .font(.system(size: 20, weight: .bold)) // bold for emphasis
+                        .foregroundColor(.white) // white text
+                        .monospacedDigit() // monospaced for stability
+                        .onTapGesture { // allow manual focus via tap
+                            // no-op; tap simply brings attention to manual field nearby
+                        }
+                }
+                
+                TextField("Enter value", text: $manualValueText) // manual numeric entry
+                    .keyboardType(.decimalPad) // numeric keyboard
+                    .multilineTextAlignment(.center) // center align
+                    .padding(.horizontal, 12) // inset
+                    .padding(.vertical, 10) // vertical pad
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.08)) // glass fill
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.14), lineWidth: 1) // thin stroke
+                    )
+                    .onChange(of: manualValueText) { _, newValue in // parse manual edits
+                        applyManualValueInput(newValue) // sync numeric value
+                    }
+            }
+            
+            HStack(spacing: 12) {
+                Picker("Unit", selection: $draft.unit) { // unit picker
+                    ForEach(DraftIntention.unitOptions, id: \.self) { unit in
+                        Text(unit).tag(unit) // unit option
+                    }
+                }
+                .pickerStyle(.menu) // compact menu style
+                .onChange(of: draft.unit) { _, _ in // unit changed
+                    applyUnitReset() // reset value defaults for unit
+                    onUnitChanged() // notify parent
+                }
+                
+                Picker("Timeframe", selection: $draft.timeframe) { // timeframe picker
+                    Text("Daily").tag("daily") // daily option
+                    Text("Weekly").tag("weekly") // weekly option
+                }
+                .pickerStyle(.segmented) // segmented control
+                .onChange(of: draft.timeframe) { _, _ in // timeframe change
+                    onUnitChanged() // still counts as dirty
+                }
+            }
+        }
+        .padding(14) // card padding
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial) // glass material
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.15), lineWidth: 1) // subtle border
+        )
+    }
+    
+    /// Config derived from unit.
+    private var valueConfig: IntentionValueConfig {
+        switch draft.unit.lowercased() {
+        case "minutes":
+            return IntentionValueConfig(minValue: 0, maxValue: 240, stepSize: 5, defaultValue: 30) // minutes config
+        case "pages":
+            return IntentionValueConfig(minValue: 0, maxValue: 200, stepSize: 1, defaultValue: 10) // pages config
+        case "steps":
+            return IntentionValueConfig(minValue: 0, maxValue: 20_000, stepSize: 500, defaultValue: 5_000) // steps config
+        default:
+            return IntentionValueConfig(minValue: 0, maxValue: 100, stepSize: 1, defaultValue: 10) // default fallback
+        }
+    }
+    
+    /// Short unit abbreviation for label.
+    private var displayUnitAbbreviation: String {
+        switch draft.unit.lowercased() {
+        case "minutes": return "min" // minutes abbreviation
+        case "pages": return "pg" // pages abbreviation
+        default: return draft.unit // fallback
+        }
+    }
+    
+    /// Applies soft snap near multiples of 10 after slider release.
+    private func applySoftSnap() {
+        let snapped = Self.softSnap(value: draft.targetValue, threshold: snapThreshold) // compute snapped value
+        guard snapped != draft.targetValue else { return } // no snap needed
+        draft.targetValue = snapped // apply snap
+        syncManualText(from: snapped) // sync text
+        hapticEngine.impactOccurred() // light haptic feedback
+        onValueChanged() // notify parent
+    }
+    
+    /// Syncs manual text field from numeric value.
+    private func syncManualText(from value: Double) {
+        isSyncingManualText = true // guard against recursion
+        manualValueText = Self.displayString(for: value) // update text
+        isSyncingManualText = false // release guard
+    }
+    
+    /// Parses manual text and clamps/snap to config.
+    private func applyManualValueInput(_ text: String) {
+        guard !isSyncingManualText else { return } // skip loops
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines) // normalize
+        if trimmed.isEmpty { return } // ignore empty
+        let normalized = trimmed.replacingOccurrences(of: ",", with: ".") // decimal separator support
+        guard let parsed = Double(normalized) else { return } // ignore invalid
+        let clamped = min(valueConfig.maxValue, max(valueConfig.minValue, parsed)) // clamp to range
+        draft.targetValue = clamped // apply exact manual value (no snap to allow override)
+        syncManualText(from: clamped) // reflect in text
+        onValueChanged() // notify parent
+    }
+    
+    /// Resets value when unit changes to its default, with snap + sync.
+    private func applyUnitReset() {
+        let defaultValue = valueConfig.defaultValue // derive default for unit
+        draft.targetValue = defaultValue // apply default
+        syncManualText(from: defaultValue) // sync text
+        applySoftSnap() // ensure snap for consistency
+    }
+    
+    /// Formats numeric display without trailing decimals when possible.
+    private static func displayString(for value: Double) -> String {
+        if value.rounded() == value { // whole number
+            return String(Int(value)) // integer display
+        }
+        return String(format: "%.2f", value) // two-decimal display
+    }
+    
+    /// Soft snaps toward nearest multiple of 10 when within threshold.
+    private static func softSnap(value: Double, threshold: Double) -> Double {
+        let nearest = (value / 10).rounded() * 10 // nearest multiple of 10
+        if abs(nearest - value) <= threshold { // within soft zone
+            return nearest // snap
+        }
+        return value // leave as-is
+    }
+}
+
+/// Inline Add card that hosts Record + manual entry.
+private struct AddIntentionCard: View {
+    @Binding var draft: DraftIntention // add draft binding
+    @Binding var isExpanded: Bool // expansion flag
+    let disableAdd: Bool // disables interaction when at cap
+    let onExpand: () -> Void // called when expanding add card
+    let onParsed: ([ParsedIntention]) -> Void // routes parsed intentions into add draft
+    let hapticEngine: UIImpactFeedbackGenerator // shared haptic
+    let onDirty: () -> Void // dirty-state notifier
+    
+    @State private var recordStatus: String? = nil // local status message
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button(action: {
+                guard !disableAdd else { return } // prevent expansion when at cap
+                onExpand() // collapse others, expand add
+            }) {
+                HStack {
+                    Text("Add Intention") // header title
+                        .font(.headline) // emphasize
+                        .foregroundColor(.white) // white text
+                    Spacer()
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down") // expand indicator
+                        .foregroundColor(.white.opacity(0.8)) // softer icon
+                }
+                .padding(.vertical, 8) // padding for tap target
+            }
+            .buttonStyle(.plain) // keep custom styling
+            .disabled(disableAdd) // respect cap
+            
+            if let recordStatus { // show status when present
+                Text(recordStatus) // status text
+                    .font(.footnote) // small font
+                    .foregroundColor(.secondary) // subtle color
+            }
+            
+            if isExpanded { // show body when expanded
+                RecordIntentionsSection(onIntentionsParsed: { parsed in // embed record UI
+                    onParsed(parsed) // populate add draft fields
+                    recordStatus = parsed.isEmpty ? "No intentions found." : "Parsed into Add card. Review then Save." // status message
+                    onDirty() // mark dirty
+                })
+                
+                InlineIntentionEditor( // reuse editor for add card
+                    draft: $draft, // bind to add draft
+                    variation: IntentionCardVariation.forId(draft.id), // palette
+                    onValueChanged: { onDirty() }, // dirty on value change
+                    onUnitChanged: { onDirty() }, // dirty on unit change
+                    hapticEngine: hapticEngine // shared haptic
+                )
+            }
+        }
+        .padding(14) // card padding
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial) // glass background
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.15), lineWidth: 1) // subtle stroke
+        )
     }
 }
 

@@ -32,10 +32,40 @@ struct MomentumChartView: View {
                 chartContent
             }
 
-            // Legend hidden: bars now use progress-based color (red→yellow→green), so intention-color legend would be misleading
+            if !legendItems.isEmpty { // Show intention colors so users can map bars to intentions
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(legendItems, id: \.id) { item in
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(MomentumPalette.color(forIndex: item.colorIndex))
+                                    .frame(width: 10, height: 10)
+                                Text(item.title)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
         }
         .padding(16)
         .glassCard()
+    }
+
+    /// Collect unique intentions for legend display using stable colorIndex
+    private var legendItems: [(id: String, title: String, colorIndex: Int)] {
+        var seen = Set<String>()
+        var items: [(String, String, Int)] = []
+        for point in points {
+            if !seen.contains(point.intentionId) {
+                seen.insert(point.intentionId)
+                items.append((point.intentionId, point.intentionTitle, point.colorIndex))
+            }
+        }
+        return items
     }
 
     /// 3D Chart with perspective view from upper left corner. Bars have 6px depth, grid lines are 3D.
@@ -206,19 +236,19 @@ struct MomentumChartView: View {
         }
     }
     
-    /// Draws 3D bars with cube-like depth. Collision layout: median centered, smaller left, larger right; draw order: right first, left second, median last (median on top).
+    /// Draws 3D bars with cube-like depth. Collision layout: centered per recording/minute, offsets sized to bar width so bars never overlap; draw order keeps larger bars behind smaller ones.
     private func draw3DBars(context: GraphicsContext, chartWidth: CGFloat, chartHeight: CGFloat, leftPadding: CGFloat, bottomPadding: CGFloat, depthOffset: CGFloat, perspectiveAngle: CGFloat) {
-        let barWidth: CGFloat = 24 // Width of each bar (also used for stagger: barWidth * 0.5)
+        let barWidth: CGFloat = 24 // Width of each bar (used for rendering depth visuals and spacing)
         let barDepth: CGFloat = barWidth
         let dayDuration = dayEnd.timeIntervalSince(dayStart)
-        let staggerPixels = barWidth * 0.5 // Minimum horizontal separation when bars share same minute bucket
 
-        // Compute layout: group by minute bucket, assign offsetPixels and drawOrder for collision handling
-        let laidOut = layoutBarsForCollision(points: points, dayStart: dayStart, staggerPixels: staggerPixels)
+        // Compute layout: group by recording when available (else minute), assign time-based offsetPixels and drawOrder for collision handling
+        let laidOut = layoutBarsForCollision(points: points, dayStart: dayStart, dayDuration: dayDuration, chartWidth: chartWidth, barWidth: barWidth) // Use spacing sized to bar width to prevent overlap
 
         // Sort for draw order: right (larger) first (back), left (smaller) second, median last (front so median on top)
         let drawOrdered = laidOut.sorted { a, b in
             if a.drawOrder != b.drawOrder { return a.drawOrder < b.drawOrder }
+            if a.point.percent != b.point.percent { return a.point.percent < b.point.percent } // smaller first, larger last
             return a.point.date < b.point.date
         }
 
@@ -237,8 +267,8 @@ struct MomentumChartView: View {
             let barHeight = barHeightRatio * chartHeight
             let yPos = chartHeight - barHeight + 10
 
-            // Bar color from progress percent (red→yellow→green); do not use colorIndex for fill
-            let barColor = MomentumPalette.colorForProgress(point.percent)
+            // Bar color per intention (stable colorIndex mapping); legend shows these colors
+            let barColor = MomentumPalette.color(forIndex: point.colorIndex)
             
             // Artificial light from above: top face brightest, front lit, side and back in shadow so edges and depth are visible.
             let backShade = Color.black.opacity(0.5)   // Back face darkest (furthest from light)
@@ -323,36 +353,63 @@ struct MomentumChartView: View {
         }
     }
 
-    /// Collects points into minute buckets, computes offset and draw order for collision layout.
-    /// When N>1 bars share a bucket: sort by percent ascending; median bar centered (offset 0);
-    /// smaller bars left (negative offset); larger bars right (positive offset). Stagger = barWidth*0.5.
-    private func layoutBarsForCollision(points: [MomentumPoint], dayStart: Date, staggerPixels: CGFloat) -> [(point: MomentumPoint, offsetPixels: CGFloat, drawOrder: Int)] {
-        let cal = Calendar.current
-        var bucketToPoints: [Int: [MomentumPoint]] = [:]
-        for point in points {
-            let minuteOfDay = Int(point.date.timeIntervalSince(dayStart) / 60)
-            bucketToPoints[minuteOfDay, default: []].append(point)
+    /// Collects points into groups: same recording/check-in when available, else minute buckets; computes offset and draw order for collision layout.
+    /// When N>1 bars share a group: sort by percent ascending; symmetric offsets center the cluster on the timestamp; spacing in time units.
+    private func layoutBarsForCollision(points: [MomentumPoint], dayStart: Date, dayDuration: TimeInterval, chartWidth: CGFloat, barWidth: CGFloat) -> [(point: MomentumPoint, offsetPixels: CGFloat, drawOrder: Int)] {
+        let cal = Calendar.current // Use calendar for minute bucketing fallback
+        var bucketToPoints: [String: (anchorDate: Date, items: [MomentumPoint])] = [:] // Map grouping key to points + anchor
+        for point in points { // Walk all points to bucket by grouping key
+            let minuteOfDay = Int(point.date.timeIntervalSince(dayStart) / 60) // Derive minute index for fallback
+            if let recordingId = point.recordingId { // Prefer grouping by recording/check-in id
+                let key = "rec-\(recordingId)"
+                bucketToPoints[key, default: (anchorDate: point.date, items: [])].items.append(point) // Anchor on point date
+            } else {
+                let key = "min-\(minuteOfDay)"
+                let anchorDate = cal.date(byAdding: .minute, value: minuteOfDay, to: dayStart) ?? point.date // Anchor to bucket start
+                if bucketToPoints[key] == nil { bucketToPoints[key] = (anchorDate: anchorDate, items: []) }
+                bucketToPoints[key]?.items.append(point)
+            }
         }
-        var result: [(MomentumPoint, CGFloat, Int)] = []
-        for (_, group) in bucketToPoints {
+        let desiredGapPx: CGFloat = 0.0 // No gap: bars abut so the next starts where the previous ends
+        let barSpacingPixels: CGFloat = barWidth + desiredGapPx // Spacing equals bar width to make bars touch edge-to-edge
+        let minimumPixelGap: CGFloat = barSpacingPixels // Enforce spacing at least one bar width to prevent overlap
+        // Cap total span when group count exceeds 10 to avoid overflow in extreme clusters (spec edge case)
+        // Offsets computed here; could move to adapter as timeOffsetSeconds if layout logic grows (keeps view lighter)
+        // Current ascending sort keeps tallest near center for odd N; spec alternative is descending to place tallest left; adjust if design changes
+        var result: [(MomentumPoint, CGFloat, Int)] = [] // Accumulate laid-out bar metadata
+        for (_, payload) in bucketToPoints { // Process each group independently
+            let group = payload.items
+            let anchorDate = payload.anchorDate
             if group.count == 1 {
                 result.append((group[0], 0, 1)) // Single bar: no offset, draw in middle layer
             } else {
-                let sorted = group.sorted { $0.percent < $1.percent }
-                let n = sorted.count
-                let medianIndex = n / 2
-                for (i, point) in sorted.enumerated() {
-                    let offsetUnits = i - medianIndex
-                    let offsetPixels = CGFloat(offsetUnits) * staggerPixels
-                    let drawOrder: Int // 0=back (right/larger), 1=mid (left/smaller), 2=front (median)
-                    if i > medianIndex { drawOrder = 0 }
-                    else if i < medianIndex { drawOrder = 1 }
-                    else { drawOrder = 2 }
-                    result.append((point, offsetPixels, drawOrder))
+                let sorted = group.sorted { $0.percent < $1.percent } // Keep tallest near center by ascending sort
+                let n = sorted.count // Count bars in this bucket for offset math
+                let center = Double(n - 1) / 2.0 // Symmetric center so even counts get half-step offsets
+                for (i, point) in sorted.enumerated() { // Assign offset to each bar
+                    let offsetIndex = Double(i) - center // Symmetric offset index per spec: i - (N - 1) / 2
+                    let offsetPixelsRaw = CGFloat(offsetIndex) * barSpacingPixels // Use spacing sized to bar width plus gap
+                    let clampedMagnitude = max(abs(offsetPixelsRaw), minimumPixelGap) // Ensure spacing clears bar width
+                    let offsetPixels = offsetPixelsRaw < 0 ? -clampedMagnitude : clampedMagnitude // Restore sign after clamping to keep left/right direction
+                    let drawOrder: Int // 0=back (right/larger), 1=mid (left/smaller), 2=front (median or nearest)
+                    if offsetIndex > 0 { drawOrder = 0 } // Positive offsets (right side) render first to sit behind
+                    else if offsetIndex < 0 { drawOrder = 1 } // Negative offsets (left side) render next
+                    else { drawOrder = 2 } // Zero offset (center) renders last on top
+                    let adjustedPoint = MomentumPoint( // Preserve metadata while keeping original timestamp for rendering anchor
+                        id: point.id,
+                        date: anchorDate, // Anchor all bars in the group on the group timestamp
+                        intentionId: point.intentionId,
+                        intentionTitle: point.intentionTitle,
+                        colorIndex: point.colorIndex,
+                        recordingId: point.recordingId,
+                        percent: point.percent,
+                        timeOffsetSeconds: point.timeOffsetSeconds
+                    )
+                    result.append((adjustedPoint, offsetPixels, drawOrder)) // Persist computed layout for rendering
                 }
             }
         }
-        return result
+        return result // Provide laid-out bars to renderer
     }
 
     /// Start of selected day (00:00 local)
