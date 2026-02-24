@@ -370,7 +370,7 @@ struct HomeView: View {
                                             sliderValues[row.intention.id] = newValue // persist slider position
                                         }
                                     ),
-                                    in: 0...max(row.intention.targetValue * 2, max(10, row.total * 2)), // allow headroom up to 2x target/current
+                                    in: 0...sliderUpperBound(for: row.intention, currentTotal: row.total), // unit-aware cap with current total guard
                                     step: sliderStep(for: row.intention) // unit-aware step size
                                 )
                                 .tint(Color(red: 0.2, green: 0.8, blue: 0.7)) // neon teal tint for consistency
@@ -572,6 +572,24 @@ struct HomeView: View {
         case "steps": return 500 // per 500 steps
         default: return 1 // general fallback
         }
+    }
+    
+    /// Unit-aware slider upper bound with sensible caps; always at least current total.
+    private func sliderUpperBound(for intention: Intention, currentTotal: Double) -> Double {
+        let unit = intention.unit.lowercased()
+        let target = intention.targetValue
+        let baseCap: Double
+        switch unit {
+        case "minutes":
+            baseCap = 360 // allow up to 6 hours
+        case "pages":
+            baseCap = 300 // large reading session
+        case "steps":
+            baseCap = 50_000 // generous daily steps ceiling
+        default:
+            baseCap = max(100, target * 3, currentTotal * 3) // dynamic default
+        }
+        return max(baseCap, currentTotal) // ensure current value is always within range
     }
     
     /// Displays numeric value without trailing decimals when possible.

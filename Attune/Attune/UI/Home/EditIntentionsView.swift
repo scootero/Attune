@@ -123,6 +123,7 @@ struct EditIntentionsView: View {
                                         onUnitChanged: { triggerDirtyCheck() }, // recompute dirty on unit changes
                                         hapticEngine: hapticEngine // shared generator
                                     )
+                                    .transition(.opacity.combined(with: .move(edge: .top))) // smooth show/hide
                                 }
                             }
                             .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // spacing for glass cards
@@ -248,25 +249,31 @@ struct EditIntentionsView: View {
     
     /// Ensures only the Add card is expanded.
     private func collapseAllForAdd() {
-        expandedEditId = nil // collapse any open edit row
-        isAddExpanded = true // expand add card
+        withAnimation(.easeInOut(duration: 0.2)) { // smooth expand animation
+            expandedEditId = nil // collapse any open edit row
+            isAddExpanded = true // expand add card
+        }
     } // end collapseAllForAdd
     
     /// Toggles expansion for a specific intention id while collapsing others.
     private func toggleEditExpansion(for id: String) {
-        if expandedEditId == id { // if already open
-            expandedEditId = nil // collapse
-        } else {
-            isAddExpanded = false // collapse add card
-            expandedEditId = id // expand target row
+        withAnimation(.easeInOut(duration: 0.2)) { // animate expand/collapse
+            if expandedEditId == id { // if already open
+                expandedEditId = nil // collapse
+            } else {
+                isAddExpanded = false // collapse add card
+                expandedEditId = id // expand target row
+            }
         }
     } // end toggleEditExpansion
     
     /// Applies parsed intentions into the Add card fields (first parsed only).
     private func applyParsedToAddDraft(_ parsed: [ParsedIntention]) {
         guard let first = parsed.first else { return } // nothing to apply
-        isAddExpanded = true // open add card to show populated fields
-        expandedEditId = nil // ensure exclusivity
+        withAnimation(.easeInOut(duration: 0.2)) { // animate opening add card when populated
+            isAddExpanded = true // open add card to show populated fields
+            expandedEditId = nil // ensure exclusivity
+        }
         addDraft.title = first.title.trimmingCharacters(in: .whitespacesAndNewlines) // set parsed title
         addDraft.unit = (first.unit?.isEmpty == false ? first.unit! : "times") // default to times
         addDraft.targetValue = max(0, first.target ?? 1) // default to 1 if missing
@@ -649,19 +656,22 @@ private struct AddIntentionCard: View {
             }
             
             if isExpanded { // show body when expanded
-                RecordIntentionsSection(onIntentionsParsed: { parsed in // embed record UI
-                    onParsed(parsed) // populate add draft fields
-                    recordStatus = parsed.isEmpty ? "No intentions found." : "Parsed into Add card. Review then Save." // status message
-                    onDirty() // mark dirty
-                })
-                
-                InlineIntentionEditor( // reuse editor for add card
-                    draft: $draft, // bind to add draft
-                    variation: IntentionCardVariation.forId(draft.id), // palette
-                    onValueChanged: { onDirty() }, // dirty on value change
-                    onUnitChanged: { onDirty() }, // dirty on unit change
-                    hapticEngine: hapticEngine // shared haptic
-                )
+                VStack(spacing: 10) {
+                    RecordIntentionsSection(onIntentionsParsed: { parsed in // embed record UI
+                        onParsed(parsed) // populate add draft fields
+                        recordStatus = parsed.isEmpty ? "No intentions found." : "Parsed into Add card. Review then Save." // status message
+                        onDirty() // mark dirty
+                    })
+                    
+                    InlineIntentionEditor( // reuse editor for add card
+                        draft: $draft, // bind to add draft
+                        variation: IntentionCardVariation.forId(draft.id), // palette
+                        onValueChanged: { onDirty() }, // dirty on value change
+                        onUnitChanged: { onDirty() }, // dirty on unit change
+                        hapticEngine: hapticEngine // shared haptic
+                    )
+                }
+                .transition(.opacity.combined(with: .move(edge: .top))) // smooth expand/collapse
             }
         }
         .padding(14) // card padding
