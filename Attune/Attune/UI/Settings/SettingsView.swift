@@ -7,9 +7,11 @@
 //
 
 import SwiftUI
+import StoreKit
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     // State for showing share sheet when exporting data
     @State private var showingExportSheet = false
     @State private var exportURL: URL?
@@ -17,10 +19,44 @@ struct SettingsView: View {
     @State private var exportErrorMessage = ""
     @State private var isReminderEnabled = ReminderPreferences.isReminderEnabled // Bind toggle to persisted enabled flag so user can turn daily reminders on/off.
     @State private var reminderTime = ReminderPreferences.reminderTimeDate // Bind DatePicker to persisted reminder time so user can customize notification time.
+    @State private var showPaywall = false
+    @State private var showManageSubscriptions = false
     
     var body: some View {
         NavigationView {
             List {
+                // Subscription section — status, subscribe, restore
+                Section {
+                    HStack {
+                        Image(systemName: "crown.fill")
+                            .foregroundColor(.orange)
+                            .font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(subscriptionManager.isSubscribed ? "Attune Monthly Active" : "Attune Monthly")
+                                .font(.body)
+                            Text(subscriptionManager.isSubscribed ? "Unlimited features unlocked" : subscriptionManager.priceText)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                    if !subscriptionManager.isSubscribed {
+                        Button("Subscribe") { showPaywall = true }
+                    }
+                    Button("Restore Purchases") {
+                        Task { await subscriptionManager.restore() }
+                    }
+                    .disabled(subscriptionManager.isBusy)
+                    // Opens Apple’s subscription management sheet / account page.
+                    Button("Manage Subscription") {
+                        showManageSubscriptions = true
+                    }
+                } header: {
+                    Text("Subscription")
+                } footer: {
+                    Text("Free: \(SubscriptionConfig.freeCheckInsPerDay) check-ins per day. Subscribe for unlimited check-ins, All Day recording, and voice intentions. Cancel anytime in Manage Subscription.")
+                }
+
                 // About section
                 Section {
                     NavigationLink(destination: AboutView()) {
@@ -80,7 +116,8 @@ struct SettingsView: View {
                     Text("Attune sends a reminder at this time when you have not checked in yet or are below 50% of your daily intentions.") // Explain exactly when reminder triggers to avoid user confusion.
                 }
                 
-                // Logs section
+                // Logs section — Debug builds only (avoid shipping sensitive transcripts in Release)
+                #if DEBUG
                 Section {
                     NavigationLink(destination: LogsView()) {
                         HStack {
@@ -94,6 +131,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Developer")
                 }
+                #endif
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
@@ -107,10 +145,18 @@ struct SettingsView: View {
                     ShareSheet(items: [url])
                 }
             }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
+                    .environmentObject(subscriptionManager)
+            }
+            .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
             .alert("Export Failed", isPresented: $showingExportError) {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(exportErrorMessage)
+            }
+            .task {
+                await subscriptionManager.refresh()
             }
         }
     }
@@ -172,4 +218,5 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 #Preview {
     SettingsView()
+        .environmentObject(SubscriptionManager.shared)
 }

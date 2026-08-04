@@ -65,6 +65,7 @@ private struct IntentionProgressRow: Identifiable {
 
 struct HomeView: View {
     @EnvironmentObject var appRouter: AppRouter
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @StateObject private var checkInRecorder = CheckInRecorderService.shared
     @State private var state: CheckInState = .idle
     @State private var todaysProgress: [IntentionProgressRow] = []
@@ -101,6 +102,10 @@ struct HomeView: View {
     @State private var sliderValues: [String: Double] = [:] // holds the working total for each intention while editing
     /// Original totals snapshot for cancel restore.
     @State private var originalTotals: [String: Double] = [:] // keeps baseline totals so Cancel can restore without saving
+    /// Shows the subscription paywall when a free-tier limit is hit.
+    @State private var showPaywall = false
+    /// Optional reason text passed into the paywall sheet.
+    @State private var paywallReason: String? = nil
     
     var body: some View {
         NavigationView {
@@ -156,16 +161,12 @@ struct HomeView: View {
         .navigationBarHidden(true)
         .onAppear {
             refreshAll()
-            // Request mic + speech permissions when Home loads (instead of on first record).
-            // Only shows dialogs when status is .undetermined; already granted = no-op.
-            PermissionsHelper.requestRecordingPermissionsIfNeeded()
-            // Request notification permission once so daily reminder notifications can be delivered.
-            PermissionsHelper.requestNotificationPermissionsIfNeeded()
             // Pre-create directories so they don't need to be created on button tap (reduces lag)
             try? AppPaths.ensureDirectoriesExist()
         }
         .sheet(isPresented: $showEditIntentions) {
             EditIntentionsView()
+                .environmentObject(subscriptionManager)
                 .onDisappear { refreshAll() }
         }
         .sheet(isPresented: $showMoodEditor) {
@@ -200,6 +201,10 @@ struct HomeView: View {
                         }
                     }
             }
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(reason: paywallReason)
+                .environmentObject(subscriptionManager)
         }
         }
     }
@@ -1079,7 +1084,18 @@ struct HomeView: View {
     // MARK: - Actions
     
     private func startCheckIn() {
+        // Free users get a daily check-in cap; subscribers are unlimited.
+        let todayCount = todayCheckIns.count
+        guard subscriptionManager.canStartCheckIn(todayCheckInCount: todayCount) else {
+            paywallReason = "You've used your \(SubscriptionConfig.freeCheckInsPerDay) free check-ins today. Subscribe for unlimited check-ins."
+            showPaywall = true
+            return
+        }
+
         do {
+            // Ask for mic + speech when the user starts a check-in (not on Home appear).
+            PermissionsHelper.requestRecordingPermissionsIfNeeded()
+            
             // Use cached intention set (already loaded in onAppear, so this should be fast)
             // If not cached, this will load synchronously but should be rare
             guard let _ = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else {

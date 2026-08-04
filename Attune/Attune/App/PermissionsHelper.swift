@@ -2,27 +2,26 @@
 //  PermissionsHelper.swift
 //  Attune
 //
-//  Requests microphone and speech recognition permissions proactively when Home loads.
-//  Shows system dialogs only when status is .undetermined/.notDetermined (first time).
-//  If already authorized, these are no-ops; if denied, user must go to Settings.
+//  Requests microphone, speech recognition, and notification permissions
+//  at the moment the user starts the related feature (not on Home appear).
 //
 
 import AVFoundation
 import Speech
 import UserNotifications
 
-/// Requests microphone and speech recognition permissions when Home loads.
-/// Only triggers system permission dialogs when the user hasn't been asked yet (.undetermined).
-/// Call from HomeView.onAppear so users see prompts before their first recording attempt.
+/// Requests system permissions only when status is still undetermined.
+/// Call from recording start (mic/speech) or when enabling reminders (notifications).
 enum PermissionsHelper {
 
-    /// Call when Home view appears. Requests both permissions only if not yet determined.
+    /// Call right before the user starts recording a session or check-in.
     static func requestRecordingPermissionsIfNeeded() {
         requestMicrophoneIfNeeded()
         requestSpeechRecognitionIfNeeded()
     }
     
-    /// Requests local notification permission if status is .notDetermined so the app can send reminders.
+    /// Requests local notification permission if status is .notDetermined.
+    /// Call when the user enables daily reminders in Settings.
     static func requestNotificationPermissionsIfNeeded() {
         let notificationCenter = UNUserNotificationCenter.current() // Use the shared notification center to read/request notification permissions.
         notificationCenter.getNotificationSettings { settings in // Read current notification authorization status before requesting anything.

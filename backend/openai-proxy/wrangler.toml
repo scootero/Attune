@@ -1,0 +1,12 @@
+# Cloudflare Worker for Attune OpenAI proxy.
+# Deploy: npx wrangler deploy
+# Secrets: npx wrangler secret put OPENAI_API_KEY
+#          npx wrangler secret put APP_PROXY_TOKEN
+
+name = "attune-openai-proxy"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# Optional local secrets file (gitignored): .dev.vars
+# OPENAI_API_KEY=sk-...
+# APP_PROXY_TOKEN=your-long-random-token

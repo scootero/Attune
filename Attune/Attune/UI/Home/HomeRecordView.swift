@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct HomeRecordView: View {
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     /// Shared recorder service
     @StateObject private var recorder = RecorderService.shared
     
@@ -29,6 +30,8 @@ struct HomeRecordView: View {
     @State private var showSessionsSheet = false
     /// Presents sheet with Insights list (Library → Insights)
     @State private var showInsightsSheet = false
+    /// Shows paywall when a free user tries All Day recording.
+    @State private var showPaywall = false
     
     var body: some View {
         VStack(spacing: 40) {
@@ -136,6 +139,10 @@ struct HomeRecordView: View {
                     }
             }
         }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(reason: "All Day recording is included with Attune Monthly.")
+                .environmentObject(subscriptionManager)
+        }
     }
     
     /// Small card: "Today: X sessions • Y insights" + View Sessions / View Insights buttons
@@ -196,6 +203,13 @@ struct HomeRecordView: View {
         if recorder.isRecording {
             recorder.stopRecording()
         } else {
+            // All Day recording requires an active subscription.
+            guard subscriptionManager.canUseAllDayRecording else {
+                showPaywall = true
+                return
+            }
+            // Ask for mic + speech when the user starts an all-day session.
+            PermissionsHelper.requestRecordingPermissionsIfNeeded()
             recorder.startRecording()
         }
     }

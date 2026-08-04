@@ -887,11 +887,13 @@ private struct RecordIntentionsPillStyle: ButtonStyle {
 
 /// Recording + parsing UI placed above the manual intentions list. // describes helper view purpose
 private struct RecordIntentionsSection: View { // encapsulates record flow UI
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @ObservedObject private var recorder = CheckInRecorderService.shared // reuse shared recorder to match existing pipeline
     @State private var phase: Phase = .idle // tracks UI state machine
     @State private var transcript: String = "" // holds latest transcript text
     @State private var parsedIntentions: [ParsedIntention] = [] // holds parsed intentions preview
     @State private var errorMessage: String? // holds error text for display
+    @State private var showPaywall = false // paywall for voice intentions (subscriber feature)
     
     let onIntentionsParsed: ([ParsedIntention]) -> Void // callback to push parsed intentions into drafts
     
@@ -915,6 +917,10 @@ private struct RecordIntentionsSection: View { // encapsulates record flow UI
             .frame(maxWidth: .infinity)
             .padding(.top, 4)
             .padding(.bottom, 4)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(reason: "Voice Record Intentions is included with Attune Monthly. You can still add intentions manually for free.")
+                .environmentObject(subscriptionManager)
         }
     } // end body
     
@@ -1032,9 +1038,16 @@ private struct RecordIntentionsSection: View { // encapsulates record flow UI
     } // end formattedElapsed
     
     private func startRecording() { // begins recording flow
+        // Voice intentions require subscription; manual add stays free.
+        guard subscriptionManager.canUseVoiceIntentions else {
+            showPaywall = true
+            return
+        }
         errorMessage = nil // clear previous errors
         parsedIntentions = [] // clear previous parse
         transcript = "" // clear previous transcript
+        // Ask for mic + speech when the user starts recording intentions.
+        PermissionsHelper.requestRecordingPermissionsIfNeeded()
         do { // attempt to start recording
             _ = try recorder.startRecording() // start using shared recorder
             phase = .recording // update phase to recording

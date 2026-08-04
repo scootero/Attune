@@ -2,7 +2,7 @@
 //  OpenAIClient.swift
 //  Attune
 //
-//  Minimal client for OpenAI Chat Completions API with Structured Outputs.
+//  Minimal client for OpenAI Chat Completions via Attune's Cloudflare proxy.
 //  POSTs to /v1/chat/completions with json_schema response format.
 //
 
@@ -15,6 +15,8 @@ enum OpenAIClientError: Error, LocalizedError {
     case timeout
     case networkError(Error)
     case decodingError(Error)
+    /// User has not accepted the AI & privacy disclosure yet.
+    case privacyConsentRequired
     
     var errorDescription: String? {
         switch self {
@@ -28,6 +30,8 @@ enum OpenAIClientError: Error, LocalizedError {
             return "Network error: \(error.localizedDescription)"
         case .decodingError(let error):
             return "Failed to decode response: \(error.localizedDescription)"
+        case .privacyConsentRequired:
+            return "AI privacy consent is required before sending transcripts"
         }
     }
 }
@@ -58,13 +62,14 @@ struct OpenAIChatResponse: Codable {
     }
 }
 
-/// Minimal client for OpenAI Chat Completions API with Structured Outputs
+/// Minimal client for OpenAI Chat Completions via Attune's Cloudflare proxy.
+/// The real OpenAI key stays on the server; the app only sends appProxyToken.
 struct OpenAIClient {
     
     // MARK: - Configuration
     
-    /// OpenAI API base URL
-    private static let baseURL = "https://api.openai.com/v1"
+    /// Proxy base URL from Secrets (Worker that forwards to OpenAI).
+    private static var baseURL: String { Secrets.proxyBaseURL }
     
     /// Default timeout interval (30 seconds)
     private static let timeoutInterval: TimeInterval = 30.0
@@ -84,6 +89,11 @@ struct OpenAIClient {
         schema: [String: Any]
     ) async throws -> String {
         
+        // Block network AI until the user accepts the first-launch disclosure.
+        guard AIPrivacyConsent.hasAccepted else {
+            throw OpenAIClientError.privacyConsentRequired
+        }
+        
         let startTime = Date()
         let userChars = inputText.count
         
@@ -93,13 +103,13 @@ struct OpenAIClient {
         // Log high-level request summary
         AppLogger.log(AppLogger.AI, "request_start model=\(model) user_chars=\(userChars) schema=\(schemaName)")
         
-        // Build request
-        let url = URL(string: "\(baseURL)/chat/completions")!
+        // Build request through Attune proxy (never call api.openai.com from the device)
+        let url = URL(string: "\(baseURL)/v1/chat/completions")!
         var request = URLRequest(url: url, timeoutInterval: timeoutInterval)
         request.httpMethod = "POST"
         
-        // Headers (never log the Authorization header)
-        request.setValue("Bearer \(Secrets.openAIKey)", forHTTPHeaderField: "Authorization")
+        // Headers (never log the Authorization header) — app proxy token, not OpenAI key
+        request.setValue("Bearer \(Secrets.appProxyToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         // Request body
@@ -139,10 +149,12 @@ struct OpenAIClient {
             throw OpenAIClientError.httpError(statusCode: httpResponse.statusCode, body: bodyString)
         }
         
-        // Log full response body
+        // Full AI JSON only in Debug — avoid persisting transcripts/insights in Release logs.
+        #if DEBUG
         if let responseString = String(data: data, encoding: .utf8) {
             AppLogger.log(AppLogger.AI, "response_body: \(responseString)")
         }
+        #endif
         
         // Decode response
         let decoder = JSONDecoder()
@@ -161,7 +173,7 @@ struct OpenAIClient {
             throw OpenAIClientError.invalidResponse
         }
         
-        // Log success with content preview
+        // Log success with short preview only (not full content)
         let contentPreview = AppLogger.previewText(content, wordLimit: 10)
         AppLogger.log(AppLogger.AI, "request_done status=\(httpResponse.statusCode) ms=\(elapsedMs) content_preview=\"\(contentPreview)\"")
         
@@ -183,6 +195,11 @@ struct OpenAIClient {
         schema: [String: Any]
     ) async throws -> String {
         
+        // Block network AI until the user accepts the first-launch disclosure.
+        guard AIPrivacyConsent.hasAccepted else {
+            throw OpenAIClientError.privacyConsentRequired
+        }
+        
         let startTime = Date()
         let systemChars = systemMessage.count
         let userChars = userMessage.count
@@ -193,13 +210,13 @@ struct OpenAIClient {
         // Log high-level request summary
         AppLogger.log(AppLogger.AI, "request_start model=\(model) system_chars=\(systemChars) user_chars=\(userChars) schema=\(schemaName)")
         
-        // Build request
-        let url = URL(string: "\(baseURL)/chat/completions")!
+        // Build request through Attune proxy (never call api.openai.com from the device)
+        let url = URL(string: "\(baseURL)/v1/chat/completions")!
         var request = URLRequest(url: url, timeoutInterval: timeoutInterval)
         request.httpMethod = "POST"
         
-        // Headers (never log the Authorization header)
-        request.setValue("Bearer \(Secrets.openAIKey)", forHTTPHeaderField: "Authorization")
+        // Headers (never log the Authorization header) — app proxy token, not OpenAI key
+        request.setValue("Bearer \(Secrets.appProxyToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         // Request body
@@ -254,9 +271,11 @@ struct OpenAIClient {
             throw OpenAIClientError.invalidResponse
         }
         
-        // Log response summary with model data structure
+        // Log response summary; full content only in Debug builds.
         AppLogger.log(AppLogger.AI, "response_received status=\(httpResponse.statusCode) ms=\(elapsedMs) content_chars=\(content.count)")
+        #if DEBUG
         AppLogger.log(AppLogger.AI, "response_content: \(content)")
+        #endif
         
         return content
     }

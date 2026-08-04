@@ -1,0 +1,59 @@
+{
+  "identifier" : "A1B2C3D4",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "BLAUCQ8H26",
+    "_failTransactionsEnabled" : false,
+    "_lastStorefrontUpdateDate" : 0,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21400001",
+      "localizations" : [
+
+      ],
+      "name" : "Attune Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "5.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21400002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited Attune check-ins, recording, and AI insights.",
+              "displayName" : "Attune Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.scottoliver.Attune.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Attune Monthly",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
