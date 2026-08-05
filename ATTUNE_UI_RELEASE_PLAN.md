@@ -1,6 +1,6 @@
 # Attune UI and App Store Release Plan
 
-Last updated: 2026-08-04
+Last updated: 2026-08-05
 
 This is the durable restart document for the Attune UI work. In a new Codex chat, ask the agent to read this file, inspect `git status` and the latest entries in **Change log**, then continue the first incomplete phase. Do not rely on chat history.
 
@@ -105,14 +105,15 @@ Acceptance: app builds; all four tabs work; Settings opens and closes; Home-to-M
 - [x] Add compact summaries and consistent intention color/symbol identity.
 - [x] Validate Day, Week, and Month with removable simulator-only historical data built from Scott's existing intentions.
 
-### Phase 6 — Settings, onboarding, privacy, and paywall
+### Phase 6 — Settings, onboarding, privacy, and paywall (UI implementation complete; production AI decision pending)
 
-- [ ] Reorganize Settings into Account, Notifications, Privacy & Data, Subscription, and Support.
-- [ ] Add permission status and privacy controls.
-- [ ] Replace export `training purposes` language.
-- [ ] Add short benefit-led onboarding followed by the AI/privacy disclosure.
-- [ ] Brand and validate the paywall and StoreKit unavailable state.
-- [ ] Polish About, support, legal, and data-request entry points.
+- [x] Reorganize Settings into Membership, Notifications, Privacy & Data, and Support; do not invent an account system the app does not have.
+- [x] Add readable microphone, speech-recognition, and notification permission status plus an iOS Settings entry point.
+- [x] Replace export `training purposes` language with backup and personal-record language.
+- [x] Add short benefit-led onboarding followed by the existing AI/privacy disclosure.
+- [x] Brand and validate the Attune Pro paywall and StoreKit loading/unavailable/error states.
+- [x] Polish About, support, legal, and data-request entry points.
+- [ ] Finalize provider-specific AI disclosure and production Worker controls after Scott approves the Cloudflare/OpenAI architecture.
 
 ### Phase 7 — Accessibility, release QA, and marketing capture
 
@@ -213,6 +214,19 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - The authoritative cleanup contract and future-removal handoff comments are at the top of `Storage/MomentumDemoDataManager.swift` and beside the Settings controls. Do not remove only the UI; first run cleanup and retain the non-Debug residue purge.
 - Current simulator handoff state: the Debug build is installed and one 17-check-in/68-progress-entry demo run is intentionally loaded for review. Remove it from **Settings → Developer → Remove and Verify Demo Data**.
 
+### 2026-08-05 — Phase 6
+
+- Reorganized Settings around Membership, Notifications, Privacy & Data, and Support while preserving Debug-only diagnostics and Momentum cleanup controls.
+- Replaced Attune Monthly marketing with Attune Pro and removed consumer-facing “background listening” sales language.
+- Built a branded paywall and then aligned the real feature gates to the approved plan: Free has one active intention, one Voice Check-In per day, today's Momentum only, and the daily reminder; Pro adds more intentions, unlimited check-ins, Listening Sessions, Insights, historical/Week/Month Momentum, voice intention setup, and data export.
+- Explained that Listening Sessions organize clear intentions, commitments, events, and states and group repeated ideas into themes; event-like captures do not currently create calendar appointments or event reminders.
+- Added first-run benefit onboarding before the existing mandatory processing disclosure.
+- Added microphone, speech, and notification status plus accurate recording, online-processing, local-storage, export, and data-request information.
+- Set the new-install reminder preference to on at 6 PM; iOS notification authorization is still required before delivery.
+- Updated the local StoreKit product to $4.99/month with a three-day free-trial offer and made trial messaging eligibility-aware. The matching offer must still be configured and verified in App Store Connect.
+- Improved StoreKit loading, unavailable, purchase, restore, and trial states without changing the product ID or Release entitlement verification.
+- Left the existing Cloudflare/OpenAI request architecture and provider-specific disclosure unchanged pending Scott's requested production-API discussion.
+
 ## Verification log
 
 - Pre-change build: succeeded for iPhone 17 Pro simulator on iOS 26.5.
@@ -248,7 +262,17 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - Manual cleanup walkthrough: removed 86 generated data files, reported protected intention hashes unchanged, and an independent filesystem scan confirmed zero `ATTUNE_DEMO_` matches, no manifest, four intentions, and the original single intention set.
 - Release-over-Debug cleanup test: Release build succeeded, preserved the simulator app container, purged all reloaded demo records on launch, kept all four intentions and the original intention set, and exposed no demo controls.
 - Final simulator state: Debug build restored, demo data loaded once for Scott's visual review, and Momentum left open on the current Week chart.
+- Phase 6 Debug and Release builds: succeeded for iPhone 17 Pro simulator on iOS 26.5; `git diff --check` passed.
+- Phase 6 onboarding walkthrough: passed all three benefit pages, page progress, VoiceOver summaries, and completion persistence.
+- Phase 6 Settings walkthrough: passed Membership, reminder defaulted on at 6 PM, Privacy & Data, Support, Debug controls, permission statuses, and external-link presentation.
+- Phase 6 paywall walkthrough: passed branded Pro hierarchy, accurate Free/Pro benefits, readable unavailable state, always-visible retry/restore controls, and legal links.
+- Phase 6 About/privacy walkthrough: passed product explanations, explicit user-started recording language, event-versus-calendar clarification, permission status, export explanation, and privacy/data-request links.
+- Free/Pro Release walkthrough: passed today-only Momentum, locked Listening Sessions and Insights, the one-intention add gate, Pro-only export, and reminder on at 6 PM. Existing data was retained when the plan gate changed.
+- Free Home no longer exposes the weekly mini-chart; it shows only today's aggregate and routes to the today-only Momentum view.
+- The StoreKit trial CTA uses Apple's eligibility result. Directly launching the Release app outside the Xcode StoreKit test session correctly showed the unavailable/fallback state; the real three-day trial remains an App Store Connect/Sandbox verification item.
+- Release launch purged simulator-only demo history by design. The last successful Debug build was reinstalled and the removable 17-check-in/68-entry demo set was reloaded for the concurrent Momentum work.
+- Final current-source Debug and Release builds succeeded after the subscription update; `git diff --check` passed. The latest Debug app is installed with demo data loaded and Momentum open.
 
 ## New-chat restart prompt
 
-> Continue the Attune UI work from `ATTUNE_UI_RELEASE_PLAN.md`. First inspect `git status`, the plan's change log, and the current simulator/build state. Preserve the pre-existing StoreKit changes, Home changes, and local ignored secrets. The simulator currently has removable Momentum demo data loaded; its cleanup contract is documented in `MomentumDemoDataManager.swift`. Approval, publishing, and physical-device verification checkboxes are gates, not incomplete implementation phases. Review Phase 5 with Scott, then continue Phase 6 unless Scott redirects. Build and visually verify the work, update the plan, then stop for review.
+> Continue the Attune UI work from `ATTUNE_UI_RELEASE_PLAN.md`. First inspect `git status`, the plan's change log, and the current simulator/build state. Preserve the pre-existing `LegacyMomentumChartView.swift` change and local ignored secrets. Phase 6 UI is implemented, but do not change the Cloudflare/OpenAI request architecture or provider-specific disclosure until Scott approves the production API direction. The simulator may contain removable Momentum demo data; its cleanup contract is documented in `MomentumDemoDataManager.swift`. After the API decision, complete that final Phase 6 gate and continue Phase 7. Build and visually verify the work, update the plan, then stop for review.

@@ -10,6 +10,7 @@ import SwiftUI
 
 struct RootTabView: View {
     @EnvironmentObject var appRouter: AppRouter
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
 
     // Track whether recovery has been performed to avoid running it multiple times
     @State private var hasPerformedRecovery = false
@@ -29,15 +30,35 @@ struct RootTabView: View {
                 }
                 .tag(RootTab.home)
             
-            // Tab 2: Record — background listening sessions.
-            HomeRecordView()
+            // Tab 2: Record — user-started Listening Sessions.
+            Group {
+                if subscriptionManager.canUseAllDayRecording {
+                    HomeRecordView()
+                } else {
+                    ProLockedFeatureView(
+                        title: "Listening Sessions",
+                        detail: "Start a longer capture when you choose. Attune organizes clear intentions, commitments, events, and states into reviewable Insights.",
+                        icon: "waveform.badge.mic"
+                    )
+                }
+            }
                 .tabItem {
                     Label("Record", systemImage: "waveform.circle.fill")
                 }
                 .tag(RootTab.allDay)
             
             // Tab 3: Insights — captures, recurring themes, and history.
-            LibraryView()
+            Group {
+                if subscriptionManager.canUseInsights {
+                    LibraryView()
+                } else {
+                    ProLockedFeatureView(
+                        title: "Insights",
+                        detail: "Review what Attune found in your Listening Sessions and notice themes that repeat over time.",
+                        icon: "sparkles"
+                    )
+                }
+            }
                 .tabItem {
                     Label("Insights", systemImage: "sparkles")
                 }
@@ -45,7 +66,11 @@ struct RootTabView: View {
             
             // Tab 5: Momentum — charted daily progress now lives here
             NavigationStack { // Provide navigation container for Momentum when used as root tab
-                MomentumView(selectedDate: appRouter.momentumSelectedDate ?? Date()) // Show Momentum screen and seed date from router when available
+                if subscriptionManager.canUseMomentumHistory {
+                    MomentumView(selectedDate: appRouter.momentumSelectedDate ?? Date()) // Full historical Momentum for Pro
+                } else {
+                    FreeMomentumTodayView() // Free is intentionally limited to the current day
+                }
             }
                 .tabItem {
                     Label("Momentum", systemImage: "chart.line.uptrend.xyaxis") // Rename tab to Momentum while reusing chart icon

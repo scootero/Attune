@@ -26,7 +26,9 @@ enum ReminderPreferences {
     private static let defaultMinute = 0 // Product default reminder time minute.
     
     /// Default in-app reminder toggle value when user has not set a preference.
-    private static let defaultIsEnabled = true // Keep reminder enabled by default so feature works immediately for new users.
+    /// Product default is on at 6 PM. iOS still requires notification permission,
+    /// so scheduling remains inactive until the user accepts the system prompt.
+    private static let defaultIsEnabled = true
     
     /// Current in-app reminder enabled preference.
     static var isReminderEnabled: Bool {

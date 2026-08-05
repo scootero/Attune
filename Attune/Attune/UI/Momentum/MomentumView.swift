@@ -33,7 +33,7 @@ struct MonthDayBar: Identifiable {
     var id: Date { date }
 }
 
-/// Models retained for the pre-Aug. 5 weekly chart comparison.
+/// Models retained for the pre-Aug. 5 weekly chart.
 struct LegacyWeekIntentionBar: Identifiable {
     let id = UUID()
     let intentionId: String
@@ -197,14 +197,6 @@ struct MomentumView: View {
                 SummaryItem(value: "\(dayCheckInCount)", label: dayCheckInCount == 1 ? "check-in" : "check-ins")
             ])
 
-            MomentumChartView(
-                points: points,
-                yAxisMax: yAxisMax,
-                selectedDate: selectedDate,
-                hasIntentions: dayIntentionCount > 0
-            )
-
-            comparisonLabel("Original daily 3D bars")
             LegacyMomentumChartView(
                 points: legacyPoints,
                 yAxisMax: legacyYAxisMax,
@@ -243,9 +235,6 @@ struct MomentumView: View {
                 SummaryItem(value: "\(intentionCount)", label: intentionCount == 1 ? "intention" : "intentions")
             ])
 
-            MomentumWeekChartView(days: weekDaysChart, yAxisMax: weekYAxisMax)
-
-            comparisonLabel("Original weekly 3D bars")
             LegacyMomentumWeekChartView(days: legacyWeekDaysChart, yAxisMax: legacyWeekYAxisMax)
 
             if !allBars.isEmpty {
@@ -264,24 +253,8 @@ struct MomentumView: View {
                 SummaryItem(value: percentText(average), label: "avg. momentum")
             ])
 
-            MomentumMonthChartView(bars: monthBars)
-
-            comparisonLabel("Original monthly bars")
-            LegacyMomentumMonthChartView(bars: legacyMonthBars)
-                .padding(16)
-                .glassCard()
+            LegacyMomentumMonthChartView(bars: monthBars)
         }
-    }
-
-    private func comparisonLabel(_ title: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "arrow.down")
-            Text("Comparison: \(title)")
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(AttuneTheme.textSecondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 4)
     }
 
     private struct SummaryItem {

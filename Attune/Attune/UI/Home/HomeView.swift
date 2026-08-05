@@ -148,7 +148,11 @@ struct HomeView: View {
                         recordCheckInCTAArea
                         todaysProgressCard
                         moodAndStreakCard
-                        weeklyMomentumCard
+                        if subscriptionManager.canUseMomentumHistory {
+                            weeklyMomentumCard
+                        } else {
+                            freeTodayMomentumCard
+                        }
                     }
                     .padding(.horizontal, AttuneTheme.horizontalPadding)
                     .padding(.top, 6)
@@ -495,6 +499,43 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .attuneCard()
+    }
+
+    /// Free shows only today's aggregate, matching the today-only Momentum tab.
+    private var freeTodayMomentumCard: some View {
+        Button {
+            appRouter.navigateToMomentum(date: Date())
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.headline)
+                    .foregroundStyle(AttuneTheme.accent)
+                    .frame(width: 38, height: 38)
+                    .background(AttuneTheme.accent.opacity(0.12), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Today's Momentum")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.textPrimary)
+                    Text("\(todayMomentumPercent)% overall today")
+                        .font(.caption)
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.accent)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
+        .buttonStyle(.plain)
+        .attuneCard()
+    }
+
+    private var todayMomentumPercent: Int {
+        guard !todaysProgress.isEmpty else { return 0 }
+        let average = todaysProgress.map { min(1, max(0, currentPercent(for: $0))) }.reduce(0, +) / Double(todaysProgress.count)
+        return Int((average * 100).rounded())
     }
     
     /// Bar color by progress ratio: 0%=red glow, partial=yellow, 80%+=green, 100%=bright green.
@@ -1264,7 +1305,7 @@ struct HomeView: View {
         // Free users get a daily check-in cap; subscribers are unlimited.
         let todayCount = todayCheckIns.count
         guard subscriptionManager.canStartCheckIn(todayCheckInCount: todayCount) else {
-            paywallReason = "You've used your \(SubscriptionConfig.freeCheckInsPerDay) free check-ins today. Subscribe for unlimited check-ins."
+            paywallReason = "You’ve reached today’s free Voice Check-In limit. Attune Pro includes unlimited check-ins."
             showPaywall = true
             return
         }

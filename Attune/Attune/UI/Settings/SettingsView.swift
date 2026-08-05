@@ -2,8 +2,7 @@
 //  SettingsView.swift
 //  Attune
 //
-//  Main settings screen with navigation to About and Logs.
-//  Modern, sleek design following iOS conventions.
+//  Consumer settings organized around membership, reminders, privacy/data, and support.
 //
 
 import SwiftUI
@@ -21,6 +20,7 @@ struct SettingsView: View {
     @State private var isReminderEnabled = ReminderPreferences.isReminderEnabled // Bind toggle to persisted enabled flag so user can turn daily reminders on/off.
     @State private var reminderTime = ReminderPreferences.reminderTimeDate // Bind DatePicker to persisted reminder time so user can customize notification time.
     @State private var showPaywall = false
+    @State private var paywallReason: String?
     @State private var showManageSubscriptions = false
     #if DEBUG && targetEnvironment(simulator)
     @State private var momentumDemoStatus = MomentumDemoDataManager.status()
@@ -29,161 +29,17 @@ struct SettingsView: View {
     #endif
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
-                // Subscription section — status, subscribe, restore
-                Section {
-                    HStack {
-                        Image(systemName: "crown.fill")
-                            .foregroundColor(.orange)
-                            .font(.title3)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(subscriptionManager.isSubscribed ? "Attune Monthly Active" : "Attune Monthly")
-                                .font(.body)
-                            Text(subscriptionManager.isSubscribed ? "Unlimited features unlocked" : subscriptionManager.priceText)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                    }
-                    if !subscriptionManager.isSubscribed {
-                        Button("Subscribe") { showPaywall = true }
-                    }
-                    Button("Restore Purchases") {
-                        Task { await subscriptionManager.restore() }
-                    }
-                    .disabled(subscriptionManager.isBusy)
-                    // Opens Apple’s subscription management sheet / account page.
-                    Button("Manage Subscription") {
-                        showManageSubscriptions = true
-                    }
-                } header: {
-                    Text("Subscription")
-                } footer: {
-                    Text("Free: \(SubscriptionConfig.freeCheckInsPerDay) check-ins per day. Subscribe for unlimited check-ins, background listening sessions, and voice intentions. Cancel anytime in Manage Subscription.")
-                }
-
-                // About section
-                Section {
-                    NavigationLink(destination: AboutView()) {
-                        HStack {
-                            Image(systemName: "info.circle.fill")
-                                .foregroundColor(.blue)
-                                .font(.title3)
-                            Text("About")
-                                .font(.body)
-                        }
-                    }
-                }
-                
-                // Data Export section
-                Section {
-                    Button(action: exportData) {
-                        HStack {
-                            Image(systemName: "square.and.arrow.up.fill")
-                                .foregroundColor(.orange)
-                                .font(.title3)
-                            Text("Export All Data")
-                                .font(.body)
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                } header: {
-                    Text("Data")
-                } footer: {
-                    Text("Export all extractions, corrections, topics, and sessions as JSON files for backup or training purposes.")
-                }
-                
-                // Notification reminder section
-                Section {
-                    Toggle("Enable Daily Reminder", isOn: $isReminderEnabled) // Provide an in-app toggle so users can disable this reminder flow without changing all system notifications.
-                        .onChange(of: isReminderEnabled) { _, newValue in // Persist and reschedule immediately whenever toggle changes.
-                            ReminderPreferences.isReminderEnabled = newValue // Save toggle state so preference survives app relaunch.
-                            if newValue { // Only request permission when user explicitly enables reminder feature.
-                                PermissionsHelper.requestNotificationPermissionsIfNeeded() // Ask for notification access if we haven't asked before.
-                            }
-                            DailyReminderNotificationService.shared.refreshReminderForToday() // Refresh pending request so disabling clears it and enabling recreates it when eligible.
-                        }
-                    DatePicker("Daily Reminder Time", selection: $reminderTime, displayedComponents: .hourAndMinute) // Let user choose hour/minute for reminder notifications.
-                        .datePickerStyle(.compact) // Keep settings row compact and native-looking in list layout.
-                        .disabled(!isReminderEnabled) // Disable time picker UI when reminder feature is turned off to prevent confusing inactive edits.
-                        .onChange(of: reminderTime) { _, newValue in // Persist and reschedule reminder immediately whenever user changes time.
-                            ReminderPreferences.reminderTimeDate = newValue // Save selected reminder time to UserDefaults-backed preferences.
-                            PermissionsHelper.requestNotificationPermissionsIfNeeded() // Ensure iOS permission has been requested before scheduling at new time.
-                            DailyReminderNotificationService.shared.refreshReminderForToday() // Recompute and reschedule today's reminder using the updated time.
-                        }
-                } header: {
-                    Text("Notifications") // Group reminder controls under a clear Notifications header.
-                } footer: {
-                    Text("Attune sends a reminder at this time when you have not checked in yet or are below 50% of your daily intentions.") // Explain exactly when reminder triggers to avoid user confusion.
-                }
-                
-                // Developer section — Debug builds only (avoid shipping logs/test controls in Release).
-                #if DEBUG
-                Section {
-                    NavigationLink(destination: LogsView()) {
-                        HStack {
-                            Image(systemName: "doc.text.fill")
-                                .foregroundColor(.green)
-                                .font(.title3)
-                            Text("Logs")
-                                .font(.body)
-                        }
-                    }
-
-                    #if targetEnvironment(simulator)
-                    // MOMENTUM DEMO CLEANUP HANDOFF:
-                    // These controls reuse real intentions but create only ATTUNE_DEMO_*
-                    // IntentionSet/CheckIn/ProgressEntry files plus one manifest.
-                    // Never remove this UI by itself. First run "Remove and Verify",
-                    // confirm 0 records remain, and preserve the non-Debug residue cleanup
-                    // in AttuneApp/MomentumDemoDataManager. Full contract is documented at
-                    // the top of MomentumDemoDataManager.swift.
-                    Button {
-                        loadMomentumDemoData()
-                    } label: {
-                        Label("Load Momentum Demo Data", systemImage: "chart.bar.xaxis")
-                    }
-                    .disabled(isChangingMomentumDemoData || momentumDemoStatus.hasDemoData)
-
-                    Button(role: .destructive) {
-                        removeMomentumDemoData()
-                    } label: {
-                        Label("Remove and Verify Demo Data", systemImage: "trash")
-                    }
-                    .disabled(isChangingMomentumDemoData || !momentumDemoStatus.hasDemoData)
-
-                    if isChangingMomentumDemoData {
-                        HStack(spacing: 10) {
-                            SwiftUI.ProgressView()
-                            Text("Updating simulator data…")
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        Label(
-                            momentumDemoMessage ?? momentumDemoStatus.message,
-                            systemImage: momentumDemoStatus.hasDemoData ? "checkmark.circle.fill" : "circle.dashed"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(momentumDemoStatus.hasDemoData ? Color.orange : Color.secondary)
-                    }
-                    #endif
-                } header: {
-                    Text("Developer")
-                } footer: {
-                    #if targetEnvironment(simulator)
-                    Text("Simulator only. Demo records use your existing intentions and are removed by exact manifest paths plus a reserved-ID residue scan.")
-                    #else
-                    Text("Developer diagnostics are available only in Debug builds.")
-                    #endif
-                }
-                #endif
+                membershipSection
+                notificationSection
+                privacyAndDataSection
+                supportSection
+                developerSection
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(AttuneScreenBackground())
             .navigationTitle("Settings")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -191,20 +47,19 @@ struct SettingsView: View {
                 }
             }
             .onAppear {
-                isReminderEnabled = ReminderPreferences.isReminderEnabled // Reload persisted reminder enabled state when settings screen appears.
-                reminderTime = ReminderPreferences.reminderTimeDate // Reload persisted reminder time when settings screen appears.
+                isReminderEnabled = ReminderPreferences.isReminderEnabled
+                reminderTime = ReminderPreferences.reminderTimeDate
                 #if DEBUG && targetEnvironment(simulator)
                 refreshMomentumDemoStatus()
                 #endif
             }
             .sheet(isPresented: $showingExportSheet) {
-                // Share sheet to export the ZIP file
                 if let url = exportURL {
                     ShareSheet(items: [url])
                 }
             }
             .sheet(isPresented: $showPaywall) {
-                PaywallView()
+                PaywallView(reason: paywallReason)
                     .environmentObject(subscriptionManager)
             }
             .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
@@ -218,8 +73,212 @@ struct SettingsView: View {
             }
         }
     }
+
+    private var membershipSection: some View {
+        Section {
+            Button {
+                paywallReason = nil
+                showPaywall = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "crown.fill")
+                        .font(.headline)
+                        .foregroundStyle(AttuneTheme.warning)
+                        .frame(width: 36, height: 36)
+                        .background(AttuneTheme.warning.opacity(0.14), in: Circle())
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(SubscriptionConfig.displayName)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        Text(membershipDetail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(subscriptionManager.isSubscribed ? "Active" : "View")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.accent)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                Task { await subscriptionManager.restore() }
+            } label: {
+                settingsLabel("Restore Purchases", icon: "arrow.clockwise", color: AttuneTheme.accent)
+            }
+            .disabled(subscriptionManager.isBusy)
+
+            Button { showManageSubscriptions = true } label: {
+                settingsLabel("Manage Subscription", icon: "person.crop.circle", color: AttuneTheme.accentSecondary)
+            }
+        } header: {
+            Text("Membership")
+        } footer: {
+            Text("Free includes one active intention, one Voice Check-In per day, today's Momentum, and the daily reminder. Eligible new subscribers can try Attune Pro free for 3 days; it then renews at \(subscriptionManager.priceText).")
+        }
+    }
+
+    private var notificationSection: some View {
+        Section {
+            Toggle("Daily Progress Reminder", isOn: $isReminderEnabled)
+                .onChange(of: isReminderEnabled) { _, newValue in
+                    ReminderPreferences.isReminderEnabled = newValue
+                    if newValue {
+                        PermissionsHelper.requestNotificationPermissionsIfNeeded()
+                    }
+                    DailyReminderNotificationService.shared.refreshReminderForToday()
+                }
+
+            DatePicker("Reminder Time", selection: $reminderTime, displayedComponents: .hourAndMinute)
+                .datePickerStyle(.compact)
+                .disabled(!isReminderEnabled)
+                .onChange(of: reminderTime) { _, newValue in
+                    ReminderPreferences.reminderTimeDate = newValue
+                    PermissionsHelper.requestNotificationPermissionsIfNeeded()
+                    DailyReminderNotificationService.shared.refreshReminderForToday()
+                }
+        } header: {
+            Text("Notifications")
+        } footer: {
+            Text("When enabled, Attune can remind you if you have not checked in or your tracked intentions are below 50% for the day.")
+        }
+    }
+
+    private var privacyAndDataSection: some View {
+        Section {
+            NavigationLink(destination: PrivacyDataView()) {
+                settingsLabel("Permissions & Privacy", icon: "hand.raised.fill", color: AttuneTheme.accentSecondary)
+            }
+
+            Button(action: handleExportTap) {
+                HStack {
+                    settingsLabel("Export My Data", icon: "square.and.arrow.up", color: AttuneTheme.warning)
+                    Spacer()
+                    if !subscriptionManager.canExportData {
+                        Image(systemName: "crown.fill")
+                            .font(.caption)
+                            .foregroundStyle(AttuneTheme.warning)
+                    }
+                }
+            }
+        } header: {
+            Text("Privacy & Data")
+        } footer: {
+            Text("Attune Pro can export a portable copy of the data in your app folder for backup or personal records.")
+        }
+    }
+
+    private var supportSection: some View {
+        Section("Support") {
+            NavigationLink(destination: AboutView()) {
+                settingsLabel("About Attune", icon: "info.circle.fill", color: .blue)
+            }
+            Link(destination: LegalLinks.support) {
+                settingsLabel("Help & Support", icon: "questionmark.circle.fill", color: AttuneTheme.accent)
+            }
+            Link(destination: LegalLinks.privacyPolicy) {
+                settingsLabel("Privacy Policy", icon: "lock.shield.fill", color: AttuneTheme.accentSecondary)
+            }
+            Link(destination: LegalLinks.termsOfUse) {
+                settingsLabel("Terms of Use", icon: "doc.text.fill", color: AttuneTheme.textSecondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var developerSection: some View {
+        #if DEBUG
+        Section {
+            NavigationLink(destination: LogsView()) {
+                settingsLabel("Logs", icon: "doc.text.magnifyingglass", color: .green)
+            }
+
+            #if targetEnvironment(simulator)
+            // MOMENTUM DEMO CLEANUP HANDOFF:
+            // These controls reuse real intentions but create only ATTUNE_DEMO_*
+            // IntentionSet/CheckIn/ProgressEntry files plus one manifest.
+            // Never remove this UI by itself. First run "Remove and Verify",
+            // confirm 0 records remain, and preserve the non-Debug residue cleanup
+            // in AttuneApp/MomentumDemoDataManager. Full contract is documented at
+            // the top of MomentumDemoDataManager.swift.
+            Button {
+                loadMomentumDemoData()
+            } label: {
+                Label("Load Momentum Demo Data", systemImage: "chart.bar.xaxis")
+            }
+            .disabled(isChangingMomentumDemoData || momentumDemoStatus.hasDemoData)
+
+            Button(role: .destructive) {
+                removeMomentumDemoData()
+            } label: {
+                Label("Remove and Verify Demo Data", systemImage: "trash")
+            }
+            .disabled(isChangingMomentumDemoData || !momentumDemoStatus.hasDemoData)
+
+            if isChangingMomentumDemoData {
+                HStack(spacing: 10) {
+                    SwiftUI.ProgressView()
+                    Text("Updating simulator data…")
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Label(
+                    momentumDemoMessage ?? momentumDemoStatus.message,
+                    systemImage: momentumDemoStatus.hasDemoData ? "checkmark.circle.fill" : "circle.dashed"
+                )
+                .font(.caption)
+                .foregroundStyle(momentumDemoStatus.hasDemoData ? Color.orange : Color.secondary)
+            }
+            #endif
+        } header: {
+            Text("Developer")
+        } footer: {
+            #if targetEnvironment(simulator)
+            Text("Simulator only. Demo records use your existing intentions and are removed by exact manifest paths plus a reserved-ID residue scan.")
+            #else
+            Text("Developer diagnostics are available only in Debug builds.")
+            #endif
+        }
+        #endif
+    }
+
+    private var membershipDetail: String {
+        if subscriptionManager.isSubscribed {
+            return "Active membership · unlimited Pro features"
+        }
+        #if DEBUG
+        return "Pro features enabled for testing"
+        #else
+        return subscriptionManager.isEligibleForIntroOffer
+            ? "Free plan · 3-day Pro trial available"
+            : "Free plan · \(subscriptionManager.priceText)"
+        #endif
+    }
+
+    private func settingsLabel(_ title: String, icon: String, color: Color) -> some View {
+        Label {
+            Text(title)
+                .foregroundStyle(.primary)
+        } icon: {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+        }
+    }
     
     // MARK: - Export Function
+
+    private func handleExportTap() {
+        guard subscriptionManager.canExportData else {
+            paywallReason = "Portable data export is included with Attune Pro."
+            showPaywall = true
+            return
+        }
+        exportData()
+    }
     
     /// Exports all app data by sharing the Attune data directory
     /// This allows the user to access all JSON files directly via Files app or AirDrop

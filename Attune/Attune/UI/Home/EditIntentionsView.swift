@@ -17,7 +17,7 @@ struct DraftIntention: Identifiable {
     var unit: String
     var timeframe: String  // "daily" or "weekly"
     
-    static let maxCount = 10  // maximum intentions user can add; single source of truth for cap
+    static let maxCount = SubscriptionConfig.maximumActiveIntentions // shared product-wide safety cap
     
     static let unitOptions = ["pages", "minutes", "sessions", "steps", "reps", "cups", "glasses", "times"] // added "times" to align with parser defaults
     
@@ -47,6 +47,7 @@ struct DraftIntention: Identifiable {
 
 struct EditIntentionsView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     
     /// Draft intentions (max 10, from DraftIntention.maxCount)
     @State private var draftIntentions: [DraftIntention] = [] // holds current working list for existing intentions
@@ -66,6 +67,8 @@ struct EditIntentionsView: View {
     @State private var baselineDrafts: [DraftIntention] = [] // original loaded drafts for change comparison
     /// Baseline snapshot of add draft for dirty-state detection.
     @State private var baselineAddDraft: DraftIntention = DraftIntention.empty() // original add-card state (empty)
+    /// Presents Pro when a Free user tries to create a second intention.
+    @State private var showIntentionLimitPaywall = false
     /// Shared haptic generator for slider snaps.
     private let hapticEngine = UIImpactFeedbackGenerator(style: .light) // reused to avoid reallocating per snap
     
@@ -107,7 +110,8 @@ struct EditIntentionsView: View {
                             AddIntentionCard( // inline Add card per spec
                                 draft: $addDraft, // bind to add draft state
                                 isExpanded: $isAddExpanded, // controls expansion
-                                disableAdd: draftIntentions.count >= DraftIntention.maxCount, // enforce max cap
+                                disableAdd: !subscriptionManager.canAddIntention(currentCount: draftIntentions.count), // enforce plan + app caps
+                                onDisabledTap: handleDisabledAddTap,
                                 onExpand: { collapseAllForAdd() }, // ensure only one expanded at a time
                                 onParsed: { parsed in applyParsedToAddDraft(parsed) }, // route record parse into add draft
                                 hapticEngine: hapticEngine, // share haptic generator
@@ -254,6 +258,10 @@ struct EditIntentionsView: View {
             } message: {
                 Text("Delete \(pendingDeleteDraftTitle)?")
             }
+            .sheet(isPresented: $showIntentionLimitPaywall) {
+                PaywallView(reason: "Free includes one active intention. Upgrade to Attune Pro to track more goals at once.")
+                    .environmentObject(subscriptionManager)
+            }
         }
     }
     
@@ -277,7 +285,7 @@ struct EditIntentionsView: View {
                 Text("What do you want to move forward?")
                     .font(.headline)
                     .foregroundStyle(AttuneTheme.textPrimary)
-                Text("Choose a measurable target and whether it resets daily or weekly. You can track up to \(DraftIntention.maxCount).")
+                Text(intentionLimitDescription)
                     .font(.subheadline)
                     .foregroundStyle(AttuneTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -285,6 +293,18 @@ struct EditIntentionsView: View {
         }
         .padding(16)
         .attuneCard()
+    }
+
+    private var intentionLimitDescription: String {
+        if subscriptionManager.hasPremiumAccess {
+            return "Choose a measurable target and whether it resets daily or weekly. You can track up to \(DraftIntention.maxCount)."
+        }
+        return "Free includes one active intention. Attune Pro lets you track up to \(DraftIntention.maxCount) at once."
+    }
+
+    private func handleDisabledAddTap() {
+        guard !subscriptionManager.hasPremiumAccess else { return }
+        showIntentionLimitPaywall = true
     }
 
     private var hasValidationIssue: Bool {
@@ -769,6 +789,7 @@ private struct AddIntentionCard: View {
     @Binding var draft: DraftIntention // add draft binding
     @Binding var isExpanded: Bool // expansion flag
     let disableAdd: Bool // disables interaction when at cap
+    let onDisabledTap: () -> Void // routes Free plan limit taps to Pro
     let onExpand: () -> Void // called when expanding add card
     let onParsed: ([ParsedIntention]) -> Void // routes parsed intentions into add draft
     let hapticEngine: UIImpactFeedbackGenerator // shared haptic
@@ -779,7 +800,10 @@ private struct AddIntentionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button(action: {
-                guard !disableAdd else { return } // prevent expansion when at cap
+                guard !disableAdd else {
+                    onDisabledTap()
+                    return
+                } // prevent expansion when at cap
                 onExpand() // collapse others, expand add
             }) {
                 HStack {
@@ -793,7 +817,7 @@ private struct AddIntentionCard: View {
                 .padding(.vertical, 8) // padding for tap target
             }
             .buttonStyle(.plain) // keep custom styling
-            .disabled(disableAdd) // respect cap
+            .opacity(disableAdd ? 0.65 : 1) // keep tappable so Free users get an explanation
             
             if let recordStatus { // show status when present
                 Text(recordStatus) // status text
@@ -1017,7 +1041,7 @@ private struct RecordIntentionsSection: View { // encapsulates record flow UI
             .padding(.bottom, 4)
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView(reason: "Voice Record Intentions is included with Attune Monthly. You can still add intentions manually for free.")
+            PaywallView(reason: "Creating tracked intentions by voice is included with Attune Pro. You can still add intentions manually on Free.")
                 .environmentObject(subscriptionManager)
         }
     } // end body

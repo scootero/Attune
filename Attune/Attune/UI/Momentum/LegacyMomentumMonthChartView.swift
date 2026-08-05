@@ -2,84 +2,97 @@
 //  LegacyMomentumMonthChartView.swift
 //  Attune
 //
-//  Preserved from commit 1573e22 for side-by-side chart comparison.
-//
-//  Monthly momentum chart: one aggregate bar per day of the month.
+//  Monthly daily-bar chart using the current monthly data source.
 //
 
-import SwiftUI // Import SwiftUI for drawing and layout.
+import SwiftUI
+import Charts
 
-/// Renders a month-long momentum chart with one aggregate bar per day.
-struct LegacyMomentumMonthChartView: View { // View container for the month chart.
-    let bars: [MonthDayBar] // Per-day aggregate data.
-    
-    var body: some View { // Main view body.
-        ScrollView(.horizontal, showsIndicators: false) { // Horizontal scroll to fit 28–31 days.
-            HStack(alignment: .bottom, spacing: 8) { // Stack bars along X-axis with bottom alignment.
-                ForEach(bars) { bar in // Iterate each day bar.
-                    VStack(spacing: 6) { // Stack bar and day label.
-                        ZStack(alignment: .bottom) { // Container to align bar to bottom.
-                            Rectangle() // Empty container to keep layout stable.
-                                .fill(Color.clear) // Transparent fill.
-                                .frame(width: 10, height: 80) // Fixed size for consistent heights.
-                            
-                            if let ratio = bar.ratio, let tier = bar.tier, !bar.isFutureDay { // Render only when data exists and not future.
-                                let barHeight = max(6, CGFloat(ratio) * 80) // Scale height by ratio, ensure a minimal stub.
-                                let barColor = colorForTier(tier) // Map tier to color.
-                                
-                                ZStack { // Draw glow + bar.
-                                    RoundedRectangle(cornerRadius: 3, style: .continuous) // Glow shape.
-                                        .fill(barColor) // Glow uses same hue.
-                                        .blur(radius: 4) // Soft blur for glow.
-                                        .opacity(0.45) // Subtle glow opacity.
-                                    
-                                    RoundedRectangle(cornerRadius: 3, style: .continuous) // Main bar shape.
-                                        .fill(barColor) // Fill with tier color.
-                                        .shadow(color: barColor.opacity(0.5), radius: 4, x: 0, y: 2) // Drop shadow for depth.
-                                }
-                                .frame(width: 10, height: barHeight) // Apply computed bar size.
-                            }
-                        }
-                        
-                        Text(dayNumber(for: bar.date)) // Day-of-month label.
-                            .font(.system(size: 10, weight: .medium)) // Compact font.
-                            .foregroundColor(.gray) // Subtle label color.
+/// Renders one daily bar across the selected calendar month. Missing days receive
+/// only a neutral baseline marker.
+struct LegacyMomentumMonthChartView: View {
+    let bars: [MonthDayBar]
+
+    var body: some View {
+        Chart {
+            ForEach(elapsedBars) { bar in
+                BarMark(
+                    x: .value("Day", bar.date, unit: .day),
+                    y: .value("Momentum", barHeight(for: bar))
+                )
+                .foregroundStyle(barColor(for: bar).gradient)
+                .cornerRadius(4)
+                .accessibilityLabel(bar.date.formatted(.dateTime.month().day()))
+                .accessibilityValue(accessibilityValue(for: bar))
+            }
+        }
+        .chartYScale(domain: 0...100)
+        .chartXScale(domain: monthDomain)
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .day, count: 5)) { _ in
+                AxisGridLine().foregroundStyle(AttuneTheme.border)
+                AxisValueLabel(format: .dateTime.day())
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: [0, 25, 50, 75, 100]) { value in
+                AxisGridLine().foregroundStyle(AttuneTheme.border)
+                AxisValueLabel {
+                    if let number = value.as(Int.self) {
+                        Text("\(number)%")
                     }
                 }
+                .foregroundStyle(AttuneTheme.textSecondary)
             }
-            .padding(.vertical, 8) // Vertical padding around bars.
-            .padding(.horizontal, 4) // Horizontal padding for scroll edges.
         }
-        .frame(height: 120) // Overall height for the month chart.
+        .frame(height: 220)
+        .accessibilityLabel("Monthly progress chart")
+        .padding(16)
+        .glassCard()
     }
-    
-    /// Convert date to day-of-month string.
-    private func dayNumber(for date: Date) -> String {
-        let formatter = DateFormatter() // Formatter for day number.
-        formatter.dateFormat = "d" // Day only (1–31).
-        formatter.timeZone = TimeZone.current // Local timezone.
-        return formatter.string(from: date) // Render string.
+
+    private var elapsedBars: [MonthDayBar] {
+        bars.filter { !$0.isFutureDay }
     }
-    
-    /// Map tier to color (mirrors weekly momentum palette).
-    private func colorForTier(_ tier: MomentumTier) -> Color {
-        switch tier { // Use tiers to pick colors.
-        case .veryLow:
-            return NeonPalette.moodLowRed // Red for very low.
-        case .low:
-            return NeonPalette.moodLowOrange // Orange for low.
-        case .neutral:
-            return Color.gray // Gray for neutral.
-        case .good:
-            return Color(red: 0.3, green: 0.7, blue: 0.5) // Greenish for good.
-        case .great:
-            return NeonPalette.neonTeal // Bright teal for great.
+
+    private var monthDomain: ClosedRange<Date> {
+        let sortedDates = bars.map(\.date).sorted()
+        let start = sortedDates.first ?? Date()
+        let end = sortedDates.last ?? start
+        return start...end
+    }
+
+    /// A tiny neutral marker keeps an elapsed day visible without representing it
+    /// as recorded progress.
+    private func barHeight(for bar: MonthDayBar) -> Double {
+        guard let ratio = bar.ratio else { return 1.5 }
+        return min(max(ratio * 100, 0), 100)
+    }
+
+    private func barColor(for bar: MonthDayBar) -> Color {
+        guard bar.ratio != nil else {
+            return AttuneTheme.textTertiary.opacity(0.24)
         }
+
+        switch bar.tier {
+        case .veryLow: return AttuneTheme.recording
+        case .low: return AttuneTheme.warning
+        case .neutral: return Color(red: 0.90, green: 0.76, blue: 0.32)
+        case .good: return AttuneTheme.success
+        case .great: return AttuneTheme.accent
+        case nil: return AttuneTheme.textTertiary
+        }
+    }
+
+    private func accessibilityValue(for bar: MonthDayBar) -> String {
+        guard let ratio = bar.ratio else { return "No recorded progress" }
+        return "\(Int((ratio * 100).rounded())) percent overall progress"
     }
 }
 
 #Preview {
-    LegacyMomentumMonthChartView(bars: []) // Preview with no data.
-        .padding() // Add padding for preview framing.
+    LegacyMomentumMonthChartView(bars: [])
+        .padding()
+        .background(AttuneScreenBackground())
 }
-

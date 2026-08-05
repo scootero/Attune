@@ -2,8 +2,8 @@
 //  HomeRecordView.swift
 //  Attune
 //
-//  Consumer-facing background listening screen. RecorderService remains the
-//  source of truth for session creation, background recording, and processing.
+//  Consumer-facing, user-started Listening Session screen. RecorderService remains
+//  the source of truth for session creation, background capability, and processing.
 //
 
 import SwiftUI
@@ -82,7 +82,7 @@ struct HomeRecordView: View {
             }
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView(reason: "Background listening sessions are included with Attune Monthly.")
+            PaywallView(reason: "Listening Sessions and the Insights they create are included with Attune Pro.")
                 .environmentObject(subscriptionManager)
         }
     }
@@ -92,7 +92,7 @@ struct HomeRecordView: View {
             Text("Record")
                 .font(.title.bold())
                 .foregroundStyle(AttuneTheme.textPrimary)
-            Text("Talk naturally while Attune listens and organizes what keeps coming up.")
+            Text("Start a session when you want to capture ideas and notice recurring patterns.")
                 .font(.subheadline)
                 .foregroundStyle(AttuneTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -128,7 +128,7 @@ struct HomeRecordView: View {
                 Text("Say what’s on your mind")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(AttuneTheme.textPrimary)
-                Text("Attune captures intentions, commitments, events, and recurring themes. You can leave the app or lock your phone while it listens.")
+                Text("Attune records only after you start. It organizes clear intentions, commitments, events, and states, then groups repeated ideas into themes in Insights. You can leave the app or lock your phone while the session is active.")
                     .font(.subheadline)
                     .foregroundStyle(AttuneTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -156,7 +156,7 @@ struct HomeRecordView: View {
                     .fill(AttuneTheme.recording)
                     .frame(width: 11, height: 11)
                     .shadow(color: AttuneTheme.recording.opacity(0.75), radius: 7)
-                Text("Listening in background")
+                Text("Listening Session active")
                     .font(.headline)
                     .foregroundStyle(AttuneTheme.textPrimary)
                 Spacer()

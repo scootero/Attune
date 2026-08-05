@@ -11,6 +11,11 @@
 import SwiftUI
 import Charts
 
+private enum LegacyMomentumChartStyle: String, CaseIterable {
+    case bar = "Bar"
+    case line = "Line"
+}
+
 /// Chart view: X = time of day, Y = % accomplished. Supports >100% with expanded axis.
 struct LegacyMomentumChartView: View {
 
@@ -23,15 +28,34 @@ struct LegacyMomentumChartView: View {
     /// Selected date (start of day local) for X-axis domain 00:00–23:59
     let selectedDate: Date
 
+    /// Optional intention filter matching the current daily chart controls.
+    @State private var selectedIntentionId: String?
+
+    /// Preserve the original 3D bars as the default presentation.
+    @State private var chartStyle: LegacyMomentumChartStyle = .bar
+
     var body: some View {
         let _ = logChartReceive() // Debug: emit chart input summary when body evaluates
         VStack(alignment: .center, spacing: 16) { // Center alignment for the entire card content
+            HStack {
+                Spacer()
+                chartStyleSwitcher
+            }
+
             // Chart area
             if points.isEmpty {
                 // Empty state when no check-ins or no progress
                 emptyChartView
             } else {
-                chartContent
+                if chartStyle == .bar {
+                    chartContent
+                } else {
+                    lineChartContent
+                }
+            }
+
+            if !legendItems.isEmpty {
+                intentionSelector
             }
 
             if !legendItems.isEmpty { // Show intention colors so users can map bars to intentions
@@ -55,6 +79,92 @@ struct LegacyMomentumChartView: View {
         }
         .padding(16)
         .glassCard()
+        .onChange(of: points.map(\.intentionId)) { _, intentionIds in
+            if let selectedIntentionId, !intentionIds.contains(selectedIntentionId) {
+                self.selectedIntentionId = nil
+            }
+        }
+    }
+
+    private var chartStyleSwitcher: some View {
+        HStack(spacing: 2) {
+            ForEach(LegacyMomentumChartStyle.allCases, id: \.self) { style in
+                Button {
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        chartStyle = style
+                    }
+                } label: {
+                    Text(style.rawValue)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(chartStyle == style ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 6)
+                        .background(
+                            chartStyle == style ? AttuneTheme.surfaceStrong : Color.clear,
+                            in: Capsule()
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(chartStyle == style ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(AttuneTheme.surface, in: Capsule())
+        .overlay(Capsule().stroke(AttuneTheme.border, lineWidth: 1))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Chart style")
+    }
+
+    /// Functional All/intention filters. Compact sizing keeps All plus roughly
+    /// four ordinary titles visible on an iPhone, with horizontal scrolling for more.
+    private var intentionSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                selectorButton(id: nil, title: "All", colorIndex: nil)
+                ForEach(legendItems, id: \.id) { item in
+                    selectorButton(id: item.id, title: item.title, colorIndex: item.colorIndex)
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func selectorButton(id: String?, title: String, colorIndex: Int?) -> some View {
+        let isSelected = selectedIntentionId == id
+        return Button {
+            withAnimation(.easeOut(duration: 0.18)) {
+                selectedIntentionId = id
+            }
+        } label: {
+            HStack(spacing: 5) {
+                if let colorIndex {
+                    Image(systemName: MomentumIdentity.symbol(forIndex: colorIndex))
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(MomentumPalette.color(forIndex: colorIndex))
+                }
+                Text(title)
+                    .lineLimit(1)
+            }
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(isSelected ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background(isSelected ? AttuneTheme.surfaceStrong : AttuneTheme.surface, in: Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(isSelected ? AttuneTheme.accent.opacity(0.75) : AttuneTheme.border, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityLabel(id == nil ? "Show all intentions" : "Show \(title)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var filteredPoints: [MomentumPoint] {
+        guard let selectedIntentionId else { return points }
+        return points.filter { $0.intentionId == selectedIntentionId }
     }
 
     /// Collect unique intentions for legend display using stable colorIndex
@@ -99,6 +209,64 @@ struct LegacyMomentumChartView: View {
             .frame(height: 220)
         }
         .frame(height: 220)
+    }
+
+    /// Line alternative using the exact same points, manual updates, colors,
+    /// selected intention, date domain, and percentage scale as the 3D bars.
+    private var lineChartContent: some View {
+        Chart {
+            if yAxisMax > 100 {
+                RuleMark(y: .value("Target", 100))
+                    .foregroundStyle(AttuneTheme.success.opacity(0.55))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+            }
+
+            ForEach(filteredPoints) { point in
+                LineMark(
+                    x: .value("Time", point.date),
+                    y: .value("Progress", min(point.percent, yAxisMax)),
+                    series: .value("Intention", point.intentionId)
+                )
+                .interpolationMethod(.monotone)
+                .foregroundStyle(MomentumPalette.color(forIndex: point.colorIndex))
+                .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+
+                PointMark(
+                    x: .value("Time", point.date),
+                    y: .value("Progress", min(point.percent, yAxisMax))
+                )
+                .foregroundStyle(MomentumPalette.color(forIndex: point.colorIndex))
+                .symbol {
+                    Image(systemName: MomentumIdentity.symbol(forIndex: point.colorIndex))
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(MomentumPalette.color(forIndex: point.colorIndex))
+                }
+                .accessibilityLabel(point.intentionTitle)
+                .accessibilityValue("\(Int(point.percent.rounded())) percent at \(point.date.formatted(.dateTime.hour().minute()))")
+            }
+        }
+        .chartXScale(domain: dayStart...dayEnd)
+        .chartYScale(domain: 0...yAxisMax)
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .hour, count: 3)) { _ in
+                AxisGridLine().foregroundStyle(AttuneTheme.border)
+                AxisValueLabel(format: .dateTime.hour())
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: .stride(by: 25)) { value in
+                AxisGridLine().foregroundStyle(AttuneTheme.border)
+                AxisValueLabel {
+                    if let number = value.as(Double.self) {
+                        Text("\(Int(number))%")
+                    }
+                }
+                .foregroundStyle(AttuneTheme.textSecondary)
+            }
+        }
+        .frame(height: 220)
+        .accessibilityLabel("Daily momentum line chart")
     }
     
     /// Draws 3D grid lines with depth perspective (looking from upper left corner)
@@ -246,7 +414,7 @@ struct LegacyMomentumChartView: View {
         let dayDuration = dayEnd.timeIntervalSince(dayStart)
 
         // Compute layout: group by recording when available (else minute), assign time-based offsetPixels and drawOrder for collision handling
-        let laidOut = layoutBarsForCollision(points: points, dayStart: dayStart, dayDuration: dayDuration, chartWidth: chartWidth, barWidth: barWidth) // Use spacing sized to bar width to prevent overlap
+        let laidOut = layoutBarsForCollision(points: filteredPoints, dayStart: dayStart, dayDuration: dayDuration, chartWidth: chartWidth, barWidth: barWidth) // Filter only the rendered bars; preserve the original layout algorithm.
 
         // Rightmost first (back), then move left so every left neighbor sits above it.
         let drawOrdered = laidOut.sorted { a, b in

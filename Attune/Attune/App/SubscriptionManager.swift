@@ -17,7 +17,7 @@ final class SubscriptionManager: ObservableObject {
     /// Shared instance injected via environmentObject from ContentView.
     static let shared = SubscriptionManager()
 
-    /// True when the user has an active Attune Monthly subscription.
+    /// True when the user has an active Attune Pro monthly subscription.
     @Published private(set) var isSubscribed: Bool = false
 
     /// Loaded StoreKit product (nil until loaded or if ASC product is missing).
@@ -25,6 +25,12 @@ final class SubscriptionManager: ObservableObject {
 
     /// True while a purchase / restore / product load is in flight.
     @Published private(set) var isBusy: Bool = false
+
+    /// True only while StoreKit product details are loading.
+    @Published private(set) var isLoadingProduct: Bool = false
+
+    /// True when StoreKit says this Apple ID can use the introductory free trial.
+    @Published private(set) var isEligibleForIntroOffer: Bool = false
 
     /// User-facing error from the last failed purchase/restore/load.
     @Published var lastErrorMessage: String?
@@ -46,6 +52,10 @@ final class SubscriptionManager: ObservableObject {
 
     /// Reloads product info and current entitlement from StoreKit.
     func refresh() async {
+        guard !isLoadingProduct else { return }
+        isLoadingProduct = true
+        defer { isLoadingProduct = false }
+        lastErrorMessage = nil
         await loadProduct()
         await refreshEntitlement()
     }
@@ -54,7 +64,7 @@ final class SubscriptionManager: ObservableObject {
     func purchase() async {
         lastErrorMessage = nil
         guard let product = product else {
-            lastErrorMessage = "Subscription is not available yet. Check your connection and try again."
+            lastErrorMessage = "Attune Pro isn’t available right now. Check your connection and try again."
             await loadProduct()
             return
         }
@@ -77,7 +87,8 @@ final class SubscriptionManager: ObservableObject {
                 lastErrorMessage = "Purchase could not be completed."
             }
         } catch {
-            lastErrorMessage = error.localizedDescription
+            lastErrorMessage = "The purchase couldn’t be completed. Please try again."
+            AppLogger.log(AppLogger.ERR, "StoreKit purchase failed: \(error.localizedDescription)")
         }
     }
 
@@ -94,7 +105,8 @@ final class SubscriptionManager: ObservableObject {
                 lastErrorMessage = "No active subscription found for this Apple ID."
             }
         } catch {
-            lastErrorMessage = error.localizedDescription
+            lastErrorMessage = "Purchases couldn’t be restored right now. Please try again."
+            AppLogger.log(AppLogger.ERR, "StoreKit restore failed: \(error.localizedDescription)")
         }
     }
 
@@ -121,7 +133,22 @@ final class SubscriptionManager: ObservableObject {
     /// Voice “Record Intentions” is a subscriber feature (manual add stays free).
     var canUseVoiceIntentions: Bool { hasPremiumAccess }
 
-    /// Price string from StoreKit when available, otherwise the known $5.99 fallback.
+    /// Free users may add their first intention; Pro users may use the app cap.
+    func canAddIntention(currentCount: Int) -> Bool {
+        if hasPremiumAccess { return currentCount < SubscriptionConfig.maximumActiveIntentions }
+        return currentCount < SubscriptionConfig.freeActiveIntentionsLimit
+    }
+
+    /// Insights and historical views are subscriber features.
+    var canUseInsights: Bool { hasPremiumAccess }
+
+    /// Free includes today's Momentum only; history, Week, and Month require Pro.
+    var canUseMomentumHistory: Bool { hasPremiumAccess }
+
+    /// Portable data export is a subscriber feature.
+    var canExportData: Bool { hasPremiumAccess }
+
+    /// Price string from StoreKit when available, otherwise the known fallback.
     var priceText: String {
         if let product = product {
             return product.displayPrice + " / month"
@@ -135,11 +162,19 @@ final class SubscriptionManager: ObservableObject {
         do {
             let products = try await Product.products(for: [SubscriptionConfig.monthlyProductID])
             product = products.first
+            if let subscription = product?.subscription {
+                isEligibleForIntroOffer = await subscription.isEligibleForIntroOffer
+            } else {
+                isEligibleForIntroOffer = false
+            }
             if product == nil {
-                lastErrorMessage = "Could not find subscription product. Create it in App Store Connect first."
+                lastErrorMessage = "Attune Pro is temporarily unavailable. Please try again later."
             }
         } catch {
-            lastErrorMessage = error.localizedDescription
+            product = nil
+            isEligibleForIntroOffer = false
+            lastErrorMessage = "Attune Pro couldn’t be loaded. Check your connection and try again."
+            AppLogger.log(AppLogger.ERR, "StoreKit product load failed: \(error.localizedDescription)")
         }
     }
 

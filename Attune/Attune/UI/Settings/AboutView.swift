@@ -24,7 +24,7 @@ struct AboutView: View {
             Section {
                 HStack {
                     Spacer()
-                    VStack(spacing: 16) {
+                    VStack(spacing: 12) {
                         // Prefer the installed app icon when available; fall back to SF Symbol.
                         appIconView
                             .frame(width: 80, height: 80)
@@ -37,24 +37,74 @@ struct AboutView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
-                        Text("Made by Scott")
-                            .font(.body)
+                        Text("A voice-first companion for intentions, reflection, and momentum.")
+                            .font(.subheadline)
+                            .multilineTextAlignment(.center)
                             .foregroundColor(.secondary)
                     }
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 14)
                     Spacer()
                 }
                 .listRowBackground(Color.clear)
             }
 
-            Section("Legal") {
+            Section("How Attune Helps") {
+                aboutPoint(
+                    icon: "mic.fill",
+                    title: "Voice Check-Ins",
+                    detail: "Update the intentions you chose and optionally record how you feel."
+                )
+                aboutPoint(
+                    icon: "waveform.badge.mic",
+                    title: "Listening Sessions",
+                    detail: "Start a session to capture clear intentions, commitments, events, and states from what you say."
+                )
+                aboutPoint(
+                    icon: "sparkles",
+                    title: "Insights",
+                    detail: "See captured ideas and recurring themes without silently changing your tracked progress."
+                )
+                aboutPoint(
+                    icon: "chart.line.uptrend.xyaxis",
+                    title: "Momentum",
+                    detail: "Review progress across a day, week, or month using your recorded check-ins."
+                )
+            }
+
+            Section("Important to Know") {
+                Text("Listening Sessions run only after you start one. Event-like details remain reviewable captures; Attune does not currently add calendar appointments or event reminders.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Support & Legal") {
+                Link("Help & Support", destination: LegalLinks.support)
                 Link("Privacy Policy", destination: LegalLinks.privacyPolicy)
                 Link("Terms of Use", destination: LegalLinks.termsOfUse)
-                Link("Support", destination: LegalLinks.support)
             }
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(AttuneScreenBackground())
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func aboutPoint(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(AttuneTheme.accent)
+                .frame(width: 26, height: 26)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 3)
     }
 
     /// Loads the primary app icon from the bundle if present.

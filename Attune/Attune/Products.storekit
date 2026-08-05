@@ -32,21 +32,25 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "5.99",
+          "displayPrice" : "4.99",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "21400002",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "internalID" : "21400003",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
           "localizations" : [
             {
-              "description" : "Unlimited Attune check-ins, recording, and AI insights.",
-              "displayName" : "Attune Monthly",
+              "description" : "Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.",
+              "displayName" : "Attune Pro Monthly",
               "locale" : "en_US"
             }
           ],
           "productID" : "com.scottoliver.Attune.monthly",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Attune Monthly",
+          "referenceName" : "Attune Pro Monthly",
           "type" : "RecurringSubscription"
         }
       ]
