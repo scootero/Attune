@@ -58,6 +58,10 @@ class ExtractionQueue: ObservableObject {
     
     /// Set of in-flight work item keys to prevent duplicates
     private var inFlight: Set<String> = []
+
+    /// Session IDs currently being extracted. Used by consumer UI to avoid
+    /// announcing that a session is ready before its captured items are saved.
+    private var inFlightSessionIds: Set<String> = []
     
     /// Current processing task (to prevent duplicate processing)
     private var processingTask: Task<Void, Never>?
@@ -100,6 +104,12 @@ class ExtractionQueue: ObservableObject {
         // Start processing if not already running
         startProcessingIfNeeded()
     }
+
+    /// True while this session is queued or actively being organized.
+    func hasPendingWork(for sessionId: String) -> Bool {
+        queue.contains { $0.workItem.sessionId == sessionId }
+            || inFlightSessionIds.contains(sessionId)
+    }
     
     // MARK: - Processing
     
@@ -137,6 +147,7 @@ class ExtractionQueue: ObservableObject {
         
         // Mark as in-flight
         inFlight.insert(key)
+        inFlightSessionIds.insert(workItem.sessionId)
         
         // Log start
         AppLogger.log(
@@ -155,6 +166,7 @@ class ExtractionQueue: ObservableObject {
         
         // Remove from in-flight
         inFlight.remove(key)
+        inFlightSessionIds.remove(workItem.sessionId)
         
         // Log completion
         AppLogger.log(

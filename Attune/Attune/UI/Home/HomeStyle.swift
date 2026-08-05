@@ -15,27 +15,27 @@ import SwiftUI
 /// All colors use SwiftUI Color for consistency across light/dark modes (though this is dark-only design).
 struct NeonPalette {
     // Base dark background colors
-    static let darkBase = Color(red: 0.08, green: 0.08, blue: 0.10)          // Near-black background
-    static let darkOverlay = Color(red: 0.12, green: 0.12, blue: 0.15)       // Slightly lighter for overlays
+    static let darkBase = AttuneTheme.background
+    static let darkOverlay = AttuneTheme.backgroundRaised
     
     // Primary neon teal (used for glows, progress fills, accents)
-    static let neonTeal = Color(red: 0.2, green: 0.8, blue: 0.7)             // Bright cyan-teal
-    static let neonTealGlow = Color(red: 0.15, green: 0.85, blue: 0.75)      // Slightly brighter for glow layers
+    static let neonTeal = AttuneTheme.accent
+    static let neonTealGlow = AttuneTheme.accent
     
     // Secondary glow (softer, used for background fog)
-    static let fogTeal = Color(red: 0.18, green: 0.65, blue: 0.6)            // Muted teal for radial background glow
+    static let fogTeal = Color(red: 0.14, green: 0.48, blue: 0.45)
     
     // Edge lighting and highlights
     static let edgeLightTop = Color.white.opacity(0.25)                      // Top-left edge light gradient start
     static let edgeLightBottom = Color.white.opacity(0.0)                    // Edge light gradient end (transparent)
     
     // Glass card strokes
-    static let glassStrokePrimary = Color.white.opacity(0.12)                // Main perimeter stroke
-    static let glassStrokeSubtle = Color.white.opacity(0.05)                 // Subtle inner stroke
+    static let glassStrokePrimary = AttuneTheme.border
+    static let glassStrokeSubtle = Color.white.opacity(0.05)
     
     // Shadow/bloom colors
-    static let bloomShadow = Color(red: 0.15, green: 0.85, blue: 0.75).opacity(0.4)  // Teal bloom shadow
-    static let darkShadow = Color.black.opacity(0.5)                         // Dark base shadow for depth
+    static let bloomShadow = AttuneTheme.accent.opacity(0.22)
+    static let darkShadow = Color.black.opacity(0.42)
     
     // Low mood colors (red/orange) - reuse MoodTier mapping but define accent palette
     static let moodLowRed = Color(red: 0.9, green: 0.25, blue: 0.2)          // veryLow tier
@@ -99,9 +99,9 @@ struct CyberBackground: View {
             // 2) Primary teal radial glow in lower-mid area (stronger, more vibrant)
             RadialGradient(
                 gradient: Gradient(colors: [
-                    NeonPalette.fogTeal.opacity(0.45),   // Brighter center glow
-                    NeonPalette.fogTeal.opacity(0.2),   // Mid falloff
-                    NeonPalette.fogTeal.opacity(0.05),  // Soft outer ring
+                    NeonPalette.fogTeal.opacity(0.28),
+                    NeonPalette.fogTeal.opacity(0.12),
+                    NeonPalette.fogTeal.opacity(0.03),
                     Color.clear                          // Fade to transparent
                 ]),
                 center: .center,
@@ -109,14 +109,14 @@ struct CyberBackground: View {
                 endRadius: 450
             )
             .offset(y: 80)
-            .blur(radius: 20)  // Soft bloom for modern glassy feel
+            .blur(radius: 34)
             .ignoresSafeArea()
             
             // 3) Secondary teal glow (upper-left corner, subtle accent)
             RadialGradient(
                 gradient: Gradient(colors: [
-                    NeonPalette.neonTealGlow.opacity(0.15),
-                    NeonPalette.neonTealGlow.opacity(0.05),
+                    NeonPalette.neonTealGlow.opacity(0.09),
+                    NeonPalette.neonTealGlow.opacity(0.03),
                     Color.clear
                 ]),
                 center: UnitPoint(x: 0.2, y: 0.15),
@@ -128,7 +128,7 @@ struct CyberBackground: View {
             // 4) Third glow (lower-right, adds depth and asymmetry)
             RadialGradient(
                 gradient: Gradient(colors: [
-                    NeonPalette.neonTeal.opacity(0.12),
+                    NeonPalette.neonTeal.opacity(0.06),
                     Color.clear
                 ]),
                 center: UnitPoint(x: 0.9, y: 0.75),
@@ -219,7 +219,7 @@ struct GlassCardModifier: ViewModifier {
                 // Cool texture: grain + subtle hex mesh (frosted crystalline look)
                 GlassTextureOverlay()
                     .blendMode(.overlay)
-                    .opacity(0.7)
+                    .opacity(0.28)
                     .allowsHitTesting(false) // Prevent texture overlay from swallowing button touches.
             )
             .overlay(
@@ -228,14 +228,14 @@ struct GlassCardModifier: ViewModifier {
                     .strokeBorder(
                         LinearGradient(
                             gradient: Gradient(colors: [
-                                Color.white.opacity(0.35),
-                                Color.white.opacity(0.08),
+                                Color.white.opacity(0.22),
+                                Color.white.opacity(0.06),
                                 Color.white.opacity(0.0)
                             ]),
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 1.5
+                        lineWidth: 1
                     )
                     .allowsHitTesting(false) // Keep edge-light stroke purely visual and non-interactive.
             )
@@ -258,7 +258,7 @@ struct GlassCardModifier: ViewModifier {
                     LinearGradient(
                         gradient: Gradient(colors: [
                             Color.clear,
-                            NeonPalette.darkShadow.opacity(0.35)
+                            NeonPalette.darkShadow.opacity(0.22)
                         ]),
                         startPoint: .top,
                         endPoint: .bottom
@@ -268,9 +268,8 @@ struct GlassCardModifier: ViewModifier {
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .allowsHitTesting(false) // Avoid inner-shadow overlay from intercepting interactions.
             )
-            .shadow(color: NeonPalette.bloomShadow.opacity(0.5), radius: 16, x: 0, y: 6)   // Teal bloom (stronger)
-            .shadow(color: NeonPalette.bloomShadow.opacity(0.2), radius: 24, x: 0, y: 8)  // Outer soft glow
-            .shadow(color: NeonPalette.darkShadow, radius: 10, x: 0, y: 4)               // Dark depth
+            .shadow(color: NeonPalette.bloomShadow.opacity(0.35), radius: 10, x: 0, y: 5)
+            .shadow(color: NeonPalette.darkShadow, radius: 12, x: 0, y: 7)
     }
 }
 

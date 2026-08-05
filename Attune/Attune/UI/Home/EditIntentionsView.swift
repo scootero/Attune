@@ -87,6 +87,23 @@ struct EditIntentionsView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         List {
+                            intentionGuideCard
+                                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 6, trailing: 12))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+
+                            if hasValidationIssue {
+                                Label("Each intention needs a name and a target greater than zero.", systemImage: "exclamationmark.circle.fill")
+                                    .font(.footnote)
+                                    .foregroundStyle(AttuneTheme.warning)
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(AttuneTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                            }
+
                             AddIntentionCard( // inline Add card per spec
                                 draft: $addDraft, // bind to add draft state
                                 isExpanded: $isAddExpanded, // controls expansion
@@ -139,6 +156,18 @@ struct EditIntentionsView: View {
                                         )
                                         .shadow(color: NeonPalette.darkShadow.opacity(0.2), radius: 4, x: 0, y: 2) // very soft shadow to avoid expensive/heavy depth effects
                                         .transition(.opacity.combined(with: .move(edge: .top))) // smooth show/hide
+
+                                        Button(role: .destructive) {
+                                            pendingDeleteDraftId = draft.id
+                                            let trimmedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            pendingDeleteDraftTitle = trimmedTitle.isEmpty ? "this intention" : "\"\(trimmedTitle)\""
+                                        } label: {
+                                            Label("Delete Intention", systemImage: "trash")
+                                                .font(.subheadline.weight(.semibold))
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .tint(AttuneTheme.recording)
                                     }
                                 }
                                 .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // spacing for glass cards
@@ -156,7 +185,7 @@ struct EditIntentionsView: View {
                     }
                 }
             }
-            .navigationTitle("Edit Intentions")
+            .navigationTitle("Intentions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -230,11 +259,48 @@ struct EditIntentionsView: View {
     
     private var canSave: Bool {
         hasChanges // requires real changes
+        && !hasValidationIssue
         && ( // allow either normal non-empty saves or explicit "clear all" saves
             !validIntentionsForSave.isEmpty // standard path: at least one valid intention remains
             || isClearingAllIntentions // special path: user removed every intention and wants to persist empty set
         ) // close save eligibility gate
     } // end canSave
+
+    private var intentionGuideCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "target")
+                .font(.title3)
+                .foregroundStyle(AttuneTheme.accent)
+                .frame(width: 36, height: 36)
+                .background(AttuneTheme.accent.opacity(0.14), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text("What do you want to move forward?")
+                    .font(.headline)
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text("Choose a measurable target and whether it resets daily or weekly. You can track up to \(DraftIntention.maxCount).")
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .attuneCard()
+    }
+
+    private var hasValidationIssue: Bool {
+        if draftIntentions.contains(where: { !isValidDraft($0) }) {
+            return true
+        }
+
+        let addHasChanges = isDraftDifferent(addDraft, baselineAddDraft)
+        return addHasChanges && !isValidDraft(addDraft)
+    }
+
+    private func isValidDraft(_ draft: DraftIntention) -> Bool {
+        !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && draft.targetValue > 0
+        && !draft.unit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
     
     /// True when user removed every intention from a previously non-empty baseline.
     private var isClearingAllIntentions: Bool {
@@ -429,7 +495,7 @@ private struct IntentionSummaryRow: View {
                 Text(displayTitle) // primary intention title text with empty fallback
                     .font(.headline) // clear hierarchy for quick scanning
                     .foregroundColor(.white) // force high-contrast title on dark glass background for readability
-                Text("\(displayValue) \(displayUnit) • \(displayTimeframe)") // concise metadata line with value + unit + cadence
+                Text("\(displayValue) \(displayUnit) \(displayTimeframe)")
                     .font(.subheadline) // secondary text scale for supporting details
                     .foregroundColor(NeonPalette.neonTeal.opacity(0.72)) // teal-tinted support text to match Home accent without losing contrast
             }
@@ -465,7 +531,7 @@ private struct IntentionSummaryRow: View {
     
     /// Human-friendly timeframe display string.
     private var displayTimeframe: String {
-        draft.timeframe.lowercased() == "weekly" ? "weekly" : "daily" // normalize unexpected values to daily for consistent copy
+        draft.timeframe.lowercased() == "weekly" ? "per week" : "per day"
     }
 }
 
@@ -500,6 +566,9 @@ private struct InlineIntentionEditor: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) { // compact stack keeps controls closer for quicker scanning/editing
+            Text("Intention")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textSecondary)
             TextField("Title", text: $draft.title) // title input
                 .textFieldStyle(.plain) // plain style for glass aesthetic
                 .foregroundColor(.white) // white text for dark bg
@@ -518,6 +587,15 @@ private struct InlineIntentionEditor: View {
                 }
             
             VStack(alignment: .leading, spacing: 8) { // tighter value group reduces empty vertical gaps
+                HStack {
+                    Text("Target")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                    Spacer()
+                    Text("\(Self.displayString(for: draft.targetValue)) \(displayUnitAbbreviation) \(targetPeriodText)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.accent)
+                }
                 HStack(spacing: 10) { // tighter horizontal spacing keeps related controls visually grouped
                     Slider(
                         value: $draft.targetValue, // bind to numeric value
@@ -535,7 +613,7 @@ private struct InlineIntentionEditor: View {
                         onValueChanged() // propagate dirty state
                     }
                     
-                    Text("\(Self.displayString(for: draft.targetValue)) \(displayUnitAbbreviation)") // live value label
+                    Text("\(Self.displayString(for: draft.targetValue))") // live value label
                         .font(.system(size: 18, weight: .semibold)) // slightly smaller type reduces visual heaviness in compact editor
                         .foregroundColor(NeonPalette.neonTeal) // teal numeric readout to mirror Home progress cards
                         .monospacedDigit() // monospaced for stability
@@ -560,12 +638,21 @@ private struct InlineIntentionEditor: View {
                     .onChange(of: manualValueText) { _, newValue in // parse manual edits
                         applyManualValueInput(newValue) // sync numeric value
                     }
+
+                if draft.targetValue <= 0 {
+                    Label("Enter a target greater than zero", systemImage: "exclamationmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(AttuneTheme.warning)
+                }
             }
-            
-            HStack(spacing: 10) { // tighter unit/timeframe row improves scan speed
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Measure in")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textSecondary)
                 Picker("Unit", selection: $draft.unit) { // unit picker
                     ForEach(DraftIntention.unitOptions, id: \.self) { unit in
-                        Text(unit).tag(unit) // unit option
+                        Text(unit.capitalized).tag(unit) // unit option
                     }
                 }
                 .pickerStyle(.menu) // compact menu style
@@ -573,7 +660,10 @@ private struct InlineIntentionEditor: View {
                     applyUnitReset() // reset value defaults for unit
                     onUnitChanged() // notify parent
                 }
-                
+
+                Text("Target period")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textSecondary)
                 Picker("Timeframe", selection: $draft.timeframe) { // timeframe picker
                     Text("Daily").tag("daily") // daily option
                     Text("Weekly").tag("weekly") // weekly option
@@ -582,6 +672,10 @@ private struct InlineIntentionEditor: View {
                 .onChange(of: draft.timeframe) { _, _ in // timeframe change
                     onUnitChanged() // still counts as dirty
                 }
+
+                Text(draft.timeframe.lowercased() == "weekly" ? "This target is measured across the full week." : "This target starts fresh each day.")
+                    .font(.caption)
+                    .foregroundStyle(AttuneTheme.textTertiary)
             }
         }
         .padding(12) // compact internal padding keeps edit panel dense and fast to read
@@ -608,6 +702,10 @@ private struct InlineIntentionEditor: View {
         case "pages": return "pg" // pages abbreviation
         default: return draft.unit // fallback
         }
+    }
+
+    private var targetPeriodText: String {
+        draft.timeframe.lowercased() == "weekly" ? "per week" : "per day"
     }
     
     /// Applies soft snap near multiples of 10 after slider release.
@@ -707,7 +805,7 @@ private struct AddIntentionCard: View {
                 VStack(spacing: 10) { // tighter spacing keeps expanded add editor compact
                     RecordIntentionsSection(onIntentionsParsed: { parsed in // embed record UI
                         onParsed(parsed) // populate add draft fields
-                        recordStatus = parsed.isEmpty ? "No intentions found." : "Parsed into Add card. Review then Save." // status message
+                        recordStatus = parsed.isEmpty ? "No intentions found." : "Attune filled this in. Review it, then save." // status message
                         onDirty() // mark dirty
                     })
                     

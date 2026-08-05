@@ -11,10 +11,12 @@ import SwiftUI
 /// State of the check-in recording flow
 private enum CheckInState: Equatable {
     case idle
+    case requestingPermission
     case recording
     case processing
-    case saved(transcript: String)
+    case saved(checkInId: String)
     case error(message: String)
+    case permissionDenied
     
     /// Manual Equatable implementation for enum with associated values
     /// Compares both the case and associated values for equality
@@ -22,14 +24,18 @@ private enum CheckInState: Equatable {
         switch (lhs, rhs) {
         case (.idle, .idle):
             return true
+        case (.requestingPermission, .requestingPermission):
+            return true
         case (.recording, .recording):
             return true
         case (.processing, .processing):
             return true
-        case (.saved(let lhsTranscript), .saved(let rhsTranscript)):
-            return lhsTranscript == rhsTranscript
+        case (.saved(let lhsId), .saved(let rhsId)):
+            return lhsId == rhsId
         case (.error(let lhsMessage), .error(let rhsMessage)):
             return lhsMessage == rhsMessage
+        case (.permissionDenied, .permissionDenied):
+            return true
         default:
             return false
         }
@@ -50,7 +56,6 @@ private struct AmbiguitySheetData: Identifiable {
     let dateKey: String
     let intentionSetId: String
     let checkInId: String
-    let transcript: String
 }
 
 /// Row data for today's progress display.
@@ -64,6 +69,7 @@ private struct IntentionProgressRow: Identifiable {
 }
 
 struct HomeView: View {
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject var appRouter: AppRouter
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @StateObject private var checkInRecorder = CheckInRecorderService.shared
@@ -74,6 +80,7 @@ struct HomeView: View {
     @State private var streak: Int = 0
     @State private var showEditIntentions = false
     @State private var showMoodEditor = false
+    @State private var showSettings = false
     /// Slice 7: Data for ambiguity disambiguation sheet (nil = not showing)
     @State private var ambiguitySheetData: AmbiguitySheetData?
     /// Today's check-ins for the Today Check-ins card (newest-first)
@@ -110,53 +117,47 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
         ZStack {
-            // Cyber glassy background: teal fog glows, vignette, modern crisp look
-            CyberBackground()
+            AttuneScreenBackground()
             
             ScrollView {
                 VStack(spacing: 0) {
-                    // Header: Attune title only (no hamburger; moved to Today's Progress card)
                     HStack {
                         Text("Attune")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .shadow(color: NeonPalette.neonTeal.opacity(0.3), radius: 8, x: 0, y: 2)
+                            .font(.title.bold())
+                            .foregroundStyle(AttuneTheme.textPrimary)
                         Spacer()
+                        Button {
+                            showSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(AttuneTheme.textPrimary)
+                                .frame(width: 44, height: 44)
+                                .background(AttuneTheme.surface, in: Circle())
+                                .overlay(Circle().stroke(AttuneTheme.border, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Settings")
+                        .accessibilityHint("Opens Attune settings")
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-                    .background {
-                        // Compact gradient bar: dark base with subtle teal glow
-                        LinearGradient(
-                            colors: [
-                                NeonPalette.darkBase.opacity(0.95),
-                                NeonPalette.darkOverlay.opacity(0.9),
-                                NeonPalette.fogTeal.opacity(0.15)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
-                    .ignoresSafeArea(edges: [.horizontal, .top])
+                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
                     
-                    // Slice B: Scrollable content (more spacing for modern feel)
-                    VStack(spacing: 16) {
-                        dailySummaryStrip
-                        todaysProgressCard
-                        smartPromptLine
+                    // The daily check-in is the primary action; supporting data follows it.
+                    VStack(spacing: 12) {
                         recordCheckInCTAArea
-                        moodLabelRow
                         weeklyMomentumCard
-                        streakSection
+                        todaysProgressCard
+                        moodLabelRow
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-                    .padding(.bottom, 24)
+                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.top, 10)
+                    .padding(.bottom, 104)
                 }
             }
             .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
         }
         .navigationBarHidden(true)
         .onAppear {
@@ -172,6 +173,10 @@ struct HomeView: View {
         .sheet(isPresented: $showMoodEditor) {
             MoodEditorView(dateKey: ProgressCalculator.dateKey(for: Date()), onSaved: { refreshMoodAndStreak() })
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environmentObject(subscriptionManager)
+        }
         .sheet(item: $ambiguitySheetData) { data in
             AmbiguityDisambiguationSheet(
                 ambiguousUpdates: data.ambiguousUpdates,
@@ -181,13 +186,13 @@ struct HomeView: View {
                     ambiguitySheetData = nil
                     loadTodaysProgress()
                     refreshMoodAndStreak()
-                    state = .saved(transcript: data.transcript)
+                    state = .saved(checkInId: data.checkInId)
                 },
                 onCancel: {
                     ambiguitySheetData = nil
                     loadTodaysProgress()
                     refreshMoodAndStreak()
-                    state = .saved(transcript: data.transcript)
+                    state = .saved(checkInId: data.checkInId)
                 }
             )
         }
@@ -280,32 +285,14 @@ struct HomeView: View {
                             glow: Color(red: 0.28, green: 0.74, blue: 0.54), // subtle green glow color
                             action: saveUpdateProgressMode // persist overrides and exit update mode
                         )
-                    } else { // in normal mode, show only Add/Edit to reduce layout pressure
-                        Button(action: { showEditIntentions = true }) { // opens Edit Intentions sheet
-                            Label("Add / Edit", systemImage: "plus.circle.fill") // clear label for add/edit
-                                .font(.system(size: 15, weight: .bold, design: .rounded)) // rounded bold font
-                                .foregroundColor(Color(red: 0.17, green: 0.06, blue: 0.20)) // dark text for contrast on gradient
-                                .padding(.horizontal, 12) // slightly tighter to avoid wrapping
-                                .padding(.vertical, 8) // balanced vertical padding
-                                .background(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 1.00, green: 0.53, blue: 0.29),
-                                            Color(red: 0.97, green: 0.39, blue: 0.67),
-                                            Color(red: 0.57, green: 0.45, blue: 0.98)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .clipShape(Capsule())
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.white.opacity(0.45), lineWidth: 1.2)
-                                )
-                                .shadow(color: Color(red: 0.97, green: 0.39, blue: 0.67).opacity(0.45), radius: 8, x: 0, y: 3)
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
+                    } else {
+                        Button(action: { showEditIntentions = true }) {
+                            Label("Manage", systemImage: "slider.horizontal.3")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AttuneTheme.accent)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(AttuneTheme.surfaceStrong, in: Capsule())
                         }
                         .buttonStyle(.plain)
                     }
@@ -313,16 +300,18 @@ struct HomeView: View {
             }
             
             if todaysProgress.isEmpty {
-                Text("No intentions yet. Add one to start tracking.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
-                Button(action: { showEditIntentions = true }) {
-                    Label("Add Intention", systemImage: "plus.circle.fill")
+                HStack(spacing: 10) {
+                    Text("No tracked intentions yet")
+                        .font(.subheadline)
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                    Spacer()
+                    Button("Add one") {
+                        showEditIntentions = true
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.accent)
                 }
-                .font(.caption)
-                .buttonStyle(.bordered)
+                .padding(.vertical, 4)
             } else {
                 ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { _, row in // render each intention row
                     VStack(alignment: .leading, spacing: 6) { // slightly more spacing for slider mode
@@ -341,7 +330,6 @@ struct HomeView: View {
                         
                         if isUpdateProgressMode { // slider mode rendering
                             let value = sliderValues[row.intention.id] ?? row.total // working total
-                            let percent = percentForTotal(value, intention: row.intention) // derived percent 0...1
                             let goalValue = row.intention.timeframe.lowercased() == "weekly" ? (row.intention.targetValue / 7.0) : row.intention.targetValue // keep displayed goal aligned with percent math (weekly goals shown as per-day target)
                             VStack(alignment: .leading, spacing: 6) { // stack slider + value
                                 Slider(
@@ -375,28 +363,12 @@ struct HomeView: View {
                     HStack {
                         Spacer()
                         Button(action: { enterUpdateProgressMode() }) {
-                            Label("Update Progress", systemImage: "slider.horizontal.3")
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    LinearGradient(
-                                        colors: [
-                                            NeonPalette.neonTeal,
-                                            NeonPalette.neonTeal.opacity(0.75)
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .clipShape(Capsule())
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.white.opacity(0.35), lineWidth: 1)
-                                )
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
+                            Label("Update", systemImage: "slider.horizontal.3")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AttuneTheme.accent)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(AttuneTheme.surfaceStrong, in: Capsule())
                         }
                         .buttonStyle(.plain)
                     }
@@ -404,7 +376,7 @@ struct HomeView: View {
             }
         }
         .padding(16)
-        .glassCard()
+        .attuneCard()
     }
     
     // MARK: - B1) Smart Prompt (Slice B)
@@ -436,73 +408,57 @@ struct HomeView: View {
         Button(action: {
             appRouter.navigateToMomentum(date: Date())  // Jump to Library → Momentum showing today
         }) {
-            // Slightly larger typography for card title and day labels
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Weekly Momentum")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.gray)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Weekly Momentum")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.textPrimary)
+                    Spacer()
+                    Text("\(streak)-day streak")
+                        .font(.caption)
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.textTertiary)
+                }
                 
-                // HStack: bars + labels; alignment .bottom so all bars share bottom baseline
                 HStack(alignment: .bottom, spacing: 10) {
                     ForEach(weekMomentum.days) { day in
-                        VStack(spacing: 6) {
-                            // Bar container: ZStack alignment .bottom = bars grow from bottom
+                        VStack(spacing: 4) {
                             if day.isFutureDay {
                                 RoundedRectangle(cornerRadius: 3)
                                     .fill(Color.clear)
-                                    .frame(width: 12, height: 56)
+                                    .frame(width: 10, height: 40)
                             } else {
                                 let ratio = day.completionRatio ?? 0
-                                let barHeight = max(8, CGFloat(ratio) * 56)  // Slightly larger: 12pt wide, 56pt max
+                                let barHeight = max(6, CGFloat(ratio) * 40)
                                 let barColor = colorForProgressRatio(ratio)
                                 ZStack(alignment: .bottom) {
-                                    // Glow layer behind filled bar (soft bloom)
                                     RoundedRectangle(cornerRadius: 3)
                                         .fill(barColor)
-                                        .blur(radius: 4)
-                                        .opacity(0.5)
-                                        .frame(width: 12, height: barHeight)
-                                    // Main filled bar (sits at bottom of container)
+                                        .blur(radius: 3)
+                                        .opacity(0.35)
+                                        .frame(width: 10, height: barHeight)
                                     RoundedRectangle(cornerRadius: 3)
                                         .fill(barColor)
-                                        .frame(width: 12, height: barHeight)
-                                        .shadow(color: barColor.opacity(0.6), radius: 4, x: 0, y: 2)
+                                        .frame(width: 10, height: barHeight)
                                 }
-                                .frame(width: 12, height: 56)  // Fixed container so all bars align at bottom
+                                .frame(width: 10, height: 40)
                             }
-                            // Day label: fixed width so M T W T F S S align on same baseline
                             Text(day.weekdayLetter)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.gray)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(AttuneTheme.textSecondary)
                                 .frame(width: 12, alignment: .center)
                         }
                         .frame(maxWidth: .infinity)
                     }
                 }
-                .padding(.vertical, 12)
-                
-                // Tap affordance: small chevron + faint gradient edge to communicate "tap for details"
-                HStack {
-                    Spacer()
-                    Image(systemName: "chevron.up")
-                        .font(.caption2)
-                        .foregroundColor(NeonPalette.neonTeal.opacity(0.7))
-                }
-                .padding(.top, 4)
-                .background(
-                    LinearGradient(
-                        gradient: Gradient(colors: [Color.clear, NeonPalette.neonTeal.opacity(0.08)]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
             }
-            .padding(16)
-            .contentShape(Rectangle())  // Make entire card area tappable (not just subviews)
+            .padding(14)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .glassCard()
+        .attuneCard()
     }
     
     /// Bar color by progress ratio: 0%=red glow, partial=yellow, 80%+=green, 100%=bright green.
@@ -546,7 +502,7 @@ struct HomeView: View {
     
     /// Saves overrides for each intention based on slider values, then exits mode.
     private func saveUpdateProgressMode() {
-        guard let intentionSet = currentIntentionSet else { // ensure we have a set
+        guard currentIntentionSet != nil else { // ensure we have a set
             isUpdateProgressMode = false // bail out to safe state
             return // nothing to save
         }
@@ -664,203 +620,327 @@ struct HomeView: View {
         return String(format: "%.1f", value) // one decimal for readability
     }
     
-    // MARK: - C) Mood Label Row (below Record button, Slice A)
-    
-    /// Shows "Mood ?" when unset (not yet from ChatGPT or manual); else "Mood: [label]".
-    /// Tapping opens MoodEditor. When unset, shows "Set mood" affordance next to it.
-    /// Mood state is per-dateKey so each day resets naturally (no extra persistence needed).
+    // MARK: - C) Mood
+
+    /// One clear score with an optional descriptive tag. Tapping opens the editor.
     private var moodLabelRow: some View {
-        HStack(spacing: 8) {
-            Button(action: { showMoodEditor = true }) {
-                Group {
-                    if hasMoodSet {
-                        Text("Mood: \(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday)))")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    } else {
-                        // Styled "Mood ?" when unset: rounded font + teal accent (cooler, more noticeable)
-                        Text("Mood ?")
-                            .font(.system(.subheadline, design: .rounded))
-                            .fontWeight(.medium)
-                            .foregroundStyle(NeonPalette.neonTeal.opacity(0.9))
-                    }
+        Button(action: { showMoodEditor = true }) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(AttuneTheme.accent.opacity(0.16))
+                        .frame(width: 40, height: 40)
+                    Text(hasMoodSet ? "\(moodScoreToday)" : "–")
+                        .font(.headline.bold())
+                        .foregroundStyle(AttuneTheme.accent)
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 4)
-            }
-            .buttonStyle(.plain)
-            // When mood unset: show "Set mood" pill so user can tap to set it manually
-            if !hasMoodSet {
-                Button(action: { showMoodEditor = true }) {
-                    Text("Set mood")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(NeonPalette.neonTeal)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(NeonPalette.neonTeal.opacity(0.15))
-                        .clipShape(Capsule())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("How are you feeling?")
+                        .font(.headline)
+                        .foregroundStyle(AttuneTheme.textPrimary)
+                    Text(moodSummaryText)
+                        .font(.subheadline)
+                        .foregroundStyle(AttuneTheme.textSecondary)
                 }
-                .buttonStyle(.plain)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textTertiary)
             }
+            .padding(14)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .attuneCard()
+        .accessibilityLabel(hasMoodSet ? "Mood \(moodScoreToday) out of 10, \(moodSummaryText)" : "Set today's mood")
     }
-    
-    // MARK: - D) Record Check-In CTA
-    
-    /// Single CTA area; all states rendered compactly (no layout shift). Slice B: tighter spacing.
+
+    private var moodSummaryText: String {
+        guard hasMoodSet else { return "Add a score and optional feeling" }
+        if let label = todayMood?.moodLabel, !label.isEmpty {
+            return "\(label) · \(moodScoreToday)/10"
+        }
+        return "\(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday))) · \(moodScoreToday)/10"
+    }
+
+    // MARK: - D) Record Check-In Hero
+
     private var recordCheckInCTAArea: some View {
-        VStack(spacing: 10) {
-            // Compact banner for saved/error only (doesn't clutter when idle/recording/processing)
-            switch state {
-            case .saved(let transcript):
-                savedBanner(transcript: transcript)
-            case .error(let message):
-                errorBanner(message: message)
-            default:
-                EmptyView()
-            }
-            
-            // Primary CTA block (stable height across states)
+        VStack(alignment: .leading, spacing: 14) {
+            Label("VOICE CHECK-IN", systemImage: "waveform")
+                .font(.caption.weight(.bold))
+                .tracking(1.1)
+                .foregroundStyle(AttuneTheme.accent)
+
             switch state {
             case .idle:
                 recordCheckInSection
+            case .requestingPermission:
+                statusPanel(
+                    icon: "mic.badge.plus",
+                    title: "Getting ready…",
+                    detail: "Waiting for microphone and speech access.",
+                    color: AttuneTheme.accent,
+                    showsProgress: true
+                )
             case .recording:
                 recordingContent
             case .processing:
                 processingContent
-            case .saved:
-                Button(action: {
-                    // Provide immediate haptic feedback for state reset
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
-                    state = .idle
-                }) {
-                    Text("Record Check-In")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
+            case .saved(let checkInId):
+                savedContent(checkInId: checkInId)
+            case .error(let message):
+                errorContent(message: message)
+            case .permissionDenied:
+                permissionDeniedContent
+            }
+        }
+        .padding(18)
+        .attuneCard()
+    }
+
+    private var recordCheckInSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Update today by voice")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textPrimary)
+
+            Text(checkInGuidanceText)
+                .font(.subheadline)
+                .foregroundStyle(AttuneTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(checkInExampleText)
+                .font(.caption)
+                .foregroundStyle(AttuneTheme.textSecondary)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(AttuneTheme.surfaceStrong, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            Button(action: {
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
+                startCheckIn()
+            }) {
+                Label("Record Check-In", systemImage: "mic.fill")
+            }
+            .buttonStyle(AttunePrimaryButtonStyle())
+            .accessibilityHint("Starts a short voice update for tracked intentions and mood")
+
+            if !todayCheckIns.isEmpty {
+                Button("\(todayCheckIns.count) \(todayCheckIns.count == 1 ? "check-in" : "check-ins") today") {
+                    showAllCheckInsSheet = true
                 }
-                .buttonStyle(RecordCheckInButtonStyle())
-            case .error:
-                Button(action: {
-                    // Provide immediate haptic feedback for retry
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
-                    state = .idle
-                }) {
-                    Text("Try Again")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                }
-                .buttonStyle(RecordCheckInButtonStyle())
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AttuneTheme.accent)
             }
         }
     }
-    
-    /// Slice B: Button/halo color driven by mood tier (Happy never red).
-    private var recordButtonColor: Color {
-        MoodTier.colorForMoodTier(MoodTier.moodTier(for: moodScoreToday))
-    }
-    
-    /// Primary CTA: Record Check-In with blue gradient, light red/orange border, glow.
-    private var recordCheckInSection: some View {
-        Button(action: {
-            // Provide immediate haptic feedback so user knows tap was registered
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            // Execute the action immediately on main thread
-            startCheckIn()
-        }) {
-            Text("Record Check-In")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
+
+    private var checkInGuidanceText: String {
+        if todaysProgress.isEmpty {
+            return "Add a tracked intention to update progress. You can still record how you feel."
         }
-        .buttonStyle(RecordCheckInButtonStyle())
-        // Disable button while already recording to prevent double-taps
-        .disabled(state == .recording || state == .processing)
+        return "Say the intention, the amount, and whether it is more or your total today. Mood is optional."
     }
-    
+
+    private var checkInExampleText: String {
+        guard let row = todaysProgress.min(by: { $0.percent < $1.percent }) else {
+            return "Try: “Mood 7 out of 10. I feel focused.”"
+        }
+
+        let unit = row.intention.unit
+        let amount: String
+        switch unit.lowercased() {
+        case "minutes": amount = "15"
+        case "pages": amount = "10"
+        case "steps": amount = "1,000"
+        case "miles": amount = "1"
+        default: amount = "1"
+        }
+        return "Try: “\(row.intention.title): \(amount) \(unit) more. Mood 7 out of 10.”"
+    }
+
     private var recordingContent: some View {
-        VStack(spacing: 8) {
-            Text("Recording \(elapsedFormatted)")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(AttuneTheme.recording)
+                    .frame(width: 10, height: 10)
+                    .shadow(color: AttuneTheme.recording.opacity(0.7), radius: 6)
+                Text("Listening")
+                    .font(.headline)
+                Spacer()
+                Text(elapsedFormatted)
+                    .font(.headline.monospacedDigit())
+            }
+            Text("Name the intention and amount. Say “more” or “total today.” Mood is optional.")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundStyle(AttuneTheme.textSecondary)
             Button(action: stopCheckIn) {
-                Label("Stop", systemImage: "stop.fill")
-                    .font(.title2)
+                Label("Finish Check-In", systemImage: "stop.fill")
+                    .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
+                    .foregroundStyle(.white)
+                    .background(AttuneTheme.recording, in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
             }
-            .buttonStyle(.borderedProminent)
-            .tint(recordButtonColor)
+            .buttonStyle(.plain)
         }
+        .padding(14)
+        .background(AttuneTheme.recording.opacity(0.10), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous).stroke(AttuneTheme.recording.opacity(0.35)))
     }
-    
+
     private var elapsedFormatted: String {
         let mins = checkInRecorder.elapsedSec / 60
         let secs = checkInRecorder.elapsedSec % 60
         return String(format: "%d:%02d", mins, secs)
     }
-    
+
     private var processingContent: some View {
-        HStack(spacing: 12) {
-            SwiftUI.ProgressView()
-                .scaleEffect(0.9)
-            Text("Transcribing...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .padding(.vertical, 8)
+        statusPanel(
+            icon: "sparkles",
+            title: "Reviewing your check-in…",
+            detail: "Attune is looking for clear progress and mood updates.",
+            color: AttuneTheme.accentSecondary,
+            showsProgress: true
+        )
     }
-    
-    /// Compact banner for saved state (no duplicate progress, no large block)
-    private func savedBanner(transcript: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
-                .font(.body)
-            Text("Saved check-in")
-                .font(.subheadline)
-                .fontWeight(.medium)
-            if !transcript.isEmpty {
-                Text("·")
-                    .foregroundColor(.secondary)
-                Text(String(transcript.prefix(60)).trimmingCharacters(in: .whitespaces) + (transcript.count > 60 ? "…" : ""))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
+
+    private func savedContent(checkInId: String) -> some View {
+        VStack(spacing: 12) {
+            statusPanel(
+                icon: "checkmark.circle.fill",
+                title: "Check-in saved",
+                detail: checkInReceiptText(checkInId: checkInId),
+                color: AttuneTheme.success
+            )
+            Button("Record another") { state = .idle }
+                .buttonStyle(.bordered)
+                .tint(AttuneTheme.accent)
+        }
+    }
+
+    private func checkInReceiptText(checkInId: String) -> String {
+        var changes: [String] = []
+        let entries = ProgressStore.shared.loadAllProgressEntries()
+            .filter { $0.sourceCheckInId == checkInId }
+            .sorted { $0.createdAt < $1.createdAt }
+
+        for entry in entries.prefix(2) {
+            let title = IntentionStore.shared.loadIntention(id: entry.intentionId)?.title ?? "Progress"
+            let amount = displayValue(entry.amount)
+            if entry.updateType == "TOTAL" {
+                changes.append("\(title): \(amount) \(entry.unit) total")
+            } else {
+                changes.append("\(title) +\(amount) \(entry.unit)")
             }
-            Spacer()
         }
-        .padding(10)
-        .background(Color.green.opacity(0.12))
-        .cornerRadius(8)
+        if entries.count > 2 {
+            changes.append("+\(entries.count - 2) more")
+        }
+
+        if let checkIn = CheckInStore.shared.loadCheckIn(id: checkInId) {
+            let dateKey = ProgressCalculator.dateKey(for: checkIn.createdAt)
+            if let mood = DailyMoodStore.shared.loadDailyMood(dateKey: dateKey), mood.sourceCheckInId == checkInId {
+                if let score = mood.moodScore {
+                    changes.append("Mood \(score)/10")
+                } else if let label = mood.moodLabel, !label.isEmpty {
+                    changes.append("Mood: \(label)")
+                }
+            }
+        }
+
+        guard !changes.isEmpty else {
+            return "Saved. No progress or mood changes were found."
+        }
+        return changes.joined(separator: " · ")
     }
-    
-    /// Compact banner for error state
-    private func errorBanner(message: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.orange)
-                .font(.body)
-            Text("Transcription failed")
-                .font(.subheadline)
-                .fontWeight(.medium)
-            Text("·")
-                .foregroundColor(.secondary)
-            Text(message)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-            Spacer()
+
+    private func errorContent(message: String) -> some View {
+        VStack(spacing: 12) {
+            statusPanel(
+                icon: "exclamationmark.triangle.fill",
+                title: "We couldn't finish that check-in",
+                detail: friendlyCheckInError(message),
+                color: AttuneTheme.warning
+            )
+            Button("Try again") { state = .idle }
+                .buttonStyle(AttunePrimaryButtonStyle())
         }
-        .padding(10)
-        .background(Color.orange.opacity(0.12))
-        .cornerRadius(8)
+    }
+
+    private var permissionDeniedContent: some View {
+        VStack(spacing: 12) {
+            statusPanel(
+                icon: "mic.slash.fill",
+                title: "Recording access is off",
+                detail: "Allow Microphone and Speech Recognition in Settings to record check-ins.",
+                color: AttuneTheme.warning
+            )
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    openURL(url)
+                }
+            }
+            .buttonStyle(AttunePrimaryButtonStyle())
+            Button("Not now") { state = .idle }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textSecondary)
+        }
+    }
+
+    private func statusPanel(
+        icon: String,
+        title: String,
+        detail: String,
+        color: Color,
+        showsProgress: Bool = false
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.16))
+                    .frame(width: 42, height: 42)
+                if showsProgress {
+                    SwiftUI.ProgressView()
+                        .tint(color)
+                } else {
+                    Image(systemName: icon)
+                        .foregroundStyle(color)
+                }
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous).stroke(color.opacity(0.26)))
+    }
+
+    private func friendlyCheckInError(_ message: String) -> String {
+        let lowercased = message.lowercased()
+        if lowercased.contains("speech") || lowercased.contains("permission") || lowercased.contains("denied") {
+            return "Check recording permissions and try again."
+        }
+        if lowercased.contains("recognition") || lowercased.contains("recognizer") {
+            return "Speech recognition isn't available right now. Try again in a moment or use a physical device."
+        }
+        if lowercased.contains("network") || lowercased.contains("internet") || lowercased.contains("offline") {
+            return "Check your connection. Your recording remains on this device so you can try again."
+        }
+        return "Your recording couldn't be processed. Please try again."
     }
     
     // MARK: - E) Streak (Slice A)
@@ -1092,10 +1172,27 @@ struct HomeView: View {
             return
         }
 
+        switch PermissionsHelper.recordingPermissionState {
+        case .ready:
+            beginRecording()
+        case .denied:
+            state = .permissionDenied
+        case .needsRequest:
+            state = .requestingPermission
+            Task { @MainActor in
+                let granted = await PermissionsHelper.requestRecordingPermissions()
+                guard state == .requestingPermission else { return }
+                if granted {
+                    beginRecording()
+                } else {
+                    state = .permissionDenied
+                }
+            }
+        }
+    }
+
+    private func beginRecording() {
         do {
-            // Ask for mic + speech when the user starts a check-in (not on Home appear).
-            PermissionsHelper.requestRecordingPermissionsIfNeeded()
-            
             // Use cached intention set (already loaded in onAppear, so this should be fast)
             // If not cached, this will load synchronously but should be rare
             guard let _ = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else {
@@ -1237,27 +1334,6 @@ struct HomeView: View {
                 }
             }
             
-            // Slice 7: If any ambiguous, show disambiguation sheet; else finish
-            if !ambiguousUpdates.isEmpty {
-                processingCheckInId = nil
-                loadTodayCheckIns()
-                highlightedCheckInId = checkInId
-                highlightKind = .success
-                scheduleClearHighlight()
-                ambiguitySheetData = AmbiguitySheetData(
-                    ambiguousUpdates: ambiguousUpdates,
-                    intentions: intentions,
-                    dateKey: dateKey,
-                    intentionSetId: intentionSet.id,
-                    checkInId: checkInId,
-                    transcript: transcript
-                )
-            } else {
-                loadTodaysProgress()
-                refreshMoodAndStreak()
-                state = .saved(transcript: transcript)
-            }
-            
             if result.moodLabel != nil || result.moodScore != nil {
                 do {
                     try DailyMoodStore.shared.setMoodFromCheckInIfNotOverridden(
@@ -1270,17 +1346,30 @@ struct HomeView: View {
                     AppLogger.log(AppLogger.ERR, "DailyMood save failed dateKey=\(dateKey) error=\"\(error.localizedDescription)\"")
                 }
             }
-            
+
             loadTodaysProgress()
             refreshMoodAndStreak()
-            state = .saved(transcript: transcript)
-            
+
             // Clear processing placeholder; show real row with green flash
             processingCheckInId = nil
             loadTodayCheckIns()
             highlightedCheckInId = checkInId
             highlightKind = .success
             scheduleClearHighlight()
+
+            // Ambiguous updates need the user's meaning before the receipt is final.
+            // Keep processing behind the sheet until they resolve or skip them.
+            if !ambiguousUpdates.isEmpty {
+                ambiguitySheetData = AmbiguitySheetData(
+                    ambiguousUpdates: ambiguousUpdates,
+                    intentions: intentions,
+                    dateKey: dateKey,
+                    intentionSetId: intentionSet.id,
+                    checkInId: checkInId
+                )
+            } else {
+                state = .saved(checkInId: checkInId)
+            }
             
         } catch {
             AppLogger.log(AppLogger.ERR, "Check-in transcription failed id=\(AppLogger.shortId(checkInId)) error=\"\(error.localizedDescription)\"")

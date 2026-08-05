@@ -11,6 +11,7 @@ import StoreKit
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
     // State for showing share sheet when exporting data
     @State private var showingExportSheet = false
@@ -54,7 +55,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Subscription")
                 } footer: {
-                    Text("Free: \(SubscriptionConfig.freeCheckInsPerDay) check-ins per day. Subscribe for unlimited check-ins, All Day recording, and voice intentions. Cancel anytime in Manage Subscription.")
+                    Text("Free: \(SubscriptionConfig.freeCheckInsPerDay) check-ins per day. Subscribe for unlimited check-ins, background listening sessions, and voice intentions. Cancel anytime in Manage Subscription.")
                 }
 
                 // About section
@@ -135,6 +136,11 @@ struct SettingsView: View {
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
             .onAppear {
                 isReminderEnabled = ReminderPreferences.isReminderEnabled // Reload persisted reminder enabled state when settings screen appears.
                 reminderTime = ReminderPreferences.reminderTimeDate // Reload persisted reminder time when settings screen appears.

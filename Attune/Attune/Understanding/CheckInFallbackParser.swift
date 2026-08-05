@@ -27,9 +27,19 @@ struct CheckInFallbackParser {
     /// - Parameters:
     ///   - transcript: The transcribed check-in text
     ///   - intentions: Current active intentions (we match by title)
-    /// - Returns: Array of CheckInUpdate (all INCREMENT, confidence 0.7)
+    /// - Returns: Array of CheckInUpdate (TOTAL when explicitly stated; otherwise INCREMENT)
     static func parseFallbackUpdates(transcript: String, intentions: [Intention]) -> [CheckInUpdate] {
         let lower = transcript.lowercased()
+
+        // Preserve the distinction taught in the UI when the AI extractor is unavailable.
+        // If a transcript mixes both meanings, do not guess and invent a wrong total.
+        let hasTotalSignal = ["total today", "in total", "altogether", "so far today"].contains { lower.contains($0) }
+        let hasIncrementSignal = [" more", "another ", "additional "].contains { lower.contains($0) }
+        guard !(hasTotalSignal && hasIncrementSignal) else {
+            AppLogger.log(AppLogger.AI, "checkin_fallback_skipped reason=mixed_total_and_increment")
+            return []
+        }
+        let fallbackUpdateType = hasTotalSignal ? "TOTAL" : "INCREMENT"
         
         // 1. Extract (amount, unit) pairs from transcript (order preserved)
         var minutesAmounts: [Double] = []
@@ -68,7 +78,7 @@ struct CheckInFallbackParser {
                 minutesIdx += 1
                 updates.append(CheckInUpdate(
                     intentionId: intention.id,
-                    updateType: "INCREMENT",
+                    updateType: fallbackUpdateType,
                     amount: amount,
                     unit: "minutes",
                     confidence: Self.fallbackConfidence,
@@ -93,41 +103,27 @@ struct CheckInFallbackParser {
             if let intention = intention { // Proceed only when a workout intention is found
                 let unitLower = intention.unit.lowercased() // Normalize unit for comparisons
                 var amountToUse: Double? // Holder for chosen amount
-                var minutesConsumed = false // Track whether we consumed a parsed minutes value
 
                 if minutesIdx < minutesAmounts.count { // Use parsed minutes when available
                     amountToUse = minutesAmounts[minutesIdx] // Set amount from parsed minutes
                     minutesIdx += 1 // Advance minutes index to avoid reusing same match
-                    minutesConsumed = true // Record that we used a parsed value
 #if DEBUG
                     AppLogger.log(AppLogger.AI, "checkin_fallback_debug workout_keyword=\(matchedKeyword ?? "unknown") amount_source=extracted_minutes amount=\(amountToUse ?? 0)") // Debug: log parsed minutes usage
 #endif
-                } else if unitLower.contains("min") { // Fallback for minute-based intentions without explicit numbers
-                    let fallbackAmount = intention.targetValue > 0 ? intention.targetValue : 30 // Prefer targetValue; else default to 30 minutes
-                    amountToUse = fallbackAmount // Set amount from fallback
-#if DEBUG
-                    AppLogger.log(AppLogger.AI, "checkin_fallback_debug workout_keyword=\(matchedKeyword ?? "unknown") amount_source=\(intention.targetValue > 0 ? "target_default" : "hard_default_30") amount=\(amountToUse ?? 0)") // Debug: log which minute fallback amount was chosen
-#endif
-                } else if unitLower.contains("session") || unitLower == "times" || unitLower.contains("workout") { // Handle session-like units
-                    amountToUse = 1 // Default one session when no numeric amount is stated
-#if DEBUG
-                    AppLogger.log(AppLogger.AI, "checkin_fallback_debug workout_keyword=\(matchedKeyword ?? "unknown") amount_source=session_default_1 amount=1") // Debug: log session default fallback
-#endif
-                } // Other units are skipped to preserve current behavior
+                } // Without an explicit amount, skip the update instead of inventing progress.
 
                 if let amount = amountToUse { // Only append update when we have an amount
                     updates.append(CheckInUpdate( // Build fallback update payload
                         intentionId: intention.id, // Apply to matched workout intention
-                        updateType: "INCREMENT", // Fallback always increments
+                        updateType: fallbackUpdateType,
                         amount: amount, // Use parsed or fallback amount
                         unit: unitLower.contains("min") ? "minutes" : intention.unit, // Use minutes for minute-based, otherwise original unit
                         confidence: Self.fallbackConfidence, // Use existing fallback confidence
                         evidence: nil // No evidence snippet in fallback
                     )) // Append constructed update
                 } else { // No valid amount derived
-                    _ = minutesConsumed // No-op to satisfy compiler for unused flag in this branch
 #if DEBUG
-                    AppLogger.log(AppLogger.AI, "checkin_fallback_debug workout_keyword=\(matchedKeyword ?? "unknown") amount_source=none reason=unsupported_unit") // Debug: log when no amount could be derived
+                    AppLogger.log(AppLogger.AI, "checkin_fallback_debug workout_keyword=\(matchedKeyword ?? "unknown") amount_source=none reason=explicit_amount_required") // Debug: log when no amount could be derived
 #endif
                 }
             }
@@ -142,7 +138,7 @@ struct CheckInFallbackParser {
             pagesIdx += 1
             updates.append(CheckInUpdate(
                 intentionId: intention.id,
-                updateType: "INCREMENT",
+                updateType: fallbackUpdateType,
                 amount: amount,
                 unit: "pages",
                 confidence: Self.fallbackConfidence,

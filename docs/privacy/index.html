@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Privacy Policy for the Attune iOS app.">
+  <title>Privacy Policy · Attune</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+  <main>
+    <a class="brand" href="../"><span class="mark">∿</span> Attune</a>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Effective August 4, 2026</p>
+    <p class="lede">Attune is designed to organize voice check-ins into personal intentions, progress, and insights while keeping most app data on your device.</p>
+
+    <section class="card">
+      <h2>Information Attune processes</h2>
+      <h3>Voice recordings and transcripts</h3>
+      <p>When you choose to record a check-in or an All Day session, Attune records audio on your device. Attune uses Apple speech-recognition services to convert that audio into text. Depending on your device and settings, Apple may process speech through its cloud services.</p>
+
+      <h3>Intentions, progress, mood, and insights</h3>
+      <p>Attune stores the intentions you create, check-in transcripts, progress entries, mood selections, corrections, and generated insights in the app's local storage on your device.</p>
+
+      <h3>AI processing</h3>
+      <p>After you accept Attune's AI disclosure, Attune sends transcripts and the limited goal context needed to interpret them through Attune's Cloudflare Worker to the OpenAI API. This processing organizes intentions, extracts progress updates, and creates insights. The proxy forwards requests and responses and is not designed to create a user profile or persist their contents.</p>
+
+      <h3>Diagnostics and settings</h3>
+      <p>Attune stores reminder preferences, privacy-consent status, subscription entitlement status, and local diagnostic logs. Logs can include timestamps, operation status, short internal identifiers, and limited text previews used to diagnose app behavior.</p>
+
+      <h3>Purchases</h3>
+      <p>Subscriptions are processed by Apple. Attune receives subscription status but does not receive your full payment-card information.</p>
+    </section>
+
+    <h2>How information is used</h2>
+    <ul>
+      <li>Record and transcribe voice sessions you start.</li>
+      <li>Organize intentions and calculate personal progress.</li>
+      <li>Generate and display insights from your transcripts.</li>
+      <li>Deliver reminders you enable.</li>
+      <li>Provide subscriptions and troubleshoot app reliability.</li>
+    </ul>
+    <p>Attune does not sell your personal information and does not include third-party advertising or cross-app tracking SDKs.</p>
+
+    <h2>Services that process information</h2>
+    <ul>
+      <li><strong>Apple:</strong> speech recognition, notifications, App Store distribution, and subscription processing.</li>
+      <li><strong>Cloudflare:</strong> secure request forwarding between Attune and OpenAI. Cloudflare may process network and security metadata under its own terms.</li>
+      <li><strong>OpenAI:</strong> transcript and context processing through the API. OpenAI states that API inputs and outputs are not used to train its models by default unless the API account owner opts in. Default abuse-monitoring logs may retain customer content for up to 30 days unless different approved retention controls apply.</li>
+    </ul>
+    <p>These providers process information under their own privacy and security terms. Attune requires its service providers to protect information consistently with the services they provide and applicable requirements.</p>
+
+    <h2>Retention and deletion</h2>
+    <p>Attune keeps local app data until you delete available items, remove the app, or otherwise erase its local data. Audio is deleted locally after successful transcription. If transcription fails, the audio may remain locally so the operation can be retried. The Attune proxy is not designed to store request contents. OpenAI's default API abuse-monitoring retention is described above.</p>
+    <p>Attune currently does not require a hosted user account. To ask a privacy question or request help deleting data, use the <a href="../support/">Attune Support page</a>. Do not include transcripts, recordings, or other sensitive information in a public GitHub issue.</p>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li>You can decline or revoke microphone and speech-recognition access in iOS Settings; voice features will then be unavailable.</li>
+      <li>You can disable Attune notifications in the app or iOS Settings.</li>
+      <li>You can export available Attune data from Settings.</li>
+      <li>You can remove locally stored Attune data by deleting it where the app provides that control or by deleting the app.</li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>Attune is not directed to children under 13, and Scott Oliver does not knowingly collect personal information from children under 13 through Attune.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>This policy may be updated when Attune's features, providers, or data practices change. The effective date above will be updated when changes are published.</p>
+
+    <h2>Contact</h2>
+    <p>Attune is developed by Scott Oliver. For support or privacy requests, visit <a href="../support/">Attune Support</a>.</p>
+
+    <footer><a href="../">Attune</a> · <a href="../support/">Support</a> · <a href="../terms/">Terms</a></footer>
+  </main>
+</body>
+</html>

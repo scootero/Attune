@@ -3,7 +3,8 @@
 //  Attune
 //
 //  Pure functions for computing progress totals and % complete.
-//  TOTAL overwrite rule: if any TOTAL exists for day/intention, use it; else sum INCREMENT.
+//  Progress entries are applied chronologically: TOTAL resets the running value,
+//  and later INCREMENT entries add to that value.
 //  Slice 4.
 //
 
@@ -20,7 +21,8 @@ struct ProgressCalculator {
     
     /// Total for an intention on a given date.
     /// Override precedence (Slice 7): If overrideAmount provided, return it. Else use entry-based logic.
-    /// Entry rule: If any TOTAL exists, use latest. Else sum INCREMENTs.
+    /// Entry rule: apply entries chronologically. TOTAL resets the running value;
+    /// later INCREMENT entries add to it.
     /// - Parameter overrideAmount: Optional manual override (takes precedence over entries)
     static func totalForIntention(entries: [ProgressEntry], dateKey: String, intentionId: String, intentionSetId: String, overrideAmount: Double? = nil) -> Double {
         if let override = overrideAmount {
@@ -31,18 +33,23 @@ struct ProgressCalculator {
             $0.dateKey == dateKey && $0.intentionId == intentionId && $0.intentionSetId == intentionSetId
         }
         
-        // Check for any TOTAL (latest wins)
-        let totals = filtered.filter { $0.updateType == "TOTAL" }
-            .sorted { $0.createdAt > $1.createdAt }
-        
-        if let latestTotal = totals.first {
-            return latestTotal.amount
+        let ordered = filtered.sorted { lhs, rhs in
+            if lhs.effectiveTookPlaceAt != rhs.effectiveTookPlaceAt {
+                return lhs.effectiveTookPlaceAt < rhs.effectiveTookPlaceAt
+            }
+            return lhs.createdAt < rhs.createdAt
         }
-        
-        // Else sum INCREMENTs
-        return filtered
-            .filter { $0.updateType == "INCREMENT" }
-            .reduce(0) { $0 + $1.amount }
+
+        return ordered.reduce(0) { runningTotal, entry in
+            switch entry.updateType {
+            case "TOTAL":
+                return entry.amount
+            case "INCREMENT":
+                return runningTotal + entry.amount
+            default:
+                return runningTotal
+            }
+        }
     }
     
     /// Percent complete for a single intention.

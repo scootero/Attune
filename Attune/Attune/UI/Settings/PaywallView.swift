@@ -27,13 +27,13 @@ struct PaywallView: View {
                         .foregroundColor(.secondary)
                 }
 
-                Text("Subscribe for unlimited check-ins, All Day recording, and voice-created intentions.")
+                Text("Subscribe for unlimited check-ins, background listening sessions, and voice-created intentions.")
                     .font(.body)
                     .foregroundColor(.secondary)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Unlimited daily check-ins", systemImage: "checkmark.circle.fill")
-                    Label("All Day voice sessions", systemImage: "checkmark.circle.fill")
+                    Label("Background listening sessions", systemImage: "checkmark.circle.fill")
                     Label("Record Intentions by voice", systemImage: "checkmark.circle.fill")
                     Label("Cancel anytime in Apple Settings", systemImage: "checkmark.circle.fill")
                 }

@@ -98,17 +98,28 @@ final class SubscriptionManager: ObservableObject {
         }
     }
 
+    /// Effective premium access for feature gates.
+    /// Debug builds unlock everything so we can test on device without StoreKit/App Store Connect.
+    /// Release builds still require a real subscription entitlement.
+    var hasPremiumAccess: Bool {
+        #if DEBUG
+        return true
+        #else
+        return isSubscribed
+        #endif
+    }
+
     /// Free users get a daily check-in allowance; subscribers are unlimited.
     func canStartCheckIn(todayCheckInCount: Int) -> Bool {
-        if isSubscribed { return true }
+        if hasPremiumAccess { return true }
         return todayCheckInCount < SubscriptionConfig.freeCheckInsPerDay
     }
 
     /// All-day recording is a subscriber feature.
-    var canUseAllDayRecording: Bool { isSubscribed }
+    var canUseAllDayRecording: Bool { hasPremiumAccess }
 
     /// Voice “Record Intentions” is a subscriber feature (manual add stays free).
-    var canUseVoiceIntentions: Bool { isSubscribed }
+    var canUseVoiceIntentions: Bool { hasPremiumAccess }
 
     /// Price string from StoreKit when available, otherwise the known $5.99 fallback.
     var priceText: String {

@@ -2,7 +2,7 @@
 //  RootTabView.swift
 //  Attune
 //
-//  Bottom tab bar with Home, All Day, Library, Settings, and Progress tabs.
+//  Four consumer-facing tabs: Today, Record, Insights, and Momentum.
 //  Uses AppRouter so Home momentum card can switch to Library → Momentum tab.
 //
 
@@ -17,37 +17,31 @@ struct RootTabView: View {
     init() {
         // Wire up dependency: inject TranscriptionQueue into RecorderService
         RecorderService.shared.transcriptionQueue = TranscriptionQueue.shared
+        AttuneTheme.configureAppearance()
     }
 
     var body: some View {
         TabView(selection: $appRouter.selectedRootTab) {
-            // Tab 1: Home — daily intentions, momentum card taps to Library → Momentum
+            // Tab 1: Today — check-ins, intentions, mood, and weekly summary.
             HomeView()
                 .tabItem {
-                    Label("Home", systemImage: "house.fill")
+                    Label("Today", systemImage: "house.fill")
                 }
                 .tag(RootTab.home)
             
-            // Tab 2: All Day — continuous recording screen
+            // Tab 2: Record — background listening sessions.
             HomeRecordView()
                 .tabItem {
-                    Label("All Day", systemImage: "record.circle")
+                    Label("Record", systemImage: "waveform.circle.fill")
                 }
                 .tag(RootTab.allDay)
             
-            // Tab 3: Library — browse sessions, segments, insights, momentum
+            // Tab 3: Insights — current Library implementation is simplified in Phase 4.
             LibraryView()
                 .tabItem {
-                    Label("Library", systemImage: "books.vertical.fill")
+                    Label("Insights", systemImage: "sparkles")
                 }
                 .tag(RootTab.library)
-            
-            // Tab 4: Settings — app settings and logs
-            SettingsView()
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
-                }
-                .tag(RootTab.settings)
             
             // Tab 5: Momentum — charted daily progress now lives here
             NavigationStack { // Provide navigation container for Momentum when used as root tab
@@ -58,6 +52,8 @@ struct RootTabView: View {
                 }
                 .tag(RootTab.progress) // Keep enum tag unchanged to avoid churn elsewhere
         }
+        .tint(AttuneTheme.accent)
+        .preferredColorScheme(.dark)
         .onAppear {
             // Perform recovery on first appearance only
             if !hasPerformedRecovery {

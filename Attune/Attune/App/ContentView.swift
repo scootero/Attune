@@ -27,6 +27,7 @@ struct ContentView: View {
                 }
                 .interactiveDismissDisabled(true) // Require an explicit Accept tap.
             }
+            .preferredColorScheme(.dark)
     }
 }
 

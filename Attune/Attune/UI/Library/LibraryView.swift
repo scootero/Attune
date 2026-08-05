@@ -3,12 +3,12 @@
 //  Attune
 //
 //  Debug cockpit: toggle between Sessions, Segments, and Insights views.
-//  Sessions tab has sub-picker: All-day (sessions) | Check-ins.
+//  Sessions tab has sub-picker: Listening sessions | Check-ins.
 //
 
 import SwiftUI
 
-/// Sub-tab for Sessions: All-day recordings vs Check-ins
+/// Sub-tab for Sessions: background listening sessions vs Check-ins
 private enum SessionsSubTab {
     case allDay
     case checkIns
@@ -17,10 +17,10 @@ private enum SessionsSubTab {
 struct LibraryView: View {
     @EnvironmentObject var appRouter: AppRouter
     
-    /// When Sessions is selected: All-day or Check-ins sub-tab
+    /// When Sessions is selected: listening sessions or Check-ins sub-tab
     @State private var sessionsSubTab: SessionsSubTab = .allDay
     
-    /// Loaded sessions from disk (for All-day list)
+    /// Loaded sessions from disk (for listening-session list)
     @State private var sessions: [Session] = []
     
     /// Loaded check-ins from disk (for Check-ins list)
@@ -39,10 +39,10 @@ struct LibraryView: View {
                 .pickerStyle(.segmented)
                 .padding()
                 
-                // When Sessions tab: show All-day | Check-ins sub-picker
+                // When Sessions tab: show Listening | Check-ins sub-picker
                 if appRouter.selectedLibraryTab == .sessions {
                     Picker("Sessions content", selection: $sessionsSubTab) {
-                        Text("All-day").tag(SessionsSubTab.allDay)
+                        Text("Listening").tag(SessionsSubTab.allDay)
                         Text("Check-ins").tag(SessionsSubTab.checkIns)
                     }
                     .pickerStyle(.segmented)
@@ -82,7 +82,7 @@ struct LibraryView: View {
         }
     }
     
-    /// Sessions tab content: All-day list or Check-ins list
+    /// Sessions tab content: listening-session list or Check-ins list
     @ViewBuilder
     private var sessionsContentView: some View {
         switch sessionsSubTab {
