@@ -2,143 +2,81 @@
 //  TopicsListView.swift
 //  Attune
 //
-//  List of aggregated topics, showing occurrence counts and last mentioned time.
-//  Topics are loaded from Topics.json and sorted by most recently mentioned.
+//  Consumer list of grouped themes. Counts are derived from visible resolved
+//  captures so items marked incorrect do not inflate the UI.
 //
 
 import SwiftUI
 
 struct TopicsListView: View {
-    /// All topic aggregates loaded from disk
     @State private var topics: [TopicAggregate] = []
-    
+    @State private var corrections: [String: ItemCorrection] = [:]
+    @State private var searchText = ""
+
     var body: some View {
         Group {
-            if topics.isEmpty {
-                // Empty state
-                VStack(spacing: 16) {
-                    Image(systemName: "folder")
-                        .font(.system(size: 64))
-                        .foregroundColor(.secondary)
-                    
-                    Text("No Topics Yet")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    
-                    Text("Topics will appear here as you mention things across sessions")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if filteredTopics.isEmpty {
+                insightsEmptyState(
+                    icon: searchText.isEmpty ? "repeat" : "magnifyingglass",
+                    title: searchText.isEmpty ? "No themes yet" : "No matching themes",
+                    detail: searchText.isEmpty
+                        ? "Related ideas from Listening Sessions will be grouped here."
+                        : "Try another search."
+                )
             } else {
-                // List of topics
-                List {
-                    ForEach(topics) { topic in
-                        NavigationLink(destination: TopicDetailView(topic: topic)) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                // Title and occurrence count
-                                HStack {
-                                    Text(topic.displayTitle)
-                                        .font(.headline)
-                                        .lineLimit(2)
-                                    
-                                    Spacer()
-                                    
-                                    // Occurrence count badge
-                                    Text("\(topic.occurrenceCount)")
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.blue.opacity(0.2))
-                                        .foregroundColor(.blue)
-                                        .cornerRadius(8)
-                                }
-                                
-                                // Categories
-                                if !topic.categories.isEmpty {
-                                    Text(formatCategories(topic.categories))
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
-                                }
-                                
-                                // Last mentioned time
-                                HStack {
-                                    Image(systemName: "clock")
-                                        .font(.caption)
-                                    Text("Last mentioned \(formatRelativeTime(topic.lastSeenAtISO))")
-                                        .font(.caption)
-                                }
-                                .foregroundColor(.secondary)
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(filteredTopics) { summary in
+                            NavigationLink(destination: TopicDetailView(topic: summary.topic)) {
+                                TopicSummaryRow(summary: summary)
                             }
-                            .padding(.vertical, 4)
+                            .buttonStyle(.plain)
                         }
                     }
+                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.vertical, 12)
+                    .padding(.bottom, 96)
                 }
+                .scrollIndicators(.hidden)
             }
         }
-        .onAppear {
-            loadTopics()
-        }
-        .refreshable {
-            loadTopics()
+        .background(AttuneScreenBackground())
+        .navigationTitle("Themes")
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $searchText, prompt: "Search themes")
+        .onAppear(perform: loadData)
+        .refreshable { loadData() }
+    }
+
+    private var filteredTopics: [ConsumerTopicSummary] {
+        visibleTopics.filter { summary in
+            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            return query.isEmpty
+                || summary.topic.displayTitle.localizedCaseInsensitiveContains(query)
+                || summary.topic.categories.contains { InsightDisplay.categoryLabel($0).localizedCaseInsensitiveContains(query) }
         }
     }
-    
-    /// Loads all topics from disk and sorts by last seen (newest first)
-    private func loadTopics() {
-        let topicsDict = TopicAggregateStore.shared.loadTopics()
-        
-        // Convert to array and sort by lastSeenAtISO descending
-        topics = Array(topicsDict.values).sorted { topic1, topic2 in
-            // ISO8601 string comparison works for sorting
-            topic1.lastSeenAtISO > topic2.lastSeenAtISO
+
+    private var visibleTopics: [ConsumerTopicSummary] {
+        topics.compactMap { topic in
+            let occurrences = ItemResolver.resolveItems(itemIds: topic.itemIds)
+                .filter { !($0.applyingCorrection(corrections[$0.id]).isMarkedIncorrect) }
+                .sorted { $0.createdAt > $1.createdAt }
+            guard !occurrences.isEmpty else { return nil }
+            return ConsumerTopicSummary(topic: topic, occurrences: occurrences)
+        }
+        .sorted { lhs, rhs in
+            if lhs.mentionCount != rhs.mentionCount { return lhs.mentionCount > rhs.mentionCount }
+            return lhs.topic.lastSeenAtISO > rhs.topic.lastSeenAtISO
         }
     }
-    
-    /// Formats categories for display (e.g., "fitness_health" -> "Fitness Health")
-    private func formatCategories(_ categories: [String]) -> String {
-        categories.map { category in
-            category.replacingOccurrences(of: "_", with: " ")
-                .capitalized
-        }.joined(separator: ", ")
-    }
-    
-    /// Formats ISO8601 timestamp as relative time (e.g., "2 hours ago")
-    private func formatRelativeTime(_ isoString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        
-        guard let date = formatter.date(from: isoString) else {
-            return "recently"
-        }
-        
-        let now = Date()
-        let interval = now.timeIntervalSince(date)
-        
-        // Format relative time
-        if interval < 60 {
-            return "just now"
-        } else if interval < 3600 {
-            let minutes = Int(interval / 60)
-            return "\(minutes) minute\(minutes == 1 ? "" : "s") ago"
-        } else if interval < 86400 {
-            let hours = Int(interval / 3600)
-            return "\(hours) hour\(hours == 1 ? "" : "s") ago"
-        } else if interval < 604800 {
-            let days = Int(interval / 86400)
-            return "\(days) day\(days == 1 ? "" : "s") ago"
-        } else {
-            let weeks = Int(interval / 604800)
-            return "\(weeks) week\(weeks == 1 ? "" : "s") ago"
-        }
+
+    private func loadData() {
+        topics = Array(TopicAggregateStore.shared.loadTopics().values)
+        corrections = CorrectionsStore.shared.loadCorrections()
     }
 }
 
 #Preview {
-    NavigationView {
-        TopicsListView()
-    }
+    NavigationStack { TopicsListView() }
 }

@@ -122,7 +122,9 @@ struct CheckInDetailView: View {
             Text(title)
                 .font(.subheadline)
                 .fontWeight(.medium)
-            Text("\(entry.updateType): \(entry.amount) \(entry.unit)")
+            Text(entry.updateType == "TOTAL"
+                 ? "Recorded total: \(displayValue(entry.amount)) \(entry.unit)"
+                 : "Added \(displayValue(entry.amount)) \(entry.unit)")
                 .font(.caption)
                 .foregroundColor(.secondary)
             // Increment % and cumulative % (INCREMENT only; hide if no goal or goal=0)
@@ -183,6 +185,10 @@ struct CheckInDetailView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+
+    private func displayValue(_ value: Double) -> String {
+        value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 }
 

@@ -19,6 +19,13 @@ This is the durable restart document for the Attune UI work. In a new Codex chat
 - **Listening Session** is a separate background recording. It extracts and categorizes intentions, commitments, events, and states; repeated topics increase recurring-theme counts shown through Insights.
 - Listening Sessions do **not** silently create quantitative tracked intentions or alter Today's progress. A future consumer flow should let the user confirm and promote a captured intention into tracking.
 
+## Consumer feedback policy
+
+- Main screens show only current state, useful results, and problems the user can act on.
+- Keep microphone/permission problems visible because they include an **Open Settings** action; keep a recording-start failure inline because the user can retry.
+- Do not leave transcription, segment, extraction, interruption, or saved-session warnings on Today or Record when the user cannot repair them there. Preserve those details in Sessions and Debug diagnostics.
+- Insights must describe only stored extracted items and recurring topic aggregates. Do not imply that an insight changed tracked progress or created an intention unless the user explicitly confirms that action.
+
 ## Baseline and safety
 
 - Branch at start: `wip/pre-appstore-changes`
@@ -79,21 +86,23 @@ Acceptance: app builds; all four tabs work; Settings opens and closes; Home-to-M
 - [x] Improve history and subscription entry points.
 - [ ] Verify successful transcription and a real interruption recovery on a physical device.
 
-### Phase 4 — Insights and history
+### Phase 4 — Insights and history (implementation complete)
 
-- [ ] Replace the Library debug cockpit with consumer-first Recent, Check-Ins, Sessions, Topics, and Insights views.
-- [ ] Remove Segments from production navigation.
-- [ ] Replace IDs with readable session titles and dates.
-- [ ] Hide fingerprints, file metadata, and confidence values behind Debug diagnostics.
-- [ ] Simplify insight review/correction language.
-- [ ] Add useful search, filters, and empty states.
+- [x] Replace the Library debug cockpit with consumer-first Recent, Check-Ins, Sessions, Topics, and Insights views.
+- [x] Remove Segments from production navigation.
+- [x] Replace IDs with readable session titles and dates.
+- [x] Hide fingerprints, file metadata, and confidence values behind Debug diagnostics.
+- [x] Simplify insight review/correction language.
+- [x] Follow the consumer feedback policy: no persistent non-actionable processing warnings or raw failure banners.
+- [x] Clearly distinguish captured items from recurring themes and from quantitative tracked intentions.
+- [x] Add useful search, filters, and empty states.
 
-### Phase 5 — Momentum and progress
+### Phase 5 — Momentum and progress (implementation complete; populated-data validation pending)
 
-- [ ] Refine Day/Week/Month navigation and empty states.
-- [ ] Consolidate duplicate Library Progress views into Momentum drill-down.
-- [ ] Improve chart contrast, accessibility, selection, and labels.
-- [ ] Add compact summaries and consistent intention color/symbol identity.
+- [x] Refine Day/Week/Month navigation and empty states.
+- [x] Consolidate duplicate Library Progress views into Momentum drill-down.
+- [x] Improve chart contrast, accessibility, selection, and labels.
+- [x] Add compact summaries and consistent intention color/symbol identity.
 - [ ] Validate with Scott's manually prepared historical data.
 
 ### Phase 6 — Settings, onboarding, privacy, and paywall
@@ -162,7 +171,38 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - Simplified Today to four visible elements: Voice Check-In, Weekly Momentum, Today's Progress, and Mood; removed the duplicate summary strip and surfaced the chart above the fold.
 - Made Check-In instructions explicit, report only persisted progress/mood changes, require numeric fallback amounts, and preserve “more” versus “total today” semantics.
 - Renamed consumer-facing All Day language to Listening Session without changing the recorder, background audio, transcription, extraction, or topic aggregation pipeline.
-- Simplified Record to one session card and compact Sessions/Insights history; completion now waits for extraction and reports the real captured-item count.
+- Simplified Record to one session card and compact Sessions/Insights history; processing waits for extraction and history shows the real captured-item count.
+- Removed persistent Record completion/transcription banners. Non-actionable failures remain available in Sessions; only permission and start failures stay on the main screen because the user can fix or retry them.
+
+### 2026-08-04 — Phase 4
+
+- Replaced the Library/Segments debug cockpit with a consumer Insights home containing recurring themes, recent captures, and listening/check-in history.
+- Built Captured and Themes views directly from stored `ExtractedItem` and `TopicAggregate` data, with search and capture-type filters.
+- Derived visible theme counts from resolved items after corrections so hidden captures do not inflate recurring counts.
+- Replaced fingerprints, confidence/strength percentages, session IDs, segment indexes, raw statuses, and technical failures with titles, summaries, quotes, dates, types, categories, and mention counts.
+- Added a Review Capture sheet that can correct title/type/categories, add a personal note, or hide a capture from consumer summaries.
+- Clarified that captures and themes do not update Today or create tracked intentions.
+- Simplified Listening Session history/details to dates, duration, captures, and available transcript; failed transcription produces no persistent warning.
+
+### 2026-08-04 — Phase 5
+
+- Replaced the noisy explanatory card and custom 3D charts with a compact Day/Week/Month hierarchy and readable Swift Charts.
+- Kept Momentum grounded in stored tracked intentions, check-in progress entries, manual overrides, and mood; no listening-session capture changes Today progress.
+- Stopped rendering empty historical days as red/zero progress bars. Week and month charts now show only days with recorded progress.
+- Added period-aware summaries, goal selection on the Day chart, percent labels, target reference, VoiceOver descriptions, and stable color plus symbol identities.
+- Moved the former standalone Progress UI into a toolbar-accessible Progress History drill-down, preserving daily details, audit entries, and manual total adjustments.
+- Corrected the paywall loading indicator to explicitly use SwiftUI's spinner after removing the conflicting standalone `ProgressView` type.
+
+### 2026-08-05 — Home hierarchy correction
+
+- Reordered Today around the product workflow: Intentions and today's progress, Voice Check-In, Mood, then Weekly Momentum.
+- Renamed the first card to Intentions with a Today's progress subtitle and added target/unit/timeframe context to every row.
+- Kept Add Intention visible whenever the card is in its normal state; it opens the existing add/edit intention flow without changing persistence.
+- Renamed the manual override action to Update Progress while preserving the existing slider, Save, Cancel, and override behavior.
+- Compacted the Voice Check-In instructions and example without changing recording, transcription, parsing, ambiguity, progress, or mood behavior.
+- Replaced the oversized check-in failure presentation with a compact inline state that auto-dismisses after eight seconds; saved receipts return to idle after five seconds.
+- Rendered days with no recorded progress as neutral empty marks on Home instead of red failure bars; actual recorded ratios and streak logic are unchanged.
+- For populated Momentum visual QA, use removable simulator fixtures or an explicitly DEBUG-only demo-data tool; do not ship fabricated history.
 
 ## Verification log
 
@@ -183,8 +223,18 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - Phase 3 source verification: background audio mode, three-minute segmentation, interruption persistence, and queue finalization remain implemented in the existing recorder services. A physical-device interruption/transcription success test is still required.
 - Product-contract correction build: succeeded for iPhone 17 Pro simulator on iOS 26.5; `git diff --check` passed.
 - Product-contract visual walkthrough: Weekly Momentum and the complete Today hierarchy are visible above the tab bar; Record contains one Listening Session card plus compact history.
-- Listening control walkthrough: Start entered the real background recording state and End entered real processing. The Simulator again produced its known speech-recognizer failure, displayed in a compact dismissible notice.
+- Listening control walkthrough: Start entered the real background recording state and End entered real processing. The Simulator again produced its known speech-recognizer failure; that diagnostic remains available inside Sessions.
+- Non-actionable-banner correction: build succeeded and the simulator confirmed Record stays clean even with four saved sessions containing failed transcription; no stale “Session needs attention” notice remains.
+- Phase 4 build: succeeded for iPhone 17 Pro simulator on iOS 26.5; `git diff --check` passed.
+- Phase 4 empty-state walkthrough: passed Insights onboarding copy, clean four-session history, readable session detail, and back navigation with no technical failure banners.
+- Phase 4 populated walkthrough: passed summary counts, recurring-first themes, recent captures, Captured/Themes navigation, search/filter controls, capture detail, Review Capture, and two-mention theme detail using temporary simulator fixtures; fixtures were removed afterward.
+- Phase 5 build: succeeded for iPhone 17 Pro simulator on iOS 26.5; `git diff --check` passed.
+- Phase 5 Day empty-state walkthrough: passed compact hierarchy, period navigation, factual zero summary, no fake chart bars, actionable check-in guidance, daily-details link, and Progress History accessibility entry.
+- Phase 5 remaining walkthrough: Week, Month, and Progress History visual inspection paused when the Mac locked; populated chart behavior still requires Scott's manually prepared historical data.
+- Home hierarchy correction build: succeeded for iPhone 17 Pro simulator on iOS 26.5; `git diff --check` passed.
+- Home populated walkthrough: passed four persisted intentions with target labels, always-visible Add Intention, existing intention-manager presentation, Update Progress slider presentation/cancel, compact Voice Check-In, Mood, and Weekly Momentum ordering.
+- Home failure walkthrough: a real Simulator recognizer failure rendered the compact inline message and automatically returned to the idle check-in control after eight seconds.
 
 ## New-chat restart prompt
 
-> Continue the Attune UI work from `ATTUNE_UI_RELEASE_PLAN.md`. First inspect `git status`, the plan's change log, and the current simulator/build state. Preserve the pre-existing StoreKit changes and local ignored secrets. Approval, publishing, and physical-device verification checkboxes are gates, not incomplete implementation phases. Continue Phase 4 unless Scott asks to verify Phase 2 or Phase 3 on a connected iPhone first. Build and visually verify the work, update the plan, then stop for review.
+> Continue the Attune UI work from `ATTUNE_UI_RELEASE_PLAN.md`. First inspect `git status`, the plan's change log, and the current simulator/build state. Preserve the pre-existing StoreKit changes and local ignored secrets. Approval, publishing, and physical-device verification checkboxes are gates, not incomplete implementation phases. Continue Phase 5 unless Scott asks to review Phase 4 or verify Phase 2/3 on a connected iPhone first. Build and visually verify the work, update the plan, then stop for review.

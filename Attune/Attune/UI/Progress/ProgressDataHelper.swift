@@ -15,6 +15,7 @@ struct DayRow: Identifiable {
     let overallPercent: Double
     let moodLabel: String?
     let intentionSet: IntentionSet?
+    let hasRecordedData: Bool
     
     var id: String { dateKey }
 }
@@ -108,7 +109,7 @@ struct ProgressDataHelper {
         let entriesBySetAndDate = loadEntriesBySetAndDate()
         let checkInsBySetAndDate = loadCheckInsBySetAndDate()
         
-        return last7DateKeys().map { dateKey, date in
+        return last7DateKeys().compactMap { dateKey, date in
             let set = StreakCalculator.intentionSetActive(on: dateKey, from: sets)
             let intentions = (set.map { intentionsBySetId[$0.id] ?? [] }) ?? []
             
@@ -140,13 +141,22 @@ struct ProgressDataHelper {
             )
             
             let mood = DailyMoodStore.shared.loadDailyMood(dateKey: dateKey)
+            let checkIns: [CheckIn]
+            if let s = set {
+                checkIns = checkInsBySetAndDate["\(s.id)|\(dateKey)"] ?? []
+            } else {
+                checkIns = []
+            }
+            let hasRecordedData = !entries.isEmpty || !overrides.isEmpty || mood != nil || !checkIns.isEmpty
+            guard hasRecordedData else { return nil }
             
             return DayRow(
                 dateKey: dateKey,
                 date: date,
                 overallPercent: overall,
                 moodLabel: mood?.moodLabel,
-                intentionSet: set
+                intentionSet: set,
+                hasRecordedData: hasRecordedData
             )
         }
     }

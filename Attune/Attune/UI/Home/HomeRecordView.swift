@@ -9,43 +9,6 @@
 import SwiftUI
 import UIKit
 
-private enum ListeningNotice: Equatable {
-    case success(String)
-    case warning(String)
-    case failure(String)
-
-    var icon: String {
-        switch self {
-        case .success: return "checkmark.circle.fill"
-        case .warning: return "exclamationmark.triangle.fill"
-        case .failure: return "xmark.octagon.fill"
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .success: return "Session ready"
-        case .warning: return "Session ended early"
-        case .failure: return "Session needs attention"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .success(let detail), .warning(let detail), .failure(let detail):
-            return detail
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .success: return AttuneTheme.success
-        case .warning: return AttuneTheme.warning
-        case .failure: return AttuneTheme.recording
-        }
-    }
-}
-
 struct HomeRecordView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
@@ -57,8 +20,7 @@ struct HomeRecordView: View {
     @State private var isProcessing = false
     @State private var processingSessionId: String?
     @State private var activeSessionId: String?
-    @State private var stopRequested = false
-    @State private var notice: ListeningNotice?
+    @State private var startErrorMessage: String?
     @State private var processingCheckTimer: Timer?
 
     @State private var todaySessionsCount = 0
@@ -98,7 +60,7 @@ struct HomeRecordView: View {
         .sheet(isPresented: $showSessionsSheet, onDismiss: { loadTodayCounts() }) {
             NavigationView {
                 SessionListView(sessions: SessionStore.shared.loadAllSessions())
-                    .navigationTitle("Sessions")
+                    .navigationTitle("Listening Sessions")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
@@ -110,7 +72,7 @@ struct HomeRecordView: View {
         .sheet(isPresented: $showInsightsSheet, onDismiss: { loadTodayCounts() }) {
             NavigationView {
                 InsightsListView()
-                    .navigationTitle("Insights")
+                    .navigationTitle("Captured")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
@@ -144,10 +106,6 @@ struct HomeRecordView: View {
                 .tracking(1.1)
                 .foregroundStyle(AttuneTheme.accent)
 
-            if let notice, !recorder.isRecording, !isProcessing, !isRequestingPermission {
-                noticeBanner(notice)
-            }
-
             if recorder.isRecording {
                 recordingContent
             } else if isProcessing {
@@ -173,6 +131,13 @@ struct HomeRecordView: View {
                 Text("Attune captures intentions, commitments, events, and recurring themes. You can leave the app or lock your phone while it listens.")
                     .font(.subheadline)
                     .foregroundStyle(AttuneTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let startErrorMessage {
+                Label(startErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(AttuneTheme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -292,37 +257,6 @@ struct HomeRecordView: View {
         .foregroundStyle(AttuneTheme.textPrimary)
     }
 
-    private func noticeBanner(_ notice: ListeningNotice) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: notice.icon)
-                .foregroundStyle(notice.color)
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(notice.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
-                Text(notice.detail)
-                    .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 4)
-            Button {
-                self.notice = nil
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(AttuneTheme.textTertiary)
-                    .padding(5)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Dismiss")
-        }
-        .padding(11)
-        .background(notice.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(notice.color.opacity(0.22)))
-    }
-
     private func statusPanel(
         icon: String,
         title: String,
@@ -373,12 +307,12 @@ struct HomeRecordView: View {
             return
         }
 
-        notice = nil
+        startErrorMessage = nil
         switch PermissionsHelper.recordingPermissionState {
         case .ready:
             beginRecording()
         case .denied:
-            notice = .failure("Recording access is off. Update permissions to start a session.")
+            break // Dedicated permission state provides the useful Open Settings action.
         case .needsRequest:
             isRequestingPermission = true
             Task { @MainActor in
@@ -386,8 +320,6 @@ struct HomeRecordView: View {
                 isRequestingPermission = false
                 if granted {
                     beginRecording()
-                } else {
-                    notice = .failure("Recording access was not granted.")
                 }
             }
         }
@@ -396,7 +328,7 @@ struct HomeRecordView: View {
     private func beginRecording() {
         recorder.startRecording()
         guard recorder.isRecording, let sessionId = recorder.currentSessionId else {
-            notice = .failure("Attune couldn't start recording. Check your audio settings and try again.")
+            startErrorMessage = "Couldn’t start listening. Check your audio settings and try again."
             return
         }
 
@@ -408,10 +340,9 @@ struct HomeRecordView: View {
 
     private func stopListeningSession() {
         guard recorder.isRecording else { return }
-        stopRequested = true
         processingSessionId = recorder.currentSessionId
         isProcessing = true
-        notice = nil
+        startErrorMessage = nil
         recorder.stopRecording()
         loadTodayCounts()
     }
@@ -427,12 +358,7 @@ struct HomeRecordView: View {
         processingSessionId = sessionId
         isProcessing = true
 
-        if !stopRequested {
-            notice = .warning("Listening stopped unexpectedly. Attune is saving what it captured.")
-        }
-
         activeSessionId = nil
-        stopRequested = false
         loadTodayCounts()
     }
 
@@ -470,27 +396,9 @@ struct HomeRecordView: View {
             return
         }
 
-        let wasProcessing = isProcessing
         isProcessing = false
         processingSessionId = nil
         loadTodayCounts()
-
-        guard wasProcessing else { return }
-        let failedSegments = session.segments.filter { $0.status == "failed" }
-        if session.status == "error" {
-            notice = .failure("The session could not be saved. Try starting a new listening session.")
-        } else if let lastError = session.lastError, lastError.localizedCaseInsensitiveContains("interrupt") {
-            notice = failedSegments.isEmpty
-                ? .warning("Listening ended early, but what Attune captured was saved.")
-                : .failure("Listening ended early and some captured audio could not be processed.")
-        } else if !failedSegments.isEmpty {
-            notice = .failure("The session was saved, but some audio could not be transcribed. Open Sessions for details.")
-        } else {
-            let capturedCount = ExtractionStore.shared.loadExtractions(sessionId: session.id).count
-            notice = capturedCount == 0
-                ? .success("Session saved. No clear intentions or themes were found.")
-                : .success("Captured \(capturedCount) \(capturedCount == 1 ? "item" : "items"). Review them in Insights.")
-        }
     }
 
     private func startProcessingCheck() {

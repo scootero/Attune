@@ -61,7 +61,7 @@ struct PaywallView: View {
                 } label: {
                     HStack {
                         if subscriptionManager.isBusy {
-                            ProgressView()
+                            SwiftUI.ProgressView()
                                 .tint(.white)
                         }
                         Text(subscriptionManager.isSubscribed ? "Subscribed" : "Subscribe")

@@ -7,9 +7,9 @@
 
 import SwiftUI // Import SwiftUI for view definitions
 
-fileprivate enum ProgressTab: String, CaseIterable { // Make enum fileprivate so ProgressContentView can access it within this file
-    case dailyTotals = "Daily Totals" // Tab for daily totals list
-    case perGoal = "Per Goal" // Tab for per-goal list
+fileprivate enum MomentumHistoryTab: String, CaseIterable {
+    case dailyTotals = "Days"
+    case perGoal = "Intentions"
 }
 
 /// Route value for DayDetail
@@ -22,15 +22,15 @@ fileprivate struct IntentionDetailRoute: Hashable { // Filewide visibility so Pr
     let intentionId: String // Intention identifier used for lookup
 }
 
-struct ProgressContentView: View { // Hosts the Progress UI without its own NavigationStack so Library can embed it
-    @State private var selectedTab: ProgressTab = .dailyTotals // Track which progress tab is selected
+struct MomentumHistoryView: View {
+    @State private var selectedTab: MomentumHistoryTab = .dailyTotals
     @State private var dayRows: [DayRow] = [] // Cached daily rows for the Daily Totals tab
     @State private var intentionRows: [IntentionRow] = [] // Cached intention rows for the Per Goal tab
     
     var body: some View { // Main body for the embeddable progress content
         VStack(spacing: 0) { // Stack picker and tab content vertically with no spacing
             Picker("View", selection: $selectedTab) { // Segmented control to switch between tabs
-                ForEach(ProgressTab.allCases, id: \.self) { tab in // Iterate through available tabs
+                ForEach(MomentumHistoryTab.allCases, id: \.self) { tab in
                     Text(tab.rawValue).tag(tab) // Label each segment and bind selection
                 }
             }
@@ -44,7 +44,7 @@ struct ProgressContentView: View { // Hosts the Progress UI without its own Navi
                 perGoalContent // Show per-goal list
             }
         }
-        .navigationTitle("Progress") // Set the navigation title for the embedded content
+        .navigationTitle("Progress History")
         .navigationDestination(for: DayDetailRoute.self) { route in // Register destination for day detail navigation
             DayDetailView(dateKey: route.dateKey) // Show day detail for the selected date
         }
@@ -59,8 +59,16 @@ struct ProgressContentView: View { // Hosts the Progress UI without its own Navi
     // MARK: - Daily Totals
     
     private var dailyTotalsContent: some View { // List showing recent daily totals
-        List { // Use List for rows
-                ForEach(dayRows) { row in // Iterate through daily rows
+        Group {
+            if dayRows.isEmpty {
+                ContentUnavailableView(
+                    "No progress history",
+                    systemImage: "chart.line.uptrend.xyaxis",
+                    description: Text("Days appear after a check-in records progress, mood, or a manual adjustment.")
+                )
+            } else {
+                List {
+                    ForEach(dayRows) { row in
                 NavigationLink(value: DayDetailRoute(dateKey: row.dateKey)) { // Navigate to day detail on tap
                     HStack { // Layout date and percent horizontally
                         VStack(alignment: .leading, spacing: 4) { // Left column with date and mood
@@ -78,6 +86,8 @@ struct ProgressContentView: View { // Hosts the Progress UI without its own Navi
                             .foregroundColor(.secondary) // Secondary color for percent text
                     }
                     .padding(.vertical, 4) // Add vertical padding to the row
+                }
+                    }
                 }
             }
         }
@@ -126,14 +136,14 @@ struct ProgressContentView: View { // Hosts the Progress UI without its own Navi
     }
 }
 
-struct ProgressView: View { // Thin wrapper to host ProgressContentView inside its own NavigationStack when used standalone
+struct MomentumHistoryContainerView: View {
     var body: some View { // Body for standalone Progress tab usage
         NavigationStack { // Provide navigation container for the progress screen
-            ProgressContentView() // Embed the reusable progress content
+            MomentumHistoryView()
         }
     }
 }
 
 #Preview { // Preview for Xcode canvas
-    ProgressView() // Preview the standalone Progress view
+    MomentumHistoryContainerView()
 }

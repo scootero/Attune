@@ -144,12 +144,12 @@ struct HomeView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 4)
                     
-                    // The daily check-in is the primary action; supporting data follows it.
+                    // Lead with what the user is tracking, then the actions that update it.
                     VStack(spacing: 12) {
-                        recordCheckInCTAArea
-                        weeklyMomentumCard
                         todaysProgressCard
+                        recordCheckInCTAArea
                         moodLabelRow
+                        weeklyMomentumCard
                     }
                     .padding(.horizontal, AttuneTheme.horizontalPadding)
                     .padding(.top, 10)
@@ -160,6 +160,9 @@ struct HomeView: View {
             .scrollIndicators(.hidden)
         }
         .navigationBarHidden(true)
+        .onChange(of: state) { _, newState in
+            scheduleTransientStateReset(for: newState)
+        }
         .onAppear {
             refreshAll()
             // Pre-create directories so they don't need to be created on button tap (reduces lag)
@@ -261,17 +264,21 @@ struct HomeView: View {
         todayMood?.moodScore ?? 0
     }
     
-    // MARK: - B) Today's Progress Card (Slice B: compacted)
+    // MARK: - B) Intentions and Today's Progress
     
     private var todaysProgressCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Today's Progress") // title for the progress card header
-                    .font(.subheadline) // keep subheadline size for compact header
-                    .fontWeight(.semibold) // slightly bold for emphasis
-                    .foregroundColor(.white) // white text on dark glass
-                Spacer() // push actions to the trailing edge
-                HStack(spacing: 8) { // tighten header actions so controls stay compact and horizontal
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Intentions")
+                        .font(.headline)
+                        .foregroundStyle(AttuneTheme.textPrimary)
+                    Text("Today's progress")
+                        .font(.caption)
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                }
+                Spacer()
+                HStack(spacing: 8) {
                     if isUpdateProgressMode { // in update mode, show only update controls (hide Add/Edit)
                         pillActionButton( // cancel action pill styled with muted retro red gradient
                             title: "Cancel", // visible cancel label in the pill
@@ -287,7 +294,7 @@ struct HomeView: View {
                         )
                     } else {
                         Button(action: { showEditIntentions = true }) {
-                            Label("Manage", systemImage: "slider.horizontal.3")
+                            Label("Add Intention", systemImage: "plus")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(AttuneTheme.accent)
                                 .padding(.horizontal, 10)
@@ -301,25 +308,24 @@ struct HomeView: View {
             
             if todaysProgress.isEmpty {
                 HStack(spacing: 10) {
-                    Text("No tracked intentions yet")
+                    Text("Add something you want to move forward today.")
                         .font(.subheadline)
                         .foregroundStyle(AttuneTheme.textSecondary)
                     Spacer()
-                    Button("Add one") {
-                        showEditIntentions = true
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.accent)
                 }
                 .padding(.vertical, 4)
             } else {
                 ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { _, row in // render each intention row
                     VStack(alignment: .leading, spacing: 6) { // slightly more spacing for slider mode
-                        HStack {
-                            Text(row.intention.title) // intention title label
-                                .font(.subheadline) // match card style
-                                .fontWeight(.medium) // medium weight for readability
-                                .foregroundColor(.white) // white text on dark bg
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(row.intention.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(AttuneTheme.textPrimary)
+                                Text(intentionTargetText(row.intention))
+                                    .font(.caption2)
+                                    .foregroundStyle(AttuneTheme.textSecondary)
+                            }
                             Spacer() // push percent to trailing edge
                             Text("\(Int(currentPercent(for: row) * 100))%") // percent based on slider or stored total
                                 .font(.subheadline) // match size
@@ -359,11 +365,11 @@ struct HomeView: View {
                     .padding(.vertical, 6) // vertical spacing between rows
                 }
                 
-                if !isUpdateProgressMode { // place Update Progress button below list in normal mode
+                if !isUpdateProgressMode {
                     HStack {
                         Spacer()
                         Button(action: { enterUpdateProgressMode() }) {
-                            Label("Update", systemImage: "slider.horizontal.3")
+                            Label("Update Progress", systemImage: "slider.horizontal.3")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(AttuneTheme.accent)
                                 .padding(.horizontal, 10)
@@ -377,6 +383,11 @@ struct HomeView: View {
         }
         .padding(16)
         .attuneCard()
+    }
+
+    private func intentionTargetText(_ intention: Intention) -> String {
+        let timeframe = intention.timeframe.lowercased()
+        return "Goal: \(displayValue(intention.targetValue)) \(intention.unit) \(timeframe)"
     }
     
     // MARK: - B1) Smart Prompt (Slice B)
@@ -429,6 +440,13 @@ struct HomeView: View {
                                 RoundedRectangle(cornerRadius: 3)
                                     .fill(Color.clear)
                                     .frame(width: 10, height: 40)
+                            } else if !day.hasData {
+                                ZStack(alignment: .bottom) {
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(AttuneTheme.surfaceStrong)
+                                        .frame(width: 10, height: 6)
+                                }
+                                .frame(width: 10, height: 40)
                             } else {
                                 let ratio = day.completionRatio ?? 0
                                 let barHeight = max(6, CGFloat(ratio) * 40)
@@ -667,7 +685,7 @@ struct HomeView: View {
     // MARK: - D) Record Check-In Hero
 
     private var recordCheckInCTAArea: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             Label("VOICE CHECK-IN", systemImage: "waveform")
                 .font(.caption.weight(.bold))
                 .tracking(1.1)
@@ -696,28 +714,25 @@ struct HomeView: View {
                 permissionDeniedContent
             }
         }
-        .padding(18)
+        .padding(14)
         .attuneCard()
     }
 
     private var recordCheckInSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Update today by voice")
-                .font(.title3.weight(.semibold))
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Update progress or mood by voice")
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AttuneTheme.textPrimary)
 
             Text(checkInGuidanceText)
-                .font(.subheadline)
+                .font(.caption)
                 .foregroundStyle(AttuneTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(checkInExampleText)
-                .font(.caption)
-                .foregroundStyle(AttuneTheme.textSecondary)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 9)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AttuneTheme.surfaceStrong, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .font(.caption2)
+                .foregroundStyle(AttuneTheme.textTertiary)
+                .lineLimit(2)
 
             Button(action: {
                 let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -741,9 +756,9 @@ struct HomeView: View {
 
     private var checkInGuidanceText: String {
         if todaysProgress.isEmpty {
-            return "Add a tracked intention to update progress. You can still record how you feel."
+            return "Add an intention to update progress, or record how you feel."
         }
-        return "Say the intention, the amount, and whether it is more or your total today. Mood is optional."
+        return "Say the intention and amount, then “more” or “total today.” Mood is optional."
     }
 
     private var checkInExampleText: String {
@@ -861,15 +876,23 @@ struct HomeView: View {
     }
 
     private func errorContent(message: String) -> some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             statusPanel(
                 icon: "exclamationmark.triangle.fill",
-                title: "We couldn't finish that check-in",
+                title: "Check-in unavailable",
                 detail: friendlyCheckInError(message),
                 color: AttuneTheme.warning
             )
-            Button("Try again") { state = .idle }
-                .buttonStyle(AttunePrimaryButtonStyle())
+            HStack {
+                Text("This message closes automatically.")
+                    .font(.caption2)
+                    .foregroundStyle(AttuneTheme.textTertiary)
+                Spacer()
+                Button("Try Again") { state = .idle }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .tint(AttuneTheme.accent)
+            }
         }
     }
 
@@ -900,11 +923,11 @@ struct HomeView: View {
         color: Color,
         showsProgress: Bool = false
     ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 10) {
             ZStack {
                 Circle()
                     .fill(color.opacity(0.16))
-                    .frame(width: 42, height: 42)
+                    .frame(width: 34, height: 34)
                 if showsProgress {
                     SwiftUI.ProgressView()
                         .tint(color)
@@ -915,32 +938,52 @@ struct HomeView: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AttuneTheme.textPrimary)
                 Text(detail)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(AttuneTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(10)
         .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous).stroke(color.opacity(0.26)))
     }
 
     private func friendlyCheckInError(_ message: String) -> String {
         let lowercased = message.lowercased()
-        if lowercased.contains("speech") || lowercased.contains("permission") || lowercased.contains("denied") {
+        if lowercased.contains("permission") || lowercased.contains("denied") {
             return "Check recording permissions and try again."
         }
-        if lowercased.contains("recognition") || lowercased.contains("recognizer") {
-            return "Speech recognition isn't available right now. Try again in a moment or use a physical device."
+        if lowercased.contains("speech") || lowercased.contains("recognition") || lowercased.contains("recognizer") {
+            return "Speech recognition is unavailable. Try again shortly."
         }
         if lowercased.contains("network") || lowercased.contains("internet") || lowercased.contains("offline") {
             return "Check your connection. Your recording remains on this device so you can try again."
         }
         return "Your recording couldn't be processed. Please try again."
+    }
+
+    private func scheduleTransientStateReset(for newState: CheckInState) {
+        let delay: UInt64
+        switch newState {
+        case .saved:
+            delay = 5_000_000_000
+        case .error:
+            delay = 8_000_000_000
+        default:
+            return
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: delay)
+            guard state == newState else { return }
+            withAnimation(.easeOut(duration: 0.2)) {
+                state = .idle
+            }
+        }
     }
     
     // MARK: - E) Streak (Slice A)

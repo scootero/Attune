@@ -36,7 +36,7 @@ struct RootTabView: View {
                 }
                 .tag(RootTab.allDay)
             
-            // Tab 3: Insights — current Library implementation is simplified in Phase 4.
+            // Tab 3: Insights — captures, recurring themes, and history.
             LibraryView()
                 .tabItem {
                     Label("Insights", systemImage: "sparkles")

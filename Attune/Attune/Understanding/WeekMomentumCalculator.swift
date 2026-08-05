@@ -70,6 +70,19 @@ struct WeekMomentumCalculator {
                 ))
                 continue
             }
+
+            let hasRecordedProgress = !entries.isEmpty || !overrides.isEmpty
+            if !hasRecordedProgress {
+                days.append(DayMomentum(
+                    date: date,
+                    weekdayLetter: weekdayLetter,
+                    completionRatio: nil,
+                    tier: .neutral,
+                    isFutureDay: false,
+                    hasData: false
+                ))
+                continue
+            }
             
             var sum: Double = 0
             for intention in activeIntentions {
