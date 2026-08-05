@@ -4,7 +4,7 @@
 //
 //  Builds [MomentumPoint] for a selected day by processing check-ins
 //  chronologically and computing cumulative % per intention at each check-in.
-//  Does NOT apply overrides (raw progression from entries only).
+//  Includes manual overrides as timestamped absolute-total points when supplied.
 //
 
 import Foundation
@@ -25,7 +25,8 @@ struct MomentumPointAdapter {
         intentionSet: IntentionSet,
         intentions: [Intention],
         checkIns: [CheckIn],
-        entries: [ProgressEntry]
+        entries: [ProgressEntry],
+        overrides: [ManualProgressOverride] = []
     ) -> [MomentumPoint] {
         let checkInIds = Set(checkIns.map { $0.id }) // Debug: collect check-in ids to measure linkage
         let linkedEntriesCount = entries.filter { checkInIds.contains($0.sourceCheckInId) }.count // Debug: how many entries are linked to a known check-in
@@ -37,20 +38,83 @@ struct MomentumPointAdapter {
             checkIns: checkIns,
             entries: entries
         )
+        let entryPoints: [MomentumPoint]
         if !fromCheckIns.isEmpty { // Debug: path succeeded using check-ins
             print("[Momentum] adapterPath=checkIns checkIns=\(checkIns.count) entries=\(entries.count) linkedEntries=\(linkedEntriesCount)") // Debug: log primary path usage
-            return deduplicateByMinuteBucket(from: fromCheckIns) // Combine same-intention same-minute duplicates, keep max %
+            entryPoints = fromCheckIns
+        } else {
+            // Fallback: entries only (use entry.createdAt as timestamp)
+            entryPoints = buildPointsFromEntriesOnly(
+                dateKey: dateKey,
+                intentionSet: intentionSet,
+                intentions: intentions,
+                entries: entries
+            )
+            print("[Momentum] adapterPath=entriesOnly checkIns=\(checkIns.count) entries=\(entries.count) linkedEntries=\(linkedEntriesCount)") // Debug: log fallback path usage
         }
 
-        // Fallback: entries only (use entry.createdAt as timestamp)
-        let fromEntriesOnly = buildPointsFromEntriesOnly(
+        let manualPoints = buildPointsFromOverrides(
             dateKey: dateKey,
-            intentionSet: intentionSet,
             intentions: intentions,
-            entries: entries
+            overrides: overrides
         )
-        print("[Momentum] adapterPath=entriesOnly checkIns=\(checkIns.count) entries=\(entries.count) linkedEntries=\(linkedEntriesCount)") // Debug: log fallback path usage
-        return deduplicateByMinuteBucket(from: fromEntriesOnly) // Combine same-intention same-minute duplicates, keep max %
+        return deduplicateByMinuteBucket(from: entryPoints + manualPoints)
+    }
+
+    /// Represents an authoritative manual total as a real chart event without
+    /// fabricating a transcript-derived ProgressEntry.
+    private static func buildPointsFromOverrides(
+        dateKey: String,
+        intentions: [Intention],
+        overrides: [ManualProgressOverride]
+    ) -> [MomentumPoint] {
+        let intentionIndexById = Dictionary(
+            uniqueKeysWithValues: intentions.enumerated().map { ($1.id, $0) }
+        )
+
+        return overrides.compactMap { override in
+            guard override.dateKey == dateKey,
+                  let intention = intentions.first(where: { $0.id == override.intentionId }),
+                  intention.targetValue > 0 else { return nil }
+
+            let effectiveTarget = intention.timeframe.lowercased() == "weekly"
+                ? intention.targetValue / 7
+                : intention.targetValue
+            guard effectiveTarget > 0 else { return nil }
+
+            let chartDate = projectedDate(override.updatedAt, onto: dateKey)
+            let clusterSecond = Int(chartDate.timeIntervalSince1970)
+            return MomentumPoint(
+                id: "manual-\(override.intentionId)-\(clusterSecond)",
+                date: chartDate,
+                intentionId: intention.id,
+                intentionTitle: intention.title,
+                colorIndex: intentionIndexById[intention.id] ?? 0,
+                recordingId: "manual-\(dateKey)-\(clusterSecond)",
+                percent: max(0, override.amount / effectiveTarget * 100),
+                timeOffsetSeconds: 0
+            )
+        }
+    }
+
+    /// Historical-day adjustments are made today, so project the action's local
+    /// clock time onto the adjusted day to keep it inside that day's chart domain.
+    private static func projectedDate(_ timestamp: Date, onto dateKey: String) -> Date {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar.current
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let targetDay = formatter.date(from: dateKey) else { return timestamp }
+
+        let calendar = Calendar.current
+        let clock = calendar.dateComponents([.hour, .minute, .second], from: timestamp)
+        return calendar.date(
+            bySettingHour: clock.hour ?? 12,
+            minute: clock.minute ?? 0,
+            second: clock.second ?? 0,
+            of: targetDay
+        ) ?? targetDay
     }
 
     /// Buckets points by (intentionId, minute) and keeps one bar per bucket with max percent.

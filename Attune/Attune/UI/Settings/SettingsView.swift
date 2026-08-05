@@ -22,6 +22,11 @@ struct SettingsView: View {
     @State private var reminderTime = ReminderPreferences.reminderTimeDate // Bind DatePicker to persisted reminder time so user can customize notification time.
     @State private var showPaywall = false
     @State private var showManageSubscriptions = false
+    #if DEBUG && targetEnvironment(simulator)
+    @State private var momentumDemoStatus = MomentumDemoDataManager.status()
+    @State private var momentumDemoMessage: String?
+    @State private var isChangingMomentumDemoData = false
+    #endif
     
     var body: some View {
         NavigationView {
@@ -117,7 +122,7 @@ struct SettingsView: View {
                     Text("Attune sends a reminder at this time when you have not checked in yet or are below 50% of your daily intentions.") // Explain exactly when reminder triggers to avoid user confusion.
                 }
                 
-                // Logs section — Debug builds only (avoid shipping sensitive transcripts in Release)
+                // Developer section — Debug builds only (avoid shipping logs/test controls in Release).
                 #if DEBUG
                 Section {
                     NavigationLink(destination: LogsView()) {
@@ -129,8 +134,52 @@ struct SettingsView: View {
                                 .font(.body)
                         }
                     }
+
+                    #if targetEnvironment(simulator)
+                    // MOMENTUM DEMO CLEANUP HANDOFF:
+                    // These controls reuse real intentions but create only ATTUNE_DEMO_*
+                    // IntentionSet/CheckIn/ProgressEntry files plus one manifest.
+                    // Never remove this UI by itself. First run "Remove and Verify",
+                    // confirm 0 records remain, and preserve the non-Debug residue cleanup
+                    // in AttuneApp/MomentumDemoDataManager. Full contract is documented at
+                    // the top of MomentumDemoDataManager.swift.
+                    Button {
+                        loadMomentumDemoData()
+                    } label: {
+                        Label("Load Momentum Demo Data", systemImage: "chart.bar.xaxis")
+                    }
+                    .disabled(isChangingMomentumDemoData || momentumDemoStatus.hasDemoData)
+
+                    Button(role: .destructive) {
+                        removeMomentumDemoData()
+                    } label: {
+                        Label("Remove and Verify Demo Data", systemImage: "trash")
+                    }
+                    .disabled(isChangingMomentumDemoData || !momentumDemoStatus.hasDemoData)
+
+                    if isChangingMomentumDemoData {
+                        HStack(spacing: 10) {
+                            SwiftUI.ProgressView()
+                            Text("Updating simulator data…")
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Label(
+                            momentumDemoMessage ?? momentumDemoStatus.message,
+                            systemImage: momentumDemoStatus.hasDemoData ? "checkmark.circle.fill" : "circle.dashed"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(momentumDemoStatus.hasDemoData ? Color.orange : Color.secondary)
+                    }
+                    #endif
                 } header: {
                     Text("Developer")
+                } footer: {
+                    #if targetEnvironment(simulator)
+                    Text("Simulator only. Demo records use your existing intentions and are removed by exact manifest paths plus a reserved-ID residue scan.")
+                    #else
+                    Text("Developer diagnostics are available only in Debug builds.")
+                    #endif
                 }
                 #endif
             }
@@ -144,6 +193,9 @@ struct SettingsView: View {
             .onAppear {
                 isReminderEnabled = ReminderPreferences.isReminderEnabled // Reload persisted reminder enabled state when settings screen appears.
                 reminderTime = ReminderPreferences.reminderTimeDate // Reload persisted reminder time when settings screen appears.
+                #if DEBUG && targetEnvironment(simulator)
+                refreshMomentumDemoStatus()
+                #endif
             }
             .sheet(isPresented: $showingExportSheet) {
                 // Share sheet to export the ZIP file
@@ -204,6 +256,36 @@ struct SettingsView: View {
         formatter.dateFormat = "yyyy-MM-dd-HHmmss"
         return formatter.string(from: date)
     }
+
+    #if DEBUG && targetEnvironment(simulator)
+    private func refreshMomentumDemoStatus() {
+        momentumDemoStatus = MomentumDemoDataManager.status()
+    }
+
+    private func loadMomentumDemoData() {
+        isChangingMomentumDemoData = true
+        defer { isChangingMomentumDemoData = false }
+        do {
+            let result = try MomentumDemoDataManager.loadUsingExistingIntentions()
+            momentumDemoMessage = result.message
+        } catch {
+            momentumDemoMessage = error.localizedDescription
+        }
+        refreshMomentumDemoStatus()
+    }
+
+    private func removeMomentumDemoData() {
+        isChangingMomentumDemoData = true
+        defer { isChangingMomentumDemoData = false }
+        do {
+            let result = try MomentumDemoDataManager.removeAndVerify()
+            momentumDemoMessage = result.message
+        } catch {
+            momentumDemoMessage = error.localizedDescription
+        }
+        refreshMomentumDemoStatus()
+    }
+    #endif
 }
 
 // MARK: - ShareSheet Helper

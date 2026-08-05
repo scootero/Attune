@@ -25,6 +25,15 @@ struct AttuneApp: App {
         }
     }()
 
+    init() {
+        #if !DEBUG
+        // Keep this cleanup even if the simulator-only Settings controls are removed.
+        // Installing a Release build over Debug can preserve Documents; this purge
+        // prevents ATTUNE_DEMO_ Momentum records from becoming production ghost data.
+        MomentumDemoDataManager.purgeResidueForNonDebugLaunch()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

@@ -97,13 +97,13 @@ Acceptance: app builds; all four tabs work; Settings opens and closes; Home-to-M
 - [x] Clearly distinguish captured items from recurring themes and from quantitative tracked intentions.
 - [x] Add useful search, filters, and empty states.
 
-### Phase 5 — Momentum and progress (implementation complete; populated-data validation pending)
+### Phase 5 — Momentum and progress (complete; populated-data validation passed)
 
 - [x] Refine Day/Week/Month navigation and empty states.
 - [x] Consolidate duplicate Library Progress views into Momentum drill-down.
 - [x] Improve chart contrast, accessibility, selection, and labels.
 - [x] Add compact summaries and consistent intention color/symbol identity.
-- [ ] Validate with Scott's manually prepared historical data.
+- [x] Validate Day, Week, and Month with removable simulator-only historical data built from Scott's existing intentions.
 
 ### Phase 6 — Settings, onboarding, privacy, and paywall
 
@@ -204,6 +204,15 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - Rendered days with no recorded progress as neutral empty marks on Home instead of red failure bars; actual recorded ratios and streak logic are unchanged.
 - For populated Momentum visual QA, use removable simulator fixtures or an explicitly DEBUG-only demo-data tool; do not ship fabricated history.
 
+### 2026-08-05 — Simulator-only Momentum demo data
+
+- Added a DEBUG + Simulator-only Settings tool that creates approximately fourteen days of ordinary `CheckIn` and linked `ProgressEntry` JSON records using the four existing intentions; it never duplicates or edits those intention files.
+- Namespaced every generated record with `ATTUNE_DEMO_` and recorded every exact created path plus protected intention-file hashes in `Documents/Attune/MomentumDemoManifest.json`.
+- Added **Remove and Verify Demo Data**, which deletes manifest paths, performs a second type-aware reserved-ID scan for interrupted/orphaned runs, verifies zero residue, and reports whether protected intentions changed.
+- Kept a non-Debug launch purge in `AttuneApp` so installing Release over a Debug simulator container cannot carry demo history forward. The seeder and Settings controls do not compile into Release or onto a physical device.
+- The authoritative cleanup contract and future-removal handoff comments are at the top of `Storage/MomentumDemoDataManager.swift` and beside the Settings controls. Do not remove only the UI; first run cleanup and retain the non-Debug residue purge.
+- Current simulator handoff state: the Debug build is installed and one 17-check-in/68-progress-entry demo run is intentionally loaded for review. Remove it from **Settings → Developer → Remove and Verify Demo Data**.
+
 ## Verification log
 
 - Pre-change build: succeeded for iPhone 17 Pro simulator on iOS 26.5.
@@ -230,11 +239,16 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - Phase 4 populated walkthrough: passed summary counts, recurring-first themes, recent captures, Captured/Themes navigation, search/filter controls, capture detail, Review Capture, and two-mention theme detail using temporary simulator fixtures; fixtures were removed afterward.
 - Phase 5 build: succeeded for iPhone 17 Pro simulator on iOS 26.5; `git diff --check` passed.
 - Phase 5 Day empty-state walkthrough: passed compact hierarchy, period navigation, factual zero summary, no fake chart bars, actionable check-in guidance, daily-details link, and Progress History accessibility entry.
-- Phase 5 remaining walkthrough: Week, Month, and Progress History visual inspection paused when the Mac locked; populated chart behavior still requires Scott's manually prepared historical data.
+- Earlier Phase 5 pause: Week, Month, and Progress History inspection had paused when the Mac locked; the removable demo-data walkthrough below resolved the populated-chart requirement.
 - Home hierarchy correction build: succeeded for iPhone 17 Pro simulator on iOS 26.5; `git diff --check` passed.
 - Home populated walkthrough: passed four persisted intentions with target labels, always-visible Add Intention, existing intention-manager presentation, Update Progress slider presentation/cancel, compact Voice Check-In, Mood, and Weekly Momentum ordering.
 - Home failure walkthrough: a real Simulator recognizer failure rendered the compact inline message and automatically returned to the idle check-in control after eight seconds.
+- Momentum demo Debug build: succeeded for iPhone 17 Pro simulator on iOS 26.5; load created 17 check-ins and 68 linked progress entries from four existing intentions.
+- Populated Momentum walkthrough: Day showed single- and two-update cumulative states including above-target values; current/prior Week and July/August Month summaries and charts all populated through the ordinary production stores. Progress History also listed the generated dates and opened a day with readable intention totals and its linked check-in.
+- Manual cleanup walkthrough: removed 86 generated data files, reported protected intention hashes unchanged, and an independent filesystem scan confirmed zero `ATTUNE_DEMO_` matches, no manifest, four intentions, and the original single intention set.
+- Release-over-Debug cleanup test: Release build succeeded, preserved the simulator app container, purged all reloaded demo records on launch, kept all four intentions and the original intention set, and exposed no demo controls.
+- Final simulator state: Debug build restored, demo data loaded once for Scott's visual review, and Momentum left open on the current Week chart.
 
 ## New-chat restart prompt
 
-> Continue the Attune UI work from `ATTUNE_UI_RELEASE_PLAN.md`. First inspect `git status`, the plan's change log, and the current simulator/build state. Preserve the pre-existing StoreKit changes and local ignored secrets. Approval, publishing, and physical-device verification checkboxes are gates, not incomplete implementation phases. Continue Phase 5 unless Scott asks to review Phase 4 or verify Phase 2/3 on a connected iPhone first. Build and visually verify the work, update the plan, then stop for review.
+> Continue the Attune UI work from `ATTUNE_UI_RELEASE_PLAN.md`. First inspect `git status`, the plan's change log, and the current simulator/build state. Preserve the pre-existing StoreKit changes, Home changes, and local ignored secrets. The simulator currently has removable Momentum demo data loaded; its cleanup contract is documented in `MomentumDemoDataManager.swift`. Approval, publishing, and physical-device verification checkboxes are gates, not incomplete implementation phases. Review Phase 5 with Scott, then continue Phase 6 unless Scott redirects. Build and visually verify the work, update the plan, then stop for review.

@@ -29,6 +29,11 @@ final class OverrideStore {
         let overrides = loadOverridesArray(dateKey: dateKey)
         return Dictionary(uniqueKeysWithValues: overrides.map { ($0.intentionId, $0.amount) })
     }
+
+    /// Loads the full override records when consumers also need update timestamps.
+    func loadOverrideRecordsForDate(dateKey: String) -> [ManualProgressOverride] {
+        loadOverridesArray(dateKey: dateKey)
+    }
     
     /// Loads override objects for a date
     private func loadOverridesArray(dateKey: String) -> [ManualProgressOverride] {

@@ -123,7 +123,7 @@ struct HomeView: View {
                 VStack(spacing: 0) {
                     HStack {
                         Text("Attune")
-                            .font(.title.bold())
+                            .font(.title2.bold())
                             .foregroundStyle(AttuneTheme.textPrimary)
                         Spacer()
                         Button {
@@ -141,18 +141,17 @@ struct HomeView: View {
                         .accessibilityHint("Opens Attune settings")
                     }
                     .padding(.horizontal, AttuneTheme.horizontalPadding)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
+                    .padding(.top, 4)
                     
-                    // Lead with what the user is tracking, then the actions that update it.
-                    VStack(spacing: 12) {
-                        todaysProgressCard
+                    // Keep the primary action and today's complete status visible with minimal scrolling.
+                    VStack(spacing: 8) {
                         recordCheckInCTAArea
-                        moodLabelRow
+                        todaysProgressCard
+                        moodAndStreakCard
                         weeklyMomentumCard
                     }
                     .padding(.horizontal, AttuneTheme.horizontalPadding)
-                    .padding(.top, 10)
+                    .padding(.top, 6)
                     .padding(.bottom, 104)
                 }
             }
@@ -267,16 +266,11 @@ struct HomeView: View {
     // MARK: - B) Intentions and Today's Progress
     
     private var todaysProgressCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Intentions")
-                        .font(.headline)
-                        .foregroundStyle(AttuneTheme.textPrimary)
-                    Text("Today's progress")
-                        .font(.caption)
-                        .foregroundStyle(AttuneTheme.textSecondary)
-                }
+                Text("Today's Intentions")
+                    .font(.headline)
+                    .foregroundStyle(AttuneTheme.textPrimary)
                 Spacer()
                 HStack(spacing: 8) {
                     if isUpdateProgressMode { // in update mode, show only update controls (hide Add/Edit)
@@ -294,14 +288,13 @@ struct HomeView: View {
                         )
                     } else {
                         Button(action: { showEditIntentions = true }) {
-                            Label("Add Intention", systemImage: "plus")
+                            Text("Manage")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(AttuneTheme.accent)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 7)
-                                .background(AttuneTheme.surfaceStrong, in: Capsule())
+                                .frame(minWidth: 44, minHeight: 44)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityHint("Add, edit, or remove intentions")
                     }
                 }
             }
@@ -316,53 +309,44 @@ struct HomeView: View {
                 .padding(.vertical, 4)
             } else {
                 ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { _, row in // render each intention row
-                    VStack(alignment: .leading, spacing: 6) { // slightly more spacing for slider mode
+                    VStack(alignment: .leading, spacing: 4) {
                         HStack(alignment: .firstTextBaseline) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(row.intention.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(AttuneTheme.textPrimary)
-                                Text(intentionTargetText(row.intention))
-                                    .font(.caption2)
-                                    .foregroundStyle(AttuneTheme.textSecondary)
-                            }
-                            Spacer() // push percent to trailing edge
-                            Text("\(Int(currentPercent(for: row) * 100))%") // percent based on slider or stored total
-                                .font(.subheadline) // match size
-                                .fontWeight(.medium) // medium weight
-                                .monospacedDigit() // stable digit width
-                                .foregroundColor(.white) // white text
+                            Text(row.intention.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AttuneTheme.textPrimary)
+                                .lineLimit(1)
+                            Spacer()
+                            Text("\(Int(currentPercent(for: row) * 100))%")
+                                .font(.subheadline.weight(.semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(AttuneTheme.textPrimary)
                         }
                         
-                        if isUpdateProgressMode { // slider mode rendering
-                            let value = sliderValues[row.intention.id] ?? row.total // working total
-                            let goalValue = row.intention.timeframe.lowercased() == "weekly" ? (row.intention.targetValue / 7.0) : row.intention.targetValue // keep displayed goal aligned with percent math (weekly goals shown as per-day target)
-                            VStack(alignment: .leading, spacing: 6) { // stack slider + value
-                                Slider(
-                                    value: Binding( // two-way bind percent to dictionary-stored totals
-                                        get: { percentForTotal(sliderValues[row.intention.id] ?? row.total, intention: row.intention) },
-                                        set: { newPercent in
-                                            sliderValues[row.intention.id] = totalForPercent(newPercent, intention: row.intention)
-                                        }
-                                    ),
-                                    in: 0...1, // percent-based slider
-                                    step: 0.01 // fine-grained percent steps
-                                )
-                                .tint(Color(red: 0.2, green: 0.8, blue: 0.7)) // neon teal tint for consistency
-                                
-                                HStack {
-                                    Spacer()
-                                    Text("\(displayValue(value)) / \(displayValue(goalValue)) \(row.intention.unit)") // show live current units and goal units together (e.g., 10 / 20 pages)
-                                        .font(.caption) // small caption
-                                        .foregroundColor(.white.opacity(0.9)) // slightly muted white
-                                }
-                            }
-                        } else { // default progress bar rendering
-                            SwiftUI.ProgressView(value: row.percent) // standard progress bar
-                                .tint(Color(red: 0.2, green: 0.8, blue: 0.7)) // teal tint
+                        if isUpdateProgressMode {
+                            Slider(
+                                value: Binding(
+                                    get: { percentForTotal(sliderValues[row.intention.id] ?? row.total, intention: row.intention) },
+                                    set: { newPercent in
+                                        sliderValues[row.intention.id] = totalForPercent(newPercent, intention: row.intention)
+                                    }
+                                ),
+                                in: 0...1,
+                                step: 0.01
+                            )
+                            .tint(AttuneTheme.accent)
+                        } else {
+                            SwiftUI.ProgressView(value: row.percent)
+                                .tint(AttuneTheme.accent)
+                                .scaleEffect(x: 1, y: 0.72, anchor: .center)
                         }
+
+                        Text(intentionProgressSummaryText(for: row))
+                            .font(.caption2)
+                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .monospacedDigit()
                     }
-                    .padding(.vertical, 6) // vertical spacing between rows
+                    .padding(.vertical, 1)
+                    .accessibilityElement(children: .combine)
                 }
                 
                 if !isUpdateProgressMode {
@@ -372,22 +356,44 @@ struct HomeView: View {
                             Label("Update Progress", systemImage: "slider.horizontal.3")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(AttuneTheme.accent)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 7)
-                                .background(AttuneTheme.surfaceStrong, in: Capsule())
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 44)
+                                .background(AttuneTheme.surfaceStrong, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(AttuneTheme.border)
+                                )
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
         }
-        .padding(16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .attuneCard()
     }
 
-    private func intentionTargetText(_ intention: Intention) -> String {
-        let timeframe = intention.timeframe.lowercased()
-        return "Goal: \(displayValue(intention.targetValue)) \(intention.unit) \(timeframe)"
+    private func intentionProgressSummaryText(for row: IntentionProgressRow) -> String {
+        let currentValue = sliderValues[row.intention.id] ?? row.total
+        let isWeekly = row.intention.timeframe.lowercased() == "weekly"
+        let targetValue = isWeekly ? row.intention.targetValue / 7.0 : row.intention.targetValue
+        let paceNote = isWeekly ? " today · weekly pace" : " today"
+        return "\(formattedProgressValue(currentValue)) / \(formattedProgressValue(targetValue)) \(compactUnit(row.intention.unit))\(paceNote)"
+    }
+
+    private func compactUnit(_ unit: String) -> String {
+        switch unit.lowercased() {
+        case "minutes", "minute", "mins": return "min"
+        default: return unit
+        }
+    }
+
+    private func formattedProgressValue(_ value: Double) -> String {
+        if value.rounded() == value {
+            return Int(value).formatted()
+        }
+        return value.formatted(.number.precision(.fractionLength(1)))
     }
     
     // MARK: - B1) Smart Prompt (Slice B)
@@ -419,37 +425,38 @@ struct HomeView: View {
         Button(action: {
             appRouter.navigateToMomentum(date: Date())  // Jump to Library → Momentum showing today
         }) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Text("Weekly Momentum")
+                    Text("This Week")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AttuneTheme.textPrimary)
                     Spacer()
-                    Text("\(streak)-day streak")
+                    Text("View Momentum")
                         .font(.caption)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(AttuneTheme.accent)
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textTertiary)
+                        .foregroundStyle(AttuneTheme.accent)
                 }
                 
-                HStack(alignment: .bottom, spacing: 10) {
+                HStack(alignment: .bottom, spacing: 4) {
                     ForEach(weekMomentum.days) { day in
-                        VStack(spacing: 4) {
+                        let isToday = Calendar.current.isDateInToday(day.date)
+                        VStack(spacing: 3) {
                             if day.isFutureDay {
                                 RoundedRectangle(cornerRadius: 3)
                                     .fill(Color.clear)
-                                    .frame(width: 10, height: 40)
+                                    .frame(width: 10, height: 24)
                             } else if !day.hasData {
                                 ZStack(alignment: .bottom) {
                                     RoundedRectangle(cornerRadius: 3)
                                         .fill(AttuneTheme.surfaceStrong)
                                         .frame(width: 10, height: 6)
                                 }
-                                .frame(width: 10, height: 40)
+                                .frame(width: 10, height: 24)
                             } else {
                                 let ratio = day.completionRatio ?? 0
-                                let barHeight = max(6, CGFloat(ratio) * 40)
+                                let barHeight = max(6, CGFloat(ratio) * 24)
                                 let barColor = colorForProgressRatio(ratio)
                                 ZStack(alignment: .bottom) {
                                     RoundedRectangle(cornerRadius: 3)
@@ -461,18 +468,29 @@ struct HomeView: View {
                                         .fill(barColor)
                                         .frame(width: 10, height: barHeight)
                                 }
-                                .frame(width: 10, height: 40)
+                                .frame(width: 10, height: 24)
                             }
                             Text(day.weekdayLetter)
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(AttuneTheme.textSecondary)
+                                .font(.caption2.weight(isToday ? .bold : .medium))
+                                .foregroundStyle(isToday ? AttuneTheme.accent : AttuneTheme.textSecondary)
                                 .frame(width: 12, alignment: .center)
                         }
+                        .padding(.vertical, 3)
                         .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(isToday ? AttuneTheme.accent.opacity(0.12) : Color.clear)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .stroke(isToday ? AttuneTheme.accent.opacity(0.75) : Color.clear, lineWidth: 1)
+                        )
+                        .accessibilityLabel("\(isToday ? "Today, " : "")\(day.weekdayLetter), \(momentumAccessibilityText(for: day))")
                     }
                 }
             }
-            .padding(14)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -638,40 +656,80 @@ struct HomeView: View {
         return String(format: "%.1f", value) // one decimal for readability
     }
     
-    // MARK: - C) Mood
+    // MARK: - C) Mood and streak
 
-    /// One clear score with an optional descriptive tag. Tapping opens the editor.
-    private var moodLabelRow: some View {
-        Button(action: { showMoodEditor = true }) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(AttuneTheme.accent.opacity(0.16))
-                        .frame(width: 40, height: 40)
-                    Text(hasMoodSet ? "\(moodScoreToday)" : "–")
-                        .font(.headline.bold())
-                        .foregroundStyle(AttuneTheme.accent)
+    private var moodAndStreakCard: some View {
+        HStack(spacing: 0) {
+            Button(action: { showMoodEditor = true }) {
+                HStack(spacing: 10) {
+                    Text(moodEmoji)
+                        .font(.system(size: 27))
+                        .frame(width: 38, height: 38)
+                        .background(AttuneTheme.accent.opacity(0.14), in: Circle())
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Mood")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AttuneTheme.textPrimary)
+                        Text(compactMoodSummaryText)
+                            .font(.caption)
+                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    Spacer(minLength: 4)
                 }
+                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(hasMoodSet ? "Mood \(moodScoreToday) out of 10, \(moodSummaryText)" : "Set today's mood")
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("How are you feeling?")
-                        .font(.headline)
+            Rectangle()
+                .fill(AttuneTheme.border)
+                .frame(width: 1, height: 40)
+
+            HStack(spacing: 9) {
+                Image(systemName: "flame.fill")
+                    .font(.title3)
+                    .foregroundStyle(AttuneTheme.accent)
+                    .frame(width: 34, height: 34)
+                    .background(AttuneTheme.accent.opacity(0.14), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Streak")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AttuneTheme.textPrimary)
-                    Text(moodSummaryText)
-                        .font(.subheadline)
+                    Text("\(streak) \(streak == 1 ? "day" : "days")")
+                        .font(.caption)
                         .foregroundStyle(AttuneTheme.textSecondary)
                 }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textTertiary)
+                Spacer(minLength: 0)
             }
-            .padding(14)
-            .contentShape(Rectangle())
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+            .accessibilityElement(children: .combine)
         }
-        .buttonStyle(.plain)
         .attuneCard()
-        .accessibilityLabel(hasMoodSet ? "Mood \(moodScoreToday) out of 10, \(moodSummaryText)" : "Set today's mood")
+    }
+
+    private var moodEmoji: String {
+        guard hasMoodSet else { return "🙂" }
+        switch moodScoreToday {
+        case 0...2: return "😞"
+        case 3...4: return "🙁"
+        case 5...6: return "😐"
+        case 7...8: return "🙂"
+        default: return "😄"
+        }
+    }
+
+    private var compactMoodSummaryText: String {
+        guard hasMoodSet else { return "Not set" }
+        if let label = todayMood?.moodLabel, !label.isEmpty {
+            return "\(moodScoreToday)/10 · \(label)"
+        }
+        return "\(moodScoreToday)/10 · \(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday)))"
     }
 
     private var moodSummaryText: String {
@@ -685,11 +743,10 @@ struct HomeView: View {
     // MARK: - D) Record Check-In Hero
 
     private var recordCheckInCTAArea: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("VOICE CHECK-IN", systemImage: "waveform")
-                .font(.caption.weight(.bold))
-                .tracking(1.1)
-                .foregroundStyle(AttuneTheme.accent)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Quick Check-In")
+                .font(.headline)
+                .foregroundStyle(AttuneTheme.textPrimary)
 
             switch state {
             case .idle:
@@ -714,25 +771,16 @@ struct HomeView: View {
                 permissionDeniedContent
             }
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .attuneCard()
     }
 
     private var recordCheckInSection: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("Update progress or mood by voice")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
-
-            Text(checkInGuidanceText)
-                .font(.caption)
                 .foregroundStyle(AttuneTheme.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Text(checkInExampleText)
-                .font(.caption2)
-                .foregroundStyle(AttuneTheme.textTertiary)
-                .lineLimit(2)
+                .font(.subheadline)
 
             Button(action: {
                 let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -776,6 +824,12 @@ struct HomeView: View {
         default: amount = "1"
         }
         return "Try: “\(row.intention.title): \(amount) \(unit) more. Mood 7 out of 10.”"
+    }
+
+    private func momentumAccessibilityText(for day: DayMomentum) -> String {
+        if day.isFutureDay { return "future day" }
+        guard day.hasData, let ratio = day.completionRatio else { return "no progress recorded" }
+        return "\(Int(ratio * 100)) percent momentum"
     }
 
     private var recordingContent: some View {

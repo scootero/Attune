@@ -33,6 +33,23 @@ struct MonthDayBar: Identifiable {
     var id: Date { date }
 }
 
+/// Models retained for the pre-Aug. 5 weekly chart comparison.
+struct LegacyWeekIntentionBar: Identifiable {
+    let id = UUID()
+    let intentionId: String
+    let intentionTitle: String
+    let colorIndex: Int
+    let percent: Double
+    let slot: Double
+}
+
+struct LegacyWeekDayChartData: Identifiable {
+    let id = UUID()
+    let date: Date
+    let weekdayLetter: String
+    let bars: [LegacyWeekIntentionBar]
+}
+
 private enum MomentumViewMode: String, CaseIterable {
     case day = "Day"
     case week = "Week"
@@ -50,6 +67,12 @@ struct MomentumView: View {
     @State private var weekDaysChart: [WeekDayChartData] = []
     @State private var weekYAxisMax: Double = 100
     @State private var monthBars: [MonthDayBar] = []
+
+    @State private var legacyPoints: [MomentumPoint] = []
+    @State private var legacyYAxisMax: Double = 100
+    @State private var legacyWeekDaysChart: [LegacyWeekDayChartData] = []
+    @State private var legacyWeekYAxisMax: Double = 100
+    @State private var legacyMonthBars: [MonthDayBar] = []
 
     @State private var dayOverallRatio: Double = 0
     @State private var dayIntentionCount = 0
@@ -181,6 +204,13 @@ struct MomentumView: View {
                 hasIntentions: dayIntentionCount > 0
             )
 
+            comparisonLabel("Original daily 3D bars")
+            LegacyMomentumChartView(
+                points: legacyPoints,
+                yAxisMax: legacyYAxisMax,
+                selectedDate: selectedDate
+            )
+
             NavigationLink {
                 DayDetailView(dateKey: ProgressCalculator.dateKey(for: selectedDate))
             } label: {
@@ -215,6 +245,9 @@ struct MomentumView: View {
 
             MomentumWeekChartView(days: weekDaysChart, yAxisMax: weekYAxisMax)
 
+            comparisonLabel("Original weekly 3D bars")
+            LegacyMomentumWeekChartView(days: legacyWeekDaysChart, yAxisMax: legacyWeekYAxisMax)
+
             if !allBars.isEmpty {
                 intentionLegend(items: uniqueWeekIntentions)
             }
@@ -232,7 +265,23 @@ struct MomentumView: View {
             ])
 
             MomentumMonthChartView(bars: monthBars)
+
+            comparisonLabel("Original monthly bars")
+            LegacyMomentumMonthChartView(bars: legacyMonthBars)
+                .padding(16)
+                .glassCard()
         }
+    }
+
+    private func comparisonLabel(_ title: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.down")
+            Text("Comparison: \(title)")
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(AttuneTheme.textSecondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
     }
 
     private struct SummaryItem {
@@ -349,6 +398,165 @@ struct MomentumView: View {
         loadDayData()
         loadWeekData()
         loadMonthData()
+        loadLegacyDayData()
+        loadLegacyWeekData()
+        loadLegacyMonthData()
+    }
+
+    /// Loads the original daily chart input, including its today-only current-set fallback.
+    private func loadLegacyDayData() {
+        let dateKey = ProgressCalculator.dateKey(for: selectedDate)
+        let sets = IntentionSetStore.shared.loadAllIntentionSets()
+        var set = StreakCalculator.intentionSetActive(on: dateKey, from: sets)
+
+        if set == nil,
+           dateKey == ProgressCalculator.dateKey(for: Date()),
+           let current = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() {
+            set = current
+        }
+
+        guard let set else {
+            legacyPoints = []
+            legacyYAxisMax = 100
+            return
+        }
+
+        let checkIns = CheckInStore.shared.loadCheckIns(intentionSetId: set.id, dateKey: dateKey)
+        let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: set.id)
+        let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
+        legacyPoints = MomentumPointAdapter.buildPoints(
+            dateKey: dateKey,
+            intentionSet: set,
+            intentions: intentions,
+            checkIns: checkIns,
+            entries: entries,
+            overrides: OverrideStore.shared.loadOverrideRecordsForDate(dateKey: dateKey)
+        )
+        legacyYAxisMax = MomentumPointAdapter.yAxisMax(for: legacyPoints)
+    }
+
+    /// Recreates the original weekly data shape: every active intention gets a bar,
+    /// including zero-height bars on days without a numeric progress entry.
+    private func loadLegacyWeekData() {
+        let days = MomentumPointAdapter.weekDays(containing: selectedDate)
+        guard let monday = days.first else {
+            legacyWeekDaysChart = []
+            legacyWeekYAxisMax = 100
+            return
+        }
+
+        let dateKey = ProgressCalculator.dateKey(for: monday)
+        let sets = IntentionSetStore.shared.loadAllIntentionSets()
+        guard let set = StreakCalculator.intentionSetActive(on: dateKey, from: sets) else {
+            legacyWeekDaysChart = []
+            legacyWeekYAxisMax = 100
+            return
+        }
+
+        let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
+        var maxPercent = 0.0
+
+        legacyWeekDaysChart = days.map { day in
+            let dayKey = ProgressCalculator.dateKey(for: day)
+            let checkIns = CheckInStore.shared.loadCheckIns(intentionSetId: set.id, dateKey: dayKey)
+            let entries = ProgressStore.shared.loadEntries(dateKey: dayKey, intentionSetId: set.id)
+            let dayPoints = MomentumPointAdapter.buildPoints(
+                dateKey: dayKey,
+                intentionSet: set,
+                intentions: intentions,
+                checkIns: checkIns,
+                entries: entries
+            )
+
+            let bars = intentions.enumerated().map { index, intention in
+                let lastPoint = dayPoints
+                    .filter { $0.intentionId == intention.id }
+                    .max { $0.date < $1.date }
+                let percent = lastPoint?.percent ?? 0
+                maxPercent = max(maxPercent, percent)
+                return LegacyWeekIntentionBar(
+                    intentionId: intention.id,
+                    intentionTitle: intention.title,
+                    colorIndex: index,
+                    percent: percent,
+                    slot: legacySlot(for: lastPoint, intentionIndex: index, totalIntentions: intentions.count, day: day)
+                )
+            }
+
+            return LegacyWeekDayChartData(
+                date: day,
+                weekdayLetter: weekdayLetter(for: day),
+                bars: bars
+            )
+        }
+
+        legacyWeekYAxisMax = maxPercent > 100 ? 150 : 100
+    }
+
+    private func legacySlot(
+        for point: MomentumPoint?,
+        intentionIndex: Int,
+        totalIntentions: Int,
+        day: Date
+    ) -> Double {
+        guard let point else {
+            if totalIntentions <= 1 { return 0.5 }
+            let fraction = Double(intentionIndex) / Double(max(totalIntentions - 1, 1))
+            return 0.2 + (0.6 * fraction)
+        }
+        let seconds = point.date.timeIntervalSince(Calendar.current.startOfDay(for: day))
+        let ratio = seconds / 86_400
+        if ratio < 0.33 { return 0.25 }
+        if ratio < 0.66 { return 0.5 }
+        return 0.75
+    }
+
+    /// Recreates the original month behavior, which keeps the full calendar scaffold
+    /// and calculates a zero/partial/full bucket for every non-future active day.
+    private func loadLegacyMonthData() {
+        let calendar = Calendar.current
+        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedDate)),
+              let range = calendar.range(of: .day, in: .month, for: monthStart) else {
+            legacyMonthBars = []
+            return
+        }
+
+        let today = calendar.startOfDay(for: Date())
+        let sets = IntentionSetStore.shared.loadAllIntentionSets()
+
+        legacyMonthBars = range.compactMap { day in
+            guard let date = calendar.date(byAdding: .day, value: day - 1, to: monthStart) else { return nil }
+            let isFuture = date > today
+            let dateKey = ProgressCalculator.dateKey(for: date)
+            guard let set = StreakCalculator.intentionSetActive(on: dateKey, from: sets) else {
+                return MonthDayBar(date: date, ratio: nil, tier: nil, isFutureDay: isFuture)
+            }
+            if isFuture {
+                return MonthDayBar(date: date, ratio: nil, tier: nil, isFutureDay: true)
+            }
+
+            let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
+            let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: set.id)
+            let overrides = OverrideStore.shared.loadOverridesForDate(dateKey: dateKey)
+            let count = max(intentions.count, 1)
+            let score = intentions.reduce(0.0) { partial, intention in
+                let total = ProgressCalculator.totalForIntention(
+                    entries: entries,
+                    dateKey: dateKey,
+                    intentionId: intention.id,
+                    intentionSetId: set.id,
+                    overrideAmount: overrides[intention.id]
+                )
+                let percent = ProgressCalculator.percentComplete(
+                    total: total,
+                    targetValue: intention.targetValue,
+                    timeframe: intention.timeframe
+                )
+                return partial + (percent >= 1 ? 1 : percent > 0 ? 0.5 : 0)
+            }
+            let ratio = score / Double(count)
+            return MonthDayBar(date: date, ratio: ratio, tier: tier(for: ratio), isFutureDay: false)
+        }
     }
 
     private func loadWeekDays() {
@@ -382,7 +590,8 @@ struct MomentumView: View {
             intentionSet: set,
             intentions: detail.intentions,
             checkIns: detail.checkIns,
-            entries: entries
+            entries: entries,
+            overrides: OverrideStore.shared.loadOverrideRecordsForDate(dateKey: dateKey)
         ).map { point in
             MomentumPoint(
                 id: point.id,
