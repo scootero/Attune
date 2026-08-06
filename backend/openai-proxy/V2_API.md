@@ -1,0 +1,124 @@
+# Attune Server-Owned AI API v2
+
+Status: deployed and live-smoke-tested. Voice intention creation uses v2 in
+Debug builds only; Release builds and the other two AI workflows remain on v1.
+
+The v2 routes run beside the existing `/v1/chat/completions` route. They keep
+the model, prompts, schemas, storage setting, and output ceilings in the Worker.
+During this migration phase they use the existing `APP_PROXY_TOKEN`. App Attest
+and server-verified StoreKit entitlement will replace that legacy credential in
+a later phase.
+
+## Common request rules
+
+- Method: `POST`
+- Header: `Authorization: Bearer <APP_PROXY_TOKEN>`
+- Header: `Content-Type: application/json`
+- Maximum HTTP body: 256 KiB
+- Unknown request fields are rejected.
+- Successful responses contain the extracted task JSON directly, not an OpenAI
+  Chat Completions envelope.
+- Responses include `X-Attune-Request-Id` and
+  `X-Attune-Contract-Version: 1`.
+
+Never place real tokens or transcripts in committed fixtures or documentation.
+
+## Voice Check-In
+
+`POST /v2/check-ins/extract`
+
+```json
+{
+  "transcript": "I read 10 pages total today. Mood eight out of ten.",
+  "intentions": [
+    {
+      "id": "read-id",
+      "title": "Read",
+      "aliases": ["reading"],
+      "targetValue": 20,
+      "unit": "pages",
+      "timeframe": "daily"
+    }
+  ],
+  "todaysTotals": {
+    "read-id": 5
+  }
+}
+```
+
+Success is the existing structured extraction object:
+
+```json
+{
+  "updates": [],
+  "moodLabel": "Calm",
+  "moodScore": 8
+}
+```
+
+## Voice intention creation
+
+`POST /v2/intentions/parse`
+
+```json
+{
+  "transcript": "I want to walk 20 minutes every day."
+}
+```
+
+Success:
+
+```json
+{
+  "intentions": [
+    {
+      "title": "Walk",
+      "target": 20,
+      "unit": "minutes",
+      "category": "fitness_health",
+      "notes": null
+    }
+  ]
+}
+```
+
+## Listening Session extraction
+
+`POST /v2/listening/extract`
+
+```json
+{
+  "transcript": "I need to call Mom tomorrow.",
+  "priorContext": "I was planning my week."
+}
+```
+
+`priorContext` may be omitted or `null`. Success returns the existing
+`{"items": [...]}` extraction object used by `ExtractorService`.
+
+## Error contract
+
+- `400`: invalid task input
+- `401`: missing or invalid migration-phase token
+- `413`: HTTP body exceeds 256 KiB
+- `415`: request is not JSON
+- `429` or another OpenAI error: provider status/body preserved for diagnosis
+- `502`: provider network failure or malformed successful response
+- `503`: Worker emergency switch is off
+- `504`: provider timeout
+
+Errors use `{"error": "message"}` unless the response is a preserved OpenAI
+error body.
+
+## Migration sequence
+
+1. ~~Deploy v2 without changing the iOS app.~~ Completed 2026-08-05.
+2. ~~Run synthetic requests against all three routes.~~ All returned HTTP 200,
+   contract version 1, and the expected response shape on 2026-08-05.
+3. ~~Add an iOS v2 client behind a Debug-only switch.~~ Intentions enabled first.
+4. Compare v1 and v2 intention results for the same consented test transcripts.
+5. Move one feature at a time: intentions, Check-In, then Listening Sessions.
+6. Add D1 usage/entitlement records and App Attest request verification.
+7. Validate StoreKit transactions server-side and enforce Free/Pro limits.
+8. Test through TestFlight before retiring `/v1/chat/completions` and the shared
+   proxy token.
