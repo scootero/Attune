@@ -237,6 +237,8 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - Set the new-install reminder preference to on at 6 PM; iOS notification authorization is still required before delivery.
 - Updated the local StoreKit product to $4.99/month with a three-day free-trial offer and made trial messaging eligibility-aware. The matching offer must still be configured and verified in App Store Connect.
 - Improved StoreKit loading, unavailable, purchase, restore, and trial states without changing the product ID or Release entitlement verification.
+- Superseded August 6, 2026: version 1.0 now intentionally has no introductory
+  trial; the local offer and all trial advertising were removed in Phase 1.
 - Left the existing Cloudflare/OpenAI request architecture and provider-specific disclosure unchanged pending Scott's requested production-API discussion.
 
 ### 2026-08-05 — Production AI gateway rollout checkpoint
@@ -297,7 +299,7 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - Phase 6 About/privacy walkthrough: passed product explanations, explicit user-started recording language, event-versus-calendar clarification, permission status, export explanation, and privacy/data-request links.
 - Free/Pro Release walkthrough: passed today-only Momentum, locked Listening Sessions and Insights, the one-intention add gate, Pro-only export, and reminder on at 6 PM. Existing data was retained when the plan gate changed.
 - Free Home no longer exposes the weekly mini-chart; it shows only today's aggregate and routes to the today-only Momentum view.
-- The StoreKit trial CTA uses Apple's eligibility result. Directly launching the Release app outside the Xcode StoreKit test session correctly showed the unavailable/fallback state; the real three-day trial remains an App Store Connect/Sandbox verification item.
+- The earlier StoreKit trial CTA verification is historical and superseded. Version 1.0 now uses a direct monthly Subscribe CTA with no introductory offer; App Store Connect/Sandbox price, purchase, and restore remain unverified.
 - Release launch purged simulator-only demo history by design. The last successful Debug build was reinstalled and the removable 17-check-in/68-entry demo set was reloaded for the concurrent Momentum work.
 - Final current-source Debug and Release builds succeeded after the subscription update; `git diff --check` passed. The latest Debug app is installed with demo data loaded and Momentum open.
 - Production Worker tests passed 20/20 after deployment; all three live `/v2`
@@ -319,7 +321,7 @@ After the approved changes reach the default branch, open GitHub repository **Se
   Xcode still emits only its metadata note that no AppIntents dependency exists.
 - Release-link review found all four configured GitHub Pages URLs returning 404.
   The private support/privacy email, Pages deployment, App Store Connect product
-  and trial, Sandbox purchase/restore, metadata, and App Privacy answers remain
+  with no introductory offer, Sandbox purchase/restore, metadata, and App Privacy answers remain
   external release blockers.
 
 ## New-chat restart prompt

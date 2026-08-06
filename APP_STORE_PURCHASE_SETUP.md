@@ -1,5 +1,11 @@
 # Attune App Store Purchase Setup
 
+> Reference only. The current controlling manual checklist is
+> `YOUR_REMAINING_STEPS.md`. The Worker deployment, app secrets wiring, In-App
+> Purchase capability, and local StoreKit configuration are already complete.
+> Version 1.0 is $4.99/month with **no introductory offer or free trial**; do
+> not repeat completed deployment/key steps solely because they appear below.
+
 This is the full checklist to make Attune purchasable with one subscription.
 
 ## What is already done in code

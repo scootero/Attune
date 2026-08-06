@@ -62,7 +62,8 @@ struct ExtractorService {
         priorContextText: String?,
         sessionId: String,
         segmentId: String,
-        segmentIndex: Int
+        segmentIndex: Int,
+        referenceDate: Date
     ) async -> [ExtractedItem] {
         
         let sessionShort = AppLogger.shortId(sessionId)
@@ -77,7 +78,8 @@ struct ExtractorService {
         // Build user message with context + transcript
         let userMessage = buildUserMessage(
             transcriptText: transcriptText,
-            priorContextText: priorContextText
+            priorContextText: priorContextText,
+            referenceDate: referenceDate
         )
         
         // Build JSON schema for structured outputs
@@ -93,6 +95,7 @@ struct ExtractorService {
             sessionId: sessionId,
             segmentId: segmentId,
             segmentIndex: segmentIndex,
+            referenceDate: referenceDate,
             retryOnFailure: true
         )
         
@@ -117,6 +120,7 @@ struct ExtractorService {
         sessionId: String,
         segmentId: String,
         segmentIndex: Int,
+        referenceDate: Date,
         retryOnFailure: Bool
     ) async -> [ExtractedItem] {
         
@@ -127,11 +131,29 @@ struct ExtractorService {
             if OpenAIClient.usesServerOwnedV2(.listening) {
                 // Debug rollout: keep the existing segment and prior-context
                 // inputs while the Worker owns the extraction policy.
-                var body: [String: Any] = ["transcript": transcriptText]
+                var body: [String: Any] = [
+                    "transcript": transcriptText,
+                    "referenceDateTime": iso8601Formatter.string(from: referenceDate),
+                    "timeZone": TimeZone.current.identifier
+                ]
                 if let priorContextText, !priorContextText.isEmpty {
                     body["priorContext"] = priorContextText
                 }
-                jsonString = try await OpenAIClient.serverOwnedTask(.listening, body: body)
+                do {
+                    jsonString = try await OpenAIClient.serverOwnedTask(.listening, body: body)
+                } catch OpenAIClientError.httpError(let statusCode, let responseBody)
+                    where statusCode == 400 && responseBody?.contains("Unsupported request field") == true {
+                    // Compatibility with a deployed Worker that predates the
+                    // explicit temporal request fields. The proper contract is
+                    // still used automatically as soon as that Worker is updated.
+                    AppLogger.log(AppLogger.AI, "listening_temporal_contract_fallback session=\(sessionShort) seg=\(segmentIndex)")
+                    var fallbackBody: [String: Any] = ["transcript": transcriptText]
+                    fallbackBody["priorContext"] = legacyTemporalContext(
+                        priorContextText: priorContextText,
+                        referenceDate: referenceDate
+                    )
+                    jsonString = try await OpenAIClient.serverOwnedTask(.listening, body: fallbackBody)
+                }
             } else {
                 // Release fallback remains unchanged until v2 comparison is approved.
                 jsonString = try await OpenAIClient.chatCompletion(
@@ -153,7 +175,8 @@ struct ExtractorService {
                     item: item,
                     sessionId: sessionId,
                     segmentId: segmentId,
-                    segmentIndex: segmentIndex
+                    segmentIndex: segmentIndex,
+                    referenceDate: referenceDate
                 )
             }
             
@@ -177,6 +200,7 @@ struct ExtractorService {
                     sessionId: sessionId,
                     segmentId: segmentId,
                     segmentIndex: segmentIndex,
+                    referenceDate: referenceDate,
                     retryOnFailure: false  // No second retry
                 )
             }
@@ -238,9 +262,12 @@ REQUIRED FINGERPRINT (best-effort concept label):
   → Just provide a simple label for this specific mention
 
 CALENDAR CANDIDATES:
-- For event types, optionally provide calendarCandidate with:
+- For event types, provide calendarCandidate whenever the words identify a date, a relative day, or a clock time.
   - suggestedTitle, startISO8601, endISO8601, isAllDay, notes
-- Only include if date/time information is explicit or strongly implied
+- Resolve "today", "tomorrow", weekdays, and other relative dates from the supplied REFERENCE DATE/TIME in its supplied TIME ZONE.
+- If an event gives a clock time but no date, use the local calendar day of the reference date/time.
+- If an event gives a date but no clock time, use yyyy-MM-dd for startISO8601, set endISO8601 to null, and isAllDay to false. This means "time not specified," not all-day.
+- If neither a date nor clock time is stated or strongly implied, calendarCandidate may be null.
 
 Return ONLY valid JSON matching the schema. No markdown, no explanations.
 If nothing meets the quality bar, return: {"items": []}
@@ -250,9 +277,10 @@ If nothing meets the quality bar, return: {"items": []}
     /// Builds the user message with optional prior context and transcript
     private static func buildUserMessage(
         transcriptText: String,
-        priorContextText: String?
+        priorContextText: String?,
+        referenceDate: Date
     ) -> String {
-        var message = ""
+        var message = temporalReference(referenceDate) + "\n\n"
         
         if let priorContext = priorContextText, !priorContext.isEmpty {
             message += "PRIOR CONTEXT (from previous segment):\n\(priorContext)\n\n"
@@ -261,6 +289,23 @@ If nothing meets the quality bar, return: {"items": []}
         message += "TRANSCRIPT:\n\(transcriptText)"
         
         return message
+    }
+
+    private static func temporalReference(_ referenceDate: Date) -> String {
+        "REFERENCE DATE/TIME (recording metadata, not spoken words):\n" +
+            "referenceDateTime: \(iso8601Formatter.string(from: referenceDate))\n" +
+            "timeZone: \(TimeZone.current.identifier)"
+    }
+
+    private static func legacyTemporalContext(
+        priorContextText: String?,
+        referenceDate: Date
+    ) -> String {
+        var context = temporalReference(referenceDate)
+        if let priorContextText, !priorContextText.isEmpty {
+            context += "\n\nPREVIOUS SPOKEN CONTEXT:\n\(priorContextText)"
+        }
+        return context
     }
     
     /// Builds the JSON schema for structured outputs
@@ -330,7 +375,8 @@ If nothing meets the quality bar, return: {"items": []}
         item: ExtractionResponse.ExtractionItem,
         sessionId: String,
         segmentId: String,
-        segmentIndex: Int
+        segmentIndex: Int,
+        referenceDate: Date
     ) -> ExtractedItem {
         
         let now = iso8601Formatter.string(from: Date())
@@ -374,11 +420,161 @@ If nothing meets the quality bar, return: {"items": []}
         
         // Apply type classification (overwrites type with deterministic rules)
         let classifiedItem = TypeClassifier.classify(canonicalizedItem)
+
+        // Apply temporal fallback after deterministic type classification so an
+        // item promoted to event still receives today/tomorrow/time handling.
+        let normalizedCandidate = normalizedCalendarCandidate(
+            classifiedItem.calendarCandidate,
+            itemType: classifiedItem.type,
+            sourceQuote: classifiedItem.sourceQuote,
+            referenceDate: referenceDate
+        )
+        if classifiedItem.calendarCandidate?.startISO8601 == nil,
+           let resolvedStart = normalizedCandidate?.startISO8601 {
+            AppLogger.log(
+                AppLogger.AI,
+                "calendar_temporal_resolved session=\(AppLogger.shortId(sessionId)) seg=\(segmentIndex) has_time=\(resolvedStart.contains("T"))"
+            )
+        }
+        let calendarReadyItem = replacingCalendarCandidate(
+            in: classifiedItem,
+            with: normalizedCandidate
+        )
         
         // Phase 3: Apply strength scoring (overwrites AI strength with heuristic score)
-        let scoredItem = applyStrengthScoring(classifiedItem)
+        let scoredItem = applyStrengthScoring(calendarReadyItem)
         
         return scoredItem
+    }
+
+    private static func replacingCalendarCandidate(
+        in item: ExtractedItem,
+        with calendarCandidate: CalendarCandidate?
+    ) -> ExtractedItem {
+        ExtractedItem(
+            id: item.id,
+            sessionId: item.sessionId,
+            segmentId: item.segmentId,
+            segmentIndex: item.segmentIndex,
+            type: item.type,
+            title: item.title,
+            summary: item.summary,
+            categories: item.categories,
+            confidence: item.confidence,
+            strength: item.strength,
+            sourceQuote: item.sourceQuote,
+            contextBefore: item.contextBefore,
+            contextAfter: item.contextAfter,
+            fingerprint: item.fingerprint,
+            reviewState: item.reviewState,
+            reviewedAt: item.reviewedAt,
+            calendarCandidate: calendarCandidate,
+            createdAt: item.createdAt,
+            extractedAt: item.extractedAt
+        )
+    }
+
+    /// Deterministic safety net for the most important relative phrases. The
+    /// model remains responsible for broader natural-language interpretation,
+    /// while this guarantees today/tomorrow/weekday and explicit AM/PM times
+    /// do not disappear when a provider returns a null calendar candidate.
+    private static func normalizedCalendarCandidate(
+        _ candidate: CalendarCandidate?,
+        itemType: String,
+        sourceQuote: String,
+        referenceDate: Date
+    ) -> CalendarCandidate? {
+        if candidate?.startISO8601 != nil { return candidate }
+        guard itemType == ExtractedItem.ItemType.event else { return candidate }
+
+        let lowercased = sourceQuote.lowercased()
+        let calendar = Calendar.autoupdatingCurrent
+        let referenceDay = calendar.startOfDay(for: referenceDate)
+        var scheduledDay: Date?
+
+        if lowercased.range(of: #"\btomorrow\b"#, options: .regularExpression) != nil {
+            scheduledDay = calendar.date(byAdding: .day, value: 1, to: referenceDay)
+        } else if lowercased.range(of: #"\b(today|tonight)\b"#, options: .regularExpression) != nil {
+            scheduledDay = referenceDay
+        } else {
+            let weekdays = [
+                "sunday": 1, "monday": 2, "tuesday": 3, "wednesday": 4,
+                "thursday": 5, "friday": 6, "saturday": 7
+            ]
+            for (name, weekday) in weekdays where lowercased.range(of: #"\b\#(name)\b"#, options: .regularExpression) != nil {
+                let searchStart = calendar.date(byAdding: .second, value: -1, to: referenceDay) ?? referenceDay
+                scheduledDay = calendar.nextDate(
+                    after: searchStart,
+                    matching: DateComponents(weekday: weekday),
+                    matchingPolicy: .nextTime,
+                    direction: .forward
+                )
+                break
+            }
+        }
+
+        let spokenTime = parsedSpokenTime(in: lowercased)
+        if scheduledDay == nil, spokenTime != nil {
+            scheduledDay = referenceDay
+        }
+        guard let scheduledDay else { return candidate }
+
+        let startValue: String
+        if let spokenTime {
+            let start = calendar.date(
+                bySettingHour: spokenTime.hour,
+                minute: spokenTime.minute,
+                second: 0,
+                of: scheduledDay
+            ) ?? scheduledDay
+            startValue = iso8601Formatter.string(from: start)
+        } else {
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = .current
+            formatter.dateFormat = "yyyy-MM-dd"
+            startValue = formatter.string(from: scheduledDay)
+        }
+
+        return CalendarCandidate(
+            suggestedTitle: candidate?.suggestedTitle,
+            startISO8601: startValue,
+            endISO8601: candidate?.endISO8601,
+            isAllDay: false,
+            notes: candidate?.notes
+        )
+    }
+
+    private static func parsedSpokenTime(in text: String) -> (hour: Int, minute: Int)? {
+        if text.range(of: #"\bnoon\b"#, options: .regularExpression) != nil {
+            return (12, 0)
+        }
+        if text.range(of: #"\bmidnight\b"#, options: .regularExpression) != nil {
+            return (0, 0)
+        }
+
+        let pattern = #"\b([1-9]|1[0-2])(?::([0-5][0-9]))?\s*(a\.?m\.?|p\.?m\.?)\b"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(
+                in: text,
+                range: NSRange(text.startIndex..., in: text)
+              ),
+              let hourRange = Range(match.range(at: 1), in: text),
+              var hour = Int(text[hourRange]) else {
+            return nil
+        }
+
+        var minute = 0
+        if match.range(at: 2).location != NSNotFound,
+           let minuteRange = Range(match.range(at: 2), in: text) {
+            minute = Int(text[minuteRange]) ?? 0
+        }
+        guard let meridiemRange = Range(match.range(at: 3), in: text) else { return nil }
+        let meridiem = text[meridiemRange].replacingOccurrences(of: ".", with: "")
+        if meridiem == "pm", hour < 12 { hour += 12 }
+        if meridiem == "am", hour == 12 { hour = 0 }
+        return (hour, minute)
     }
     
     /// Applies Phase 3 strength scoring to an extracted item.

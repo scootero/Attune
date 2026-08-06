@@ -32,6 +32,10 @@ struct LibraryView: View {
                             recentSection
                         }
 
+                        if CalendarFeature.isEnabled {
+                            calendarSection
+                        }
+
                         historySection
                     }
                     .padding(.horizontal, AttuneTheme.horizontalPadding)
@@ -47,13 +51,35 @@ struct LibraryView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("Insights")
-                .font(.title.bold())
-                .foregroundStyle(AttuneTheme.textPrimary)
-            Text("What you’ve said—and what keeps coming up.")
-                .font(.subheadline)
-                .foregroundStyle(AttuneTheme.textSecondary)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Insights")
+                    .font(.title.bold())
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text("What you’ve said—and what keeps coming up.")
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+
+            Spacer(minLength: 4)
+
+            if CalendarFeature.isEnabled {
+                NavigationLink(destination: AttuneCalendarView()) {
+                    Label("Calendar", systemImage: "calendar")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.accent)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 36)
+                        .background(AttuneTheme.accent.opacity(0.12), in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .stroke(AttuneTheme.accent.opacity(0.28), lineWidth: 1)
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens your captured events calendar")
+            }
         }
     }
 
@@ -183,6 +209,55 @@ struct LibraryView: View {
             }
             .attuneCard()
         }
+    }
+
+    private var calendarSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Plan from your captures")
+                .font(.headline)
+                .foregroundStyle(AttuneTheme.textPrimary)
+
+            NavigationLink(destination: AttuneCalendarView()) {
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar")
+                        .font(.headline)
+                        .foregroundStyle(AttuneTheme.accent)
+                        .frame(width: 38, height: 38)
+                        .background(AttuneTheme.accent.opacity(0.12), in: Circle())
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Calendar")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AttuneTheme.textPrimary)
+                        Text(calendarCaptureCount == 0
+                             ? (undatedCalendarEventCount == 0
+                                ? "Clear dates and times will appear here."
+                                : "\(undatedCalendarEventCount) event\(undatedCalendarEventCount == 1 ? "" : "s") need a date")
+                             : "\(calendarCaptureCount) dated capture\(calendarCaptureCount == 1 ? "" : "s")")
+                            .font(.caption)
+                            .foregroundStyle(AttuneTheme.textSecondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.textTertiary)
+                }
+                .padding(14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .attuneCard()
+        }
+    }
+
+    private var calendarCaptureCount: Int {
+        CalendarCaptureParser.captures(from: items, corrections: corrections).count
+    }
+
+    private var undatedCalendarEventCount: Int {
+        CalendarCaptureParser.undatedCaptures(from: items, corrections: corrections).count
     }
 
     private func historyRow(title: String, detail: String, icon: String) -> some View {

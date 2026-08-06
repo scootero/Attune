@@ -9,6 +9,19 @@
 
 import Foundation
 
+/// User-owned scheduling override for a captured event. Keeping this in the
+/// correction overlay preserves the original AI extraction and makes Calendar
+/// edits independently removable.
+struct CalendarScheduleCorrection: Codable, Equatable {
+    /// False explicitly removes an AI-proposed schedule from the in-app calendar.
+    var isScheduled: Bool
+    /// ISO8601 instant when a clock time is set, or yyyy-MM-dd when it is not.
+    var startISO8601: String?
+    var endISO8601: String?
+    /// Distinguishes a spoken/edited clock time from a date-only capture.
+    var hasSpecifiedTime: Bool
+}
+
 /// Represents a user correction to an extracted item
 /// Corrections are keyed by itemId (ExtractedItem.id.uuidString) and stored separately
 /// from per-session extraction files to avoid retroactive mutation.
@@ -44,6 +57,10 @@ struct ItemCorrection: Codable, Identifiable {
     
     /// Optional user note explaining the correction
     var note: String?
+
+    /// Optional user override for the event's in-app Calendar schedule.
+    /// Nil means the original AI calendar candidate remains authoritative.
+    var calendarSchedule: CalendarScheduleCorrection?
     
     // MARK: - Timestamps
     
@@ -68,6 +85,7 @@ struct ItemCorrection: Codable, Identifiable {
         correctedType: String? = nil,
         correctedCategories: [String]? = nil,
         note: String? = nil,
+        calendarSchedule: CalendarScheduleCorrection? = nil,
         updatedAtISO: String = ISO8601DateFormatter().string(from: Date())
     ) {
         self.itemId = itemId
@@ -76,6 +94,7 @@ struct ItemCorrection: Codable, Identifiable {
         self.correctedType = correctedType
         self.correctedCategories = correctedCategories
         self.note = note
+        self.calendarSchedule = calendarSchedule
         self.updatedAtISO = updatedAtISO
     }
 }

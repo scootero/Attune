@@ -1,5 +1,9 @@
 # Attune Launch Steps — Handoff for Web AI Agent
 
+> Historical long-form reference. Use `YOUR_REMAINING_STEPS.md` as the current
+> controlling manual checklist. Version 1.0 is $4.99/month with no introductory
+> offer, and the Worker/app subscription implementation is already complete.
+
 Use this document exactly. Do steps in order.
 
 Goal:

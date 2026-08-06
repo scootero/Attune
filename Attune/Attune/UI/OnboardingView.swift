@@ -18,7 +18,7 @@ struct OnboardingView: View {
             icon: "waveform.and.mic",
             eyebrow: "VOICE CHECK-INS",
             title: "Speak it. See it move.",
-            detail: "Tell Attune what you completed and by how much. It updates the tracked intentions you chose and can capture an optional mood."
+            detail: "An intention is a measurable daily or weekly focus you choose. Tell Attune what you completed and by how much, and a Voice Check-In updates its progress and can capture an optional mood."
         ),
         OnboardingPage(
             icon: "sparkles",

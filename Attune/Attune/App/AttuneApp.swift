@@ -42,6 +42,7 @@ struct AttuneApp: App {
         .onChange(of: scenePhase) { _, newPhase in // Refresh reminder when app becomes active so today's state is always up-to-date.
             if newPhase == .active { // Only refresh on active to avoid unnecessary work in background/inactive states.
                 DailyReminderNotificationService.shared.refreshReminderForToday() // Recompute reminder at user-selected time based on latest check-ins/progress.
+                Task { await SubscriptionManager.shared.refreshEntitlement() }
             }
         }
     }

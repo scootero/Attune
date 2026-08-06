@@ -15,6 +15,8 @@ struct ExtractionWorkItem: Equatable {
     let sessionId: String
     let segmentId: String
     let segmentIndex: Int
+    /// Recording timestamp used to resolve today/tomorrow and time-only events.
+    let referenceDate: Date
     let transcriptText: String
     let priorContextText: String?
     
@@ -161,7 +163,8 @@ class ExtractionQueue: ObservableObject {
             priorContextText: workItem.priorContextText,
             sessionId: workItem.sessionId,
             segmentId: workItem.segmentId,
-            segmentIndex: workItem.segmentIndex
+            segmentIndex: workItem.segmentIndex,
+            referenceDate: workItem.referenceDate
         )
         
         // Remove from in-flight

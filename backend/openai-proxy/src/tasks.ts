@@ -128,7 +128,12 @@ function buildIntentionsTask(rawBody: unknown): ValidationResult {
 
 function buildListeningTask(rawBody: unknown): ValidationResult {
   if (!isRecord(rawBody)) return invalid("Request body must be an object");
-  const keyError = validateKeys(rawBody, ["transcript", "priorContext"]);
+  const keyError = validateKeys(rawBody, [
+    "transcript",
+    "priorContext",
+    "referenceDateTime",
+    "timeZone",
+  ]);
   if (keyError) return invalid(keyError);
   const transcript = validateText(rawBody.transcript, "transcript", MAX_TRANSCRIPT_CHARACTERS);
   if (!transcript.ok) return invalid(transcript.error);
@@ -145,8 +150,37 @@ function buildListeningTask(rawBody: unknown): ValidationResult {
     priorContext = validated.value;
   }
 
+  let referenceDateTime: string | undefined;
+  let timeZone: string | undefined;
+  const hasReferenceDateTime = rawBody.referenceDateTime !== undefined;
+  const hasTimeZone = rawBody.timeZone !== undefined;
+  if (hasReferenceDateTime !== hasTimeZone) {
+    return invalid("referenceDateTime and timeZone must be supplied together");
+  }
+  if (hasReferenceDateTime && hasTimeZone) {
+    const validatedDateTime = validateText(rawBody.referenceDateTime, "referenceDateTime", 64);
+    const validatedTimeZone = validateText(rawBody.timeZone, "timeZone", 100);
+    if (!validatedDateTime.ok) return invalid(validatedDateTime.error);
+    if (!validatedTimeZone.ok) return invalid(validatedTimeZone.error);
+    if (!Number.isFinite(Date.parse(validatedDateTime.value))) {
+      return invalid("referenceDateTime must be an ISO8601 date-time");
+    }
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: validatedTimeZone.value }).format();
+    } catch {
+      return invalid("timeZone must be a valid IANA time zone");
+    }
+    referenceDateTime = validatedDateTime.value;
+    timeZone = validatedTimeZone.value;
+  }
+
   const systemMessage = LISTENING_SYSTEM_PROMPT;
-  const userMessage = buildListeningUserMessage(transcript.value, priorContext);
+  const userMessage = buildListeningUserMessage(
+    transcript.value,
+    priorContext,
+    referenceDateTime,
+    timeZone,
+  );
   return valid({
     taskName: "listening",
     inputCharacters: systemMessage.length + userMessage.length,
@@ -299,8 +333,18 @@ Rules:
 Return JSON only. // detailed contract plus rules for the model`;
 }
 
-function buildListeningUserMessage(transcript: string, priorContext?: string): string {
+function buildListeningUserMessage(
+  transcript: string,
+  priorContext?: string,
+  referenceDateTime?: string,
+  timeZone?: string,
+): string {
   let message = "";
+  if (referenceDateTime && timeZone) {
+    message += "REFERENCE DATE/TIME (recording metadata, not spoken words):\n";
+    message += `referenceDateTime: ${referenceDateTime}\n`;
+    message += `timeZone: ${timeZone}\n\n`;
+  }
   if (priorContext) message += `PRIOR CONTEXT (from previous segment):\n${priorContext}\n\n`;
   message += `TRANSCRIPT:\n${transcript}`;
   return message;
@@ -384,9 +428,12 @@ REQUIRED FINGERPRINT (best-effort concept label):
   → Just provide a simple label for this specific mention
 
 CALENDAR CANDIDATES:
-- For event types, optionally provide calendarCandidate with:
+- For event types, provide calendarCandidate whenever the words identify a date, a relative day, or a clock time.
   - suggestedTitle, startISO8601, endISO8601, isAllDay, notes
-- Only include if date/time information is explicit or strongly implied
+- Resolve "today", "tomorrow", weekdays, and other relative dates from the supplied REFERENCE DATE/TIME in its supplied TIME ZONE.
+- If an event gives a clock time but no date, use the local calendar day of the reference date/time.
+- If an event gives a date but no clock time, use yyyy-MM-dd for startISO8601, set endISO8601 to null, and isAllDay to false. This means "time not specified," not all-day.
+- If neither a date nor clock time is stated or strongly implied, calendarCandidate may be null.
 
 Return ONLY valid JSON matching the schema. No markdown, no explanations.
 If nothing meets the quality bar, return: {"items": []}`;

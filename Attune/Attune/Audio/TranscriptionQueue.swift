@@ -569,10 +569,13 @@ class TranscriptionQueue: ObservableObject {
         }()
         
         // Build extraction work item
+        let referenceDate = session.segments.first(where: { $0.id == segmentId })?.startedAt
+            ?? session.startedAt
         let workItem = ExtractionWorkItem(
             sessionId: sessionId,
             segmentId: segmentId,
             segmentIndex: segmentIndex,
+            referenceDate: referenceDate,
             transcriptText: transcriptText,
             priorContextText: priorContextText
         )

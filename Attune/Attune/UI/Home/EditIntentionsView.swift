@@ -475,6 +475,16 @@ struct EditIntentionsView: View {
             dismiss() // no persistable intention changes, so close sheet
             return // stop early
         } // end guard
+
+        let baselineIDs = Set(baselineDrafts.map(\.id))
+        let proposedIDs = valid.map(\.id)
+        guard subscriptionManager.canSaveIntentions(baselineIDs: baselineIDs, proposedIDs: proposedIDs) else {
+            AppLogger.log(AppLogger.STORE, "EditIntentions blocked by subscription policy baseline=\(baselineIDs.count) proposed=\(proposedIDs.count)")
+            if !subscriptionManager.hasPremiumAccess {
+                showIntentionLimitPaywall = true
+            }
+            return
+        }
         
         do {
             // 1. Save each intention (create or update) and collect IDs

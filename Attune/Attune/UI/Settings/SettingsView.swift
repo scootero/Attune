@@ -115,10 +115,21 @@ struct SettingsView: View {
             Button { showManageSubscriptions = true } label: {
                 settingsLabel("Manage Subscription", icon: "person.crop.circle", color: AttuneTheme.accentSecondary)
             }
+
+            if let message = subscriptionManager.actionState.message {
+                Label(
+                    message,
+                    systemImage: subscriptionManager.actionState.isFailure
+                        ? "exclamationmark.triangle.fill"
+                        : "info.circle.fill"
+                )
+                .font(.footnote)
+                .foregroundStyle(subscriptionManager.actionState.isFailure ? AttuneTheme.warning : Color.secondary)
+            }
         } header: {
             Text("Membership")
         } footer: {
-            Text("Free includes one active intention, one Voice Check-In per day, today's Momentum, and the daily reminder. Eligible new subscribers can try Attune Pro free for 3 days; it then renews at \(subscriptionManager.priceText).")
+            Text("Free includes one active intention, one Voice Check-In per day, today's Momentum, and the daily reminder. Attune Pro adds more active intentions and Listening Sessions for \(subscriptionManager.priceText).")
         }
     }
 
@@ -193,6 +204,13 @@ struct SettingsView: View {
     private var developerSection: some View {
         #if DEBUG
         Section {
+            Picker("Subscription Access", selection: $subscriptionManager.debugMode) {
+                ForEach(DebugSubscriptionMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
             NavigationLink(destination: LogsView()) {
                 settingsLabel("Logs", icon: "doc.text.magnifyingglass", color: .green)
             }
@@ -240,23 +258,28 @@ struct SettingsView: View {
             #if targetEnvironment(simulator)
             Text("Simulator only. Demo records use your existing intentions and are removed by exact manifest paths plus a reserved-ID residue scan.")
             #else
-            Text("Developer diagnostics are available only in Debug builds.")
+            Text("Subscription Access changes only this Debug build. Pro preserves the existing unlocked test behavior; Free verifies paywalls; System follows StoreKit.")
             #endif
         }
         #endif
     }
 
     private var membershipDetail: String {
-        if subscriptionManager.isSubscribed {
-            return "Active membership · unlimited Pro features"
-        }
         #if DEBUG
-        return "Pro features enabled for testing"
+        switch subscriptionManager.debugMode {
+        case .pro: return "Debug test mode · Pro"
+        case .free: return "Debug test mode · Free"
+        case .system: return isSubscribedDetail
+        }
         #else
-        return subscriptionManager.isEligibleForIntroOffer
-            ? "Free plan · 3-day Pro trial available"
-            : "Free plan · \(subscriptionManager.priceText)"
+        return isSubscribedDetail
         #endif
+    }
+
+    private var isSubscribedDetail: String {
+        subscriptionManager.isSubscribed
+            ? "Active membership · unlimited Pro features"
+            : "Free plan · \(subscriptionManager.priceText)"
     }
 
     private func settingsLabel(_ title: String, icon: String, color: Color) -> some View {

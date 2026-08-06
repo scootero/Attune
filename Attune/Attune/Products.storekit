@@ -36,11 +36,6 @@
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "21400002",
-          "introductoryOffer" : {
-            "internalID" : "21400003",
-            "paymentMode" : "free",
-            "subscriptionPeriod" : "P3D"
-          },
           "localizations" : [
             {
               "description" : "Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.",

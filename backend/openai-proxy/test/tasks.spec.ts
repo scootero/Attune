@@ -44,6 +44,8 @@ const taskCases = [
     body: {
       transcript: "I need to call Mom tomorrow.",
       priorContext: "I was planning my week.",
+      referenceDateTime: "2026-08-06T15:00:00Z",
+      timeZone: "America/Chicago",
     },
     schemaName: "items_extraction",
     output: { items: [] },
@@ -104,6 +106,11 @@ describe("server-owned v2 task routes", () => {
       expect(forwarded.messages[0].role).toBe("system");
       expect(forwarded.messages[1].role).toBe("user");
       expect(forwarded.messages[1].content).toContain(testCase.body.transcript);
+      if (testCase.path === TASK_PATHS.listening) {
+        expect(forwarded.messages[1].content).toContain("referenceDateTime: 2026-08-06T15:00:00Z");
+        expect(forwarded.messages[1].content).toContain("timeZone: America/Chicago");
+        expect(forwarded.messages[0].content).toContain("clock time but no date");
+      }
     });
   }
 
@@ -132,6 +139,22 @@ describe("server-owned v2 task routes", () => {
     );
 
     expect(response.status).toBe(400);
+  });
+
+  it("validates Listening temporal context as a pair", async () => {
+    const response = await handleRequest(
+      taskRequest(TASK_PATHS.listening, {
+        transcript: "Dentist tomorrow at 2 PM.",
+        referenceDateTime: "2026-08-06T15:00:00Z",
+      }),
+      env,
+      vi.fn(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "referenceDateTime and timeZone must be supplied together",
+    });
   });
 
   it("requires the legacy token until App Attest replaces it", async () => {

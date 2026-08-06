@@ -9,6 +9,10 @@
 
 import Foundation
 
+extension Notification.Name {
+    static let attuneCorrectionsDidChange = Notification.Name("attune.corrections.didChange")
+}
+
 /// Manages loading and saving of ItemCorrection objects to disk using JSON.
 /// All corrections are stored in a single file: Documents/Attune/Corrections.json
 /// File format: [ItemCorrection] (array, for simplicity)
@@ -82,6 +86,7 @@ final class CorrectionsStore {
         
         // Save to disk
         try saveCorrections(corrections)
+        NotificationCenter.default.post(name: .attuneCorrectionsDidChange, object: nil)
         
         AppLogger.log(
             AppLogger.STORE,
@@ -102,6 +107,7 @@ final class CorrectionsStore {
         corrections.removeValue(forKey: itemId)
         
         try saveCorrections(corrections)
+        NotificationCenter.default.post(name: .attuneCorrectionsDidChange, object: nil)
         
         AppLogger.log(
             AppLogger.STORE,

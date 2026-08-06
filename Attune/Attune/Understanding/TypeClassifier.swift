@@ -125,6 +125,7 @@ struct TypeClassifier {
             "on saturday",
             "on sunday",
             "at \\d", // "at 3pm", "at 10am"
+            "\\b(is|this|next|by)\\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b",
             "due date"
         ]
         

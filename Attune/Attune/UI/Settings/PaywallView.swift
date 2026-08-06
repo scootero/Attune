@@ -120,12 +120,9 @@ struct PaywallView: View {
                     .foregroundStyle(AttuneTheme.textSecondary)
             }
 
-            Text("\(SubscriptionConfig.trialDurationText) for eligible new subscribers")
+            Text("\(subscriptionManager.priceText). Cancel anytime.")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AttuneTheme.accent)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 7)
-                .background(AttuneTheme.accent.opacity(0.11), in: Capsule())
         }
         .frame(maxWidth: .infinity)
     }
@@ -175,15 +172,15 @@ struct PaywallView: View {
                 .padding(18)
                 .attuneCard()
             } else {
-                if let message = subscriptionManager.lastErrorMessage {
-                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                if let message = subscriptionManager.actionState.message {
+                    Label(message, systemImage: subscriptionManager.actionState.isFailure ? "exclamationmark.triangle.fill" : "info.circle.fill")
                         .font(.footnote)
-                        .foregroundStyle(AttuneTheme.warning)
+                        .foregroundStyle(subscriptionManager.actionState.isFailure ? AttuneTheme.warning : AttuneTheme.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Button {
-                    if subscriptionManager.product == nil {
+                    if !subscriptionManager.isProductAvailable {
                         Task { await subscriptionManager.refresh() }
                     } else {
                         Task {
@@ -196,14 +193,14 @@ struct PaywallView: View {
                         if subscriptionManager.isBusy {
                             SwiftUI.ProgressView().tint(Color(red: 0.025, green: 0.12, blue: 0.12))
                         }
-                        Text(subscriptionManager.product == nil ? "Try Again" : purchaseButtonTitle)
+                        Text(subscriptionManager.isProductAvailable ? "Subscribe to Attune Pro" : "Try Again")
                     }
                 }
                 .buttonStyle(AttunePrimaryButtonStyle())
                 .disabled(subscriptionManager.isBusy)
 
-                if subscriptionManager.product != nil {
-                    Text(purchaseTermsText)
+                if subscriptionManager.isProductAvailable {
+                    Text("\(subscriptionManager.priceText), auto-renewing unless cancelled at least 24 hours before renewal.")
                         .font(.footnote)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(AttuneTheme.textSecondary)
@@ -265,21 +262,8 @@ struct PaywallView: View {
             .frame(minHeight: 44)
     }
 
-    private var purchaseButtonTitle: String {
-        subscriptionManager.isEligibleForIntroOffer ? "Start 3-Day Free Trial" : "Subscribe to Attune Pro"
-    }
-
-    private var purchaseTermsText: String {
-        if subscriptionManager.isEligibleForIntroOffer {
-            return "Free for 3 days, then \(subscriptionManager.priceText), auto-renewing unless cancelled at least 24 hours before renewal."
-        }
-        return "\(subscriptionManager.priceText), auto-renewing unless cancelled at least 24 hours before renewal."
-    }
-
     private var legalPaymentText: String {
-        subscriptionManager.isEligibleForIntroOffer
-            ? "After the free trial, payment is charged to your Apple ID. Cancel anytime in Apple account settings."
-            : "Payment is charged to your Apple ID after confirmation. Cancel anytime in Apple account settings."
+        "Payment is charged to your Apple ID after confirmation. Cancel anytime in Apple account settings."
     }
 }
 

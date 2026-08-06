@@ -11,6 +11,7 @@ import UIKit
 
 struct HomeRecordView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @StateObject private var recorder = RecorderService.shared
     @StateObject private var transcriptionQueue = TranscriptionQueue.shared
@@ -25,6 +26,12 @@ struct HomeRecordView: View {
 
     @State private var todaySessionsCount = 0
     @State private var todayInsightsCount = 0
+    /// Briefly marks Today as refreshed after a Listening Session is fully saved.
+    @State private var showsRecentSessionCompletion = false
+    /// Number of saved captures produced by the just-finished session.
+    @State private var recentInsightsAddedCount = 0
+    /// Ensures an older delayed fade cannot clear newer completion feedback.
+    @State private var completionFeedbackToken = UUID()
     @State private var showSessionsSheet = false
     @State private var showInsightsSheet = false
     @State private var showPaywall = false
@@ -234,31 +241,82 @@ struct HomeRecordView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AttuneTheme.textPrimary)
                 Spacer()
-                Text("\(todaySessionsCount) \(todaySessionsCount == 1 ? "session" : "sessions") · \(todayInsightsCount) captured")
+                HStack(spacing: 4) {
+                    Text("\(todaySessionsCount) \(todaySessionsCount == 1 ? "session" : "sessions")")
+                    Text("·")
+                    Text("\(todayInsightsCount) captured")
+                }
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .fontWeight(showsRecentSessionCompletion ? .semibold : .regular)
+                    .foregroundStyle(showsRecentSessionCompletion ? AttuneTheme.success : AttuneTheme.textSecondary)
             }
 
             HStack(spacing: 10) {
-                historyButton(title: "Sessions", icon: "waveform", action: { showSessionsSheet = true })
-                historyButton(title: "Insights", icon: "sparkles", action: { showInsightsSheet = true })
+                historyButton(
+                    title: "Sessions",
+                    icon: "waveform",
+                    isHighlighted: showsRecentSessionCompletion,
+                    action: { showSessionsSheet = true }
+                )
+                historyButton(
+                    title: "Insights",
+                    icon: "sparkles",
+                    badgeText: recentInsightsAddedCount > 0 ? "+\(recentInsightsAddedCount) new" : nil,
+                    isHighlighted: showsRecentSessionCompletion,
+                    action: { showInsightsSheet = true }
+                )
             }
         }
         .padding(14)
         .attuneCard()
+        .overlay(
+            RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+                .stroke(
+                    showsRecentSessionCompletion ? AttuneTheme.success.opacity(0.72) : Color.clear,
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(
+            color: showsRecentSessionCompletion ? AttuneTheme.success.opacity(0.22) : .clear,
+            radius: 12
+        )
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: showsRecentSessionCompletion)
     }
 
-    private func historyButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func historyButton(
+        title: String,
+        icon: String,
+        badgeText: String? = nil,
+        isHighlighted: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-                .background(AttuneTheme.surfaceStrong, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(AttuneTheme.border))
+            HStack(spacing: 6) {
+                Label(title, systemImage: icon)
+                    .font(.subheadline.weight(.semibold))
+                if let badgeText {
+                    Text(badgeText)
+                        .font(.caption2.weight(.bold))
+                        .monospacedDigit()
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(AttuneTheme.success.opacity(0.22), in: Capsule())
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
+            .background(
+                isHighlighted ? AttuneTheme.success.opacity(0.15) : AttuneTheme.surfaceStrong,
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isHighlighted ? AttuneTheme.success.opacity(0.60) : AttuneTheme.border)
+            )
         }
         .buttonStyle(.plain)
-        .foregroundStyle(AttuneTheme.textPrimary)
+        .foregroundStyle(isHighlighted ? AttuneTheme.success : AttuneTheme.textPrimary)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: isHighlighted)
     }
 
     private func statusPanel(
@@ -342,6 +400,8 @@ struct HomeRecordView: View {
         activeSessionId = sessionId
         processingSessionId = nil
         isProcessing = false
+        showsRecentSessionCompletion = false
+        recentInsightsAddedCount = 0
         loadTodayCounts()
     }
 
@@ -406,6 +466,7 @@ struct HomeRecordView: View {
         isProcessing = false
         processingSessionId = nil
         loadTodayCounts()
+        showCompletionFeedback(for: sessionId)
     }
 
     private func startProcessingCheck() {
@@ -433,6 +494,25 @@ struct HomeRecordView: View {
             guard let date else { return false }
             return date >= startOfDay && date < endOfDay
         }.count
+    }
+
+    /// Displays completion feedback only after this session's transcription and captures are saved.
+    private func showCompletionFeedback(for sessionId: String) {
+        recentInsightsAddedCount = ExtractionStore.shared.loadExtractions(sessionId: sessionId).count
+        let token = UUID()
+        completionFeedbackToken = token
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+            showsRecentSessionCompletion = true
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard completionFeedbackToken == token else { return }
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.55)) {
+                showsRecentSessionCompletion = false
+            }
+            recentInsightsAddedCount = 0
+        }
     }
 }
 

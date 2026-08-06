@@ -1,5 +1,8 @@
 # App Store Readiness Checklist
 
+> Engineering history/reference. Scott's current ordered manual actions are in
+> `YOUR_REMAINING_STEPS.md`; keep version 1.0 at $4.99/month with no introductory offer.
+
 Working rules: one phase at a time; minimal diffs; update this file after each phase.
 
 ---
@@ -56,7 +59,7 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 - [ ] Archive → TestFlight → Submit
 - [ ] Confirm old OpenAI key revoked
 
-Current release values are $4.99/month with a three-day introductory trial.
+Current release values are $4.99/month with no introductory trial.
 Free includes one active intention and one Voice Check-In per day; use
 `ATTUNE_REMAINING_WORK.md` as the controlling release tracker.
 

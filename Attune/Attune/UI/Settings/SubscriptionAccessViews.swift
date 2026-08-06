@@ -40,10 +40,10 @@ struct ProLockedFeatureView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Button(trialButtonTitle) { showPaywall = true }
+                Button("View Attune Pro") { showPaywall = true }
                     .buttonStyle(AttunePrimaryButtonStyle())
 
-                Text(trialDetail)
+                Text("\(subscriptionManager.priceText). Cancel anytime.")
                     .font(.footnote)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(AttuneTheme.textTertiary)
@@ -57,15 +57,6 @@ struct ProLockedFeatureView: View {
         }
     }
 
-    private var trialButtonTitle: String {
-        subscriptionManager.isEligibleForIntroOffer ? "Try Attune Pro Free" : "View Attune Pro"
-    }
-
-    private var trialDetail: String {
-        subscriptionManager.isEligibleForIntroOffer
-            ? "3 days free, then \(subscriptionManager.priceText). Cancel anytime."
-            : "\(subscriptionManager.priceText). Cancel anytime."
-    }
 }
 
 /// Free users can see only today's Momentum. Historical navigation, Week,

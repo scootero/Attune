@@ -28,6 +28,4 @@ enum SubscriptionConfig {
     /// Short marketing line for the paywall.
     static let displayPriceFallback = "$4.99/month"
 
-    /// App Store Connect must contain the matching introductory offer before release.
-    static let trialDurationText = "3-day free trial"
 }

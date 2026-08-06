@@ -111,6 +111,10 @@ struct HomeView: View {
     @State private var sliderValues: [String: Double] = [:] // holds the working total for each intention while editing
     /// Original totals snapshot for cancel restore.
     @State private var originalTotals: [String: Double] = [:] // keeps baseline totals so Cancel can restore without saving
+    /// Intention rows that recently received a visible progress change.
+    @State private var highlightedProgressIntentionIDs: Set<String> = []
+    /// Prevents an older delayed reset from clearing a newer progress highlight.
+    @State private var progressHighlightToken = UUID()
     /// Shows the subscription paywall when a free-tier limit is hit.
     @State private var showPaywall = false
     /// Optional reason text passed into the paywall sheet.
@@ -190,9 +194,11 @@ struct HomeView: View {
                 ambiguousUpdates: data.ambiguousUpdates,
                 intentions: data.intentions,
                 onResolve: { resolutions in
+                    let previousPercents = displayedProgressPercentages()
                     applyAmbiguityResolutions(resolutions, context: data)
                     ambiguitySheetData = nil
                     refreshAll()
+                    highlightProgressRows(changedProgressIntentionIDs(since: previousPercents))
                     state = .saved(checkInId: data.checkInId)
                 },
                 onCancel: {
@@ -319,7 +325,29 @@ struct HomeView: View {
                             .foregroundStyle(AttuneTheme.textSecondary)
                             .monospacedDigit()
                     }
-                    .padding(.vertical, 1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(
+                                highlightedProgressIntentionIDs.contains(row.id)
+                                    ? AttuneTheme.success.opacity(0.18)
+                                    : Color.clear
+                            )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(
+                                highlightedProgressIntentionIDs.contains(row.id)
+                                    ? AttuneTheme.success.opacity(0.55)
+                                    : Color.clear,
+                                lineWidth: 1
+                            )
+                    )
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 0.45),
+                        value: highlightedProgressIntentionIDs
+                    )
                     .accessibilityElement(children: .combine)
                 }
                 
@@ -616,6 +644,7 @@ struct HomeView: View {
             isUpdateProgressMode = false // bail out to safe state
             return // nothing to save
         }
+        let previousPercents = displayedProgressPercentages()
         let dateKey = ProgressCalculator.dateKey(for: Date()) // today’s date key
         for row in todaysProgress { // iterate intentions shown
             let value = sliderValues[row.intention.id] ?? row.total // use slider or existing total
@@ -630,6 +659,40 @@ struct HomeView: View {
         isUpdateProgressMode = false // exit mode
         loadTodaysProgress() // refresh data to reflect overrides
         loadIntentionsBreakdown() // recompute counts
+        highlightProgressRows(changedProgressIntentionIDs(since: previousPercents))
+    }
+
+    /// Returns the currently visible progress percentage for each intention row.
+    private func displayedProgressPercentages() -> [String: Double] {
+        Dictionary(uniqueKeysWithValues: todaysProgress.map { ($0.id, $0.percent) })
+    }
+
+    /// Limits feedback to rows whose displayed percentage changed after a save.
+    private func changedProgressIntentionIDs(since previousPercents: [String: Double]) -> Set<String> {
+        Set(todaysProgress.compactMap { row in
+            guard let previous = previousPercents[row.id],
+                  abs(previous - row.percent) > 0.000_001 else { return nil }
+            return row.id
+        })
+    }
+
+    /// Shows a short success highlight, then restores the ordinary row appearance.
+    private func highlightProgressRows(_ intentionIDs: Set<String>) {
+        guard !intentionIDs.isEmpty else { return }
+
+        let token = UUID()
+        progressHighlightToken = token
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+            highlightedProgressIntentionIDs = intentionIDs
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard progressHighlightToken == token else { return }
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.55)) {
+                highlightedProgressIntentionIDs = []
+            }
+        }
     }
     
     /// Computes current percent for a row using live or slider value.
@@ -1539,6 +1602,7 @@ struct HomeView: View {
             }
             
             // Apply clear updates immediately; log count and each applied update
+            let previousPercents = displayedProgressPercentages()
             AppLogger.log(AppLogger.AI, "checkin_apply parsed_updates_count=\(clearUpdates.count)")
             for update in clearUpdates { // apply non-ambiguous updates immediately
                 do {
@@ -1595,6 +1659,7 @@ struct HomeView: View {
             }
 
             refreshAll()
+            highlightProgressRows(changedProgressIntentionIDs(since: previousPercents))
 
             // Clear processing placeholder; show real row with green flash
             processingCheckInId = nil

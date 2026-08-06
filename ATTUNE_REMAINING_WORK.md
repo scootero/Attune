@@ -1,6 +1,6 @@
 # Attune Remaining Work
 
-Last updated: August 5, 2026
+Last updated: August 6, 2026
 
 This is the concise tracker for the work remaining after completion of UI Phases 0–6. The detailed history and verification log remain in `ATTUNE_UI_RELEASE_PLAN.md`.
 
@@ -12,8 +12,8 @@ This is the concise tracker for the work remaining after completion of UI Phases
 - Pro unlocks additional intentions, unlimited check-ins, Listening Sessions,
   Insights, Momentum history/Week/Month, voice intention setup, and export.
 - Free Home and Momentum expose only today's progress; the weekly Home preview is Pro-only.
-- The local StoreKit product is configured for $4.99/month with a three-day
-  introductory trial. The same price and offer still must be created in App Store Connect.
+- The local StoreKit product is configured for $4.99/month with no introductory
+  trial. The same product and price still must be created in App Store Connect.
 - Momentum Day, Week, Month, and Progress History have been tested with removable simulator-only demo data.
 - The hardened Cloudflare gateway and all three server-owned `/v2` task
   endpoints are deployed. Live synthetic smoke tests passed for voice
@@ -23,8 +23,11 @@ This is the concise tracker for the work remaining after completion of UI Phases
   `/v2/listening/extract`. Release remains entirely on `/v1` until staged
   physical-device verification is complete.
 - Physical-iPhone verification passed for voice intentions, Voice Check-In,
-  and Listening Sessions. The immediate next work is the remaining production
-  security layer and Phase 7 release QA.
+  and Listening Sessions. Phase 1 Free/Pro implementation and local tests are
+  complete. The next approved phase is Phase 2 App Store Connect and public
+  website setup; production AI security follows only in Phase 3.
+- `YOUR_REMAINING_STEPS.md` is the controlling checklist for Scott's manual
+  account, website, Sandbox, TestFlight, and submission actions.
 
 ## Phase 6 — Settings, onboarding, privacy, and paywall
 
@@ -62,7 +65,12 @@ Debug AI paths are currently opted into their server-owned `/v2` routes.
 - [x] Enable and verify Check-In through `/v2`.
 - [x] Enable Listening Sessions through `/v2` in Debug.
 - [x] Verify Listening Sessions through `/v2` on a physical iPhone.
-- [ ] Add App Attest installation validation, server-side StoreKit verification, D1 entitlement/usage accounting, and per-install limits.
+- [ ] Before Phase 3 code, inspect the current client/Worker and obtain approval
+  for a minimum server authorization, entitlement, usage-limit, and spending-control plan.
+- [ ] Remove shipped reusable backend credentials and add server-side entitlement
+  verification plus reasonable per-install, request, duration, output, and daily ceilings.
+- [ ] Evaluate App Attest, D1, and App Store Server Notifications individually;
+  use them only when the approved version 1.0 design justifies them.
 - [ ] Move the iOS client to the task endpoints, validate in TestFlight, then retire the shared `APP_PROXY_TOKEN` path.
 
 The Cloudflare `OPENAI_API_KEY` remains independently rotatable without an app
@@ -81,7 +89,7 @@ migration has been made yet.
 - [ ] Test offline behavior and denied permissions.
 - [x] Test processing failure and recovery states.
 - [x] Test StoreKit failure and recovery states locally; App Store Sandbox remains below.
-- [ ] Configure and verify the $4.99/month product and three-day free trial in App Store Connect/Sandbox.
+- [ ] Configure and verify the $4.99/month product with no introductory trial in App Store Connect/Sandbox.
 - [ ] Complete final Debug and Release builds.
 - [ ] Review App Store metadata, privacy disclosures, and legal/support links.
 
@@ -103,7 +111,7 @@ migration has been made yet.
   automatically to the idle control. Offline transport recovery still needs a
   real-device/network test.
 - Local StoreKit configuration was rechecked at
-  `com.scottoliver.Attune.monthly`, $4.99/month, with a three-day free trial.
+  `com.scottoliver.Attune.monthly`, $4.99/month, with no introductory trial.
   App Store Connect/Sandbox configuration is still external and unverified.
 - Current-source generic-device Debug and Release builds passed after the QA
   fixes. Re-run both after Listening `/v2`, security, and TestFlight changes;
@@ -116,6 +124,23 @@ migration has been made yet.
 
 These flows are implemented but cannot be completely proven in the iOS Simulator.
 
+### Phase 1 Free/Pro checklist — pending physical iPhone and Sandbox
+
+- [ ] In a Debug build, open Settings > Developer and select `Free`.
+- [ ] With zero active intentions, create the first intention and confirm it saves.
+- [ ] With one active intention, tap Add and confirm the Attune Pro paywall opens.
+- [ ] Remove the active intention, save, reopen Intentions, and confirm a replacement can be created.
+- [ ] Confirm reaching 100% daily or weekly progress does not free the active-intention slot.
+- [ ] On the Record tab, confirm Free shows the Listening Sessions lock and its CTA opens the paywall.
+- [ ] Select `Pro`; confirm another intention can be created and Listening Sessions can start after permissions.
+- [ ] Create multiple intentions in Pro, switch to `Free`, and confirm all existing data remains readable/editable while Add is blocked until the active set is within the Free limit.
+- [ ] Select `System`; use an Apple Sandbox account to verify purchase, cancellation, pending/interrupted purchase, restore, expiration, reinstall, and entitlement recovery.
+- [ ] Confirm the Apple purchase sheet shows `com.scottoliver.Attune.monthly` at the localized equivalent of $4.99/month with no introductory trial.
+
+Automated Phase 1 coverage passed 16/16 tests on the iPhone 17 Pro simulator.
+Generic Debug simulator and unsigned Release-device builds passed. These local
+results do not verify real Apple Sandbox, TestFlight, reinstall, or expiration behavior.
+
 - [x] Verify successful Voice Check-In transcription and saved-result UI.
 - [x] Verify successful Listening Session transcription.
 - [x] Verify Debug voice intention creation through `/v2/intentions/parse` on a
@@ -126,12 +151,16 @@ These flows are implemented but cannot be completely proven in the iOS Simulator
 
 ## Exact next handoff
 
-1. Implement App Attest installation validation, server-side StoreKit
-   verification, D1 entitlement/usage accounting, and per-install limits.
-2. Complete the remaining Phase 7 physical accessibility, offline, and real
-   phone/audio-interruption checks.
-3. Keep `/v1/chat/completions` and Release routing intact until TestFlight
-   validation supports moving production to the server-owned task endpoints.
+1. Open `YOUR_REMAINING_STEPS.md`; optionally complete its Phase 1 physical
+   Free/Pro checklist, then begin Phase 2 manual App Store Connect and website work.
+2. Verify each external account action before marking it complete. Current
+   unknowns include Apple membership, agreements/tax/banking, support email,
+   GitHub Pages publication, subscription creation, and App Privacy answers.
+3. Stop after the Phase 2 report. Do not begin App Attest, server-side
+   StoreKit verification, usage accounting, or other Phase 3 AI-security code
+   without first presenting and receiving approval for the narrow file-level plan.
+   Do not preselect App Attest, D1, or App Store Server Notifications.
+   Keep Release routing intact until the complete TestFlight release-candidate flow passes.
 
 ### Voice Check-In physical test checklist
 
@@ -185,12 +214,15 @@ These flows are implemented but cannot be completely proven in the iOS Simulator
 
 ## Public pages and App Store setup
 
+The detailed, ordered manual checklist is maintained in
+`YOUR_REMAINING_STEPS.md`; keep these summary boxes synchronized with it.
+
 - [ ] Add the private support/privacy email.
 - [ ] Publish the prepared `/docs` website through GitHub Pages.
 - [ ] Verify the landing, Privacy, Support, and Terms URLs.
 - [ ] Enter the Privacy URL in App Store Connect.
 - [ ] Complete the App Privacy answers in App Store Connect.
-- [ ] Match `com.scottoliver.Attune.monthly` to $4.99/month with a three-day free-trial introductory offer in App Store Connect.
+- [ ] Match `com.scottoliver.Attune.monthly` to $4.99/month with no introductory offer in App Store Connect.
 - [ ] Create an approved checkpoint commit when the UI is accepted.
 - [ ] Prepare and upload a TestFlight build with Scott's approval.
 - [ ] Submit to the App Store only with Scott's approval.

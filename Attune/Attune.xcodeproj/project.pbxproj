@@ -12,6 +12,7 @@
 
 /* Begin PBXFileReference section */
 		D251D06F30228ECD002565CD /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
+		D2A1000130240001002565CD /* AttuneTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AttuneTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2F8FEB12F2E7D5D00DB8E5E /* Attune.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Attune.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -26,6 +27,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		D2A1000230240001002565CD /* AttuneTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AttuneTests;
+			sourceTree = "<group>";
+		};
 		D2F8FEB32F2E7D5D00DB8E5E /* Attune */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -37,6 +43,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		D2A1000430240001002565CD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D2F8FEAE2F2E7D5D00DB8E5E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -60,6 +73,7 @@
 			isa = PBXGroup;
 			children = (
 				D2F8FEB32F2E7D5D00DB8E5E /* Attune */,
+				D2A1000230240001002565CD /* AttuneTests */,
 				D251D06E30228ECD002565CD /* Frameworks */,
 				D2F8FEB22F2E7D5D00DB8E5E /* Products */,
 			);
@@ -69,6 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				D2F8FEB12F2E7D5D00DB8E5E /* Attune.app */,
+				D2A1000130240001002565CD /* AttuneTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,6 +91,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		D2A1000630240001002565CD /* AttuneTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D2A1000B30240001002565CD /* Build configuration list for PBXNativeTarget "AttuneTests" */;
+			buildPhases = (
+				D2A1000330240001002565CD /* Sources */,
+				D2A1000430240001002565CD /* Frameworks */,
+				D2A1000530240001002565CD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D2A1000830240001002565CD /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D2A1000230240001002565CD /* AttuneTests */,
+			);
+			name = AttuneTests;
+			packageProductDependencies = (
+			);
+			productName = AttuneTests;
+			productReference = D2A1000130240001002565CD /* AttuneTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		D2F8FEB02F2E7D5D00DB8E5E /* Attune */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D2F8FEBE2F2E7D5F00DB8E5E /* Build configuration list for PBXNativeTarget "Attune" */;
@@ -108,6 +146,10 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					D2A1000630240001002565CD = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = D2F8FEB02F2E7D5D00DB8E5E;
+					};
 					D2F8FEB02F2E7D5D00DB8E5E = {
 						CreatedOnToolsVersion = 26.2;
 						SystemCapabilities = {
@@ -133,11 +175,19 @@
 			projectRoot = "";
 			targets = (
 				D2F8FEB02F2E7D5D00DB8E5E /* Attune */,
+				D2A1000630240001002565CD /* AttuneTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		D2A1000530240001002565CD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D2F8FEAF2F2E7D5D00DB8E5E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -148,6 +198,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		D2A1000330240001002565CD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D2F8FEAD2F2E7D5D00DB8E5E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -157,7 +214,52 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		D2A1000830240001002565CD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D2F8FEB02F2E7D5D00DB8E5E /* Attune */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		D2A1000930240001002565CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BLAUCQ8H26;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks");
+				PRODUCT_BUNDLE_IDENTIFIER = com.scottoliver.AttuneTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Attune.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Attune";
+			};
+			name = Debug;
+		};
+		D2A1000A30240001002565CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BLAUCQ8H26;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks");
+				PRODUCT_BUNDLE_IDENTIFIER = com.scottoliver.AttuneTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Attune.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Attune";
+			};
+			name = Release;
+		};
 		D2F8FEBC2F2E7D5F00DB8E5E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -364,6 +466,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		D2A1000B30240001002565CD /* Build configuration list for PBXNativeTarget "AttuneTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D2A1000930240001002565CD /* Debug */,
+				D2A1000A30240001002565CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		D2F8FEAC2F2E7D5D00DB8E5E /* Build configuration list for PBXProject "Attune" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
