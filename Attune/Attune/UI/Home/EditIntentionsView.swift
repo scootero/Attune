@@ -47,6 +47,7 @@ struct DraftIntention: Identifiable {
 
 struct EditIntentionsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
     
     /// Draft intentions (max 10, from DraftIntention.maxCount)
@@ -393,7 +394,7 @@ struct EditIntentionsView: View {
     
     /// Ensures only the Add card is expanded.
     private func collapseAllForAdd() {
-        withAnimation(.easeInOut(duration: 0.2)) { // smooth expand animation
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { // smooth expand animation
             expandedEditId = nil // collapse any open edit row
             isAddExpanded = true // expand add card
         }
@@ -401,7 +402,7 @@ struct EditIntentionsView: View {
     
     /// Toggles expansion for a specific intention id while collapsing others.
     private func toggleEditExpansion(for id: String) {
-        withAnimation(.easeInOut(duration: 0.2)) { // animate expand/collapse
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { // animate expand/collapse
             if expandedEditId == id { // if already open
                 expandedEditId = nil // collapse
             } else {
@@ -414,7 +415,7 @@ struct EditIntentionsView: View {
     /// Applies parsed intentions into the Add card fields (first parsed only).
     private func applyParsedToAddDraft(_ parsed: [ParsedIntention]) {
         guard let first = parsed.first else { return } // nothing to apply
-        withAnimation(.easeInOut(duration: 0.2)) { // animate opening add card when populated
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { // animate opening add card when populated
             isAddExpanded = true // open add card to show populated fields
             expandedEditId = nil // ensure exclusivity
         }
@@ -984,6 +985,8 @@ private struct IntentionCardVariation {
 /// Compact pill button style for Record Intentions: red gradient, soft shadow, centered.
 /// Kept local to EditIntentionsView; minimal scope per constraints.
 private struct RecordIntentionsPillStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold)) // readable but not oversized
@@ -1002,8 +1005,8 @@ private struct RecordIntentionsPillStyle: ButtonStyle {
             )
             .clipShape(Capsule()) // pill/oval shape
             .shadow(color: Color.black.opacity(0.14), radius: 4, x: 0, y: 2) // flatter shadow keeps CTA crisp without heavy glow
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1.0)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 

@@ -151,7 +151,7 @@ class SessionStore {
     func recoverIncompleteSessionsOnLaunch() -> [Session] {
         print("[SessionStore] Starting recovery on app launch")
         
-        var sessions = loadAllSessions()
+        let sessions = loadAllSessions()
         var modifiedSessions: [Session] = []
         
         for var session in sessions {

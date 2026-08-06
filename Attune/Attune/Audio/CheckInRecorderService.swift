@@ -120,19 +120,19 @@ class CheckInRecorderService: NSObject, ObservableObject {
     /// Same configuration as RecorderService: record category, Bluetooth mic support
     private func configureAudioSession() throws {
         let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .default, options: [.allowBluetooth])
+        try audioSession.setCategory(.record, mode: .default, options: [.allowBluetoothHFP])
         try audioSession.setActive(true)
     }
     
     // MARK: - Timer
     
     private func startElapsedTimer() {
-        elapsedTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.elapsedSec += 1
-            }
-        }
+        elapsedTimer = Timer(timeInterval: 1.0, target: self, selector: #selector(incrementElapsedTimer), userInfo: nil, repeats: true)
         RunLoop.current.add(elapsedTimer!, forMode: .common)
+    }
+
+    @objc private func incrementElapsedTimer() {
+        elapsedSec += 1
     }
     
     private func stopElapsedTimer() {

@@ -4,7 +4,7 @@ Use this document exactly. Do steps in order.
 
 Goal:
 - Launch Attune on the App Store
-- One subscription only: `$5.99 / month`
+- One subscription only: `$4.99 / month`
 - Keep OpenAI key off the iPhone app (Cloudflare Worker proxy)
 
 Tech choice:
@@ -47,18 +47,18 @@ Tech choice:
 | Field 1 | `privacyPolicy` |
 | Field 2 | `termsOfUse` |
 | Field 3 | `support` |
-| Current placeholders | `https://example.com/attune/privacy`, `https://example.com/attune/terms`, `https://example.com/attune/support` |
+| Current placeholders | `https://scootero.github.io/Attune/privacy/`, `https://scootero.github.io/Attune/terms/`, `https://scootero.github.io/Attune/support/` |
 
 ### Subscription product (App Store Connect)
 | Field | Exact value |
 |------|-------------|
 | Subscription Group Name | `Attune Premium` |
-| Subscription Reference Name | `Attune Monthly` |
+| Subscription Reference Name | `Attune Pro Monthly` |
 | Product ID | `com.scottoliver.Attune.monthly` |
 | Duration | `1 Month` |
-| Price | `$5.99` |
-| Display Name | `Attune Monthly` |
-| Description | `Unlimited Attune check-ins, recording, and AI insights.` |
+| Price | `$4.99` |
+| Display Name | `Attune Pro Monthly` |
+| Description | `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.` |
 
 ### URLs the human must visit
 | Purpose | URL |
@@ -203,7 +203,7 @@ Complete:
 - Banking
 - Tax
 
-Required before Apple will sell the `$5.99` subscription.
+Required before Apple will sell the `$4.99` subscription.
 
 ---
 
@@ -223,12 +223,12 @@ Enter these exact values:
 | Field | Enter this |
 |------|-------------|
 | Subscription Group Name | `Attune Premium` |
-| Reference Name | `Attune Monthly` |
+| Reference Name | `Attune Pro Monthly` |
 | Product ID | `com.scottoliver.Attune.monthly` |
 | Duration | `1 Month` |
-| Price | `$5.99` |
-| Display Name | `Attune Monthly` |
-| Description | `Unlimited Attune check-ins, recording, and AI insights.` |
+| Price | `$4.99` |
+| Display Name | `Attune Pro Monthly` |
+| Description | `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.` |
 
 ---
 
@@ -285,7 +285,7 @@ Attune records voice only when the user starts a session or check-in.
 Background audio is only for an active user-started recording.
 Speech may use Apple cloud speech recognition.
 Transcripts are sent to OpenAI through Attune’s Cloudflare Worker proxy after the user accepts the in-app AI disclosure.
-Subscription product ID: com.scottoliver.Attune.monthly ($5.99/month).
+Subscription product ID: com.scottoliver.Attune.monthly ($4.99/month).
 To demo: accept privacy sheet → start check-in/record → speak briefly → stop → wait for processing.
 Also test Subscribe and Restore Purchases on the paywall.
 ```

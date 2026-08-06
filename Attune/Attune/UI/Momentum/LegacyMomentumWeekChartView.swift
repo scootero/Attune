@@ -17,6 +17,7 @@ private enum LegacyWeekDimension: String, CaseIterable {
 
 /// Renders a 7-day momentum chart with multiple intention bars per day.
 struct LegacyMomentumWeekChartView: View { // View container for the weekly chart.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let days: [LegacyWeekDayChartData] // Input data: per-day columns with intention bars.
     let yAxisMax: Double // Axis cap (100 or 150) to scale bar heights.
     @State private var dimension: LegacyWeekDimension = .threeD
@@ -267,7 +268,7 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
         HStack(spacing: 2) {
             ForEach(LegacyWeekDimension.allCases, id: \.self) { option in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
                         dimension = option
                     }
                 } label: {
@@ -275,7 +276,7 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(dimension == option ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                        .frame(minHeight: 44)
                         .background {
                             if dimension == option {
                                 Capsule().fill(AttuneTheme.accent.opacity(0.22))
@@ -283,6 +284,7 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(dimension == option ? .isSelected : [])
             }
         }
         .padding(2)

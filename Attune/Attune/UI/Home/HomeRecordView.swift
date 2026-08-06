@@ -156,6 +156,7 @@ struct HomeRecordView: View {
                     .fill(AttuneTheme.recording)
                     .frame(width: 11, height: 11)
                     .shadow(color: AttuneTheme.recording.opacity(0.75), radius: 7)
+                    .accessibilityHidden(true)
                 Text("Listening Session active")
                     .font(.headline)
                     .foregroundStyle(AttuneTheme.textPrimary)
@@ -164,6 +165,9 @@ struct HomeRecordView: View {
                     .font(.title3.bold().monospacedDigit())
                     .foregroundStyle(AttuneTheme.textPrimary)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Listening Session active")
+            .accessibilityValue(formattedDuration)
 
             Text("Keep talking naturally. Repeated ideas are grouped into recurring themes in Insights.")
                 .font(.subheadline)
@@ -249,7 +253,7 @@ struct HomeRecordView: View {
             Label(title, systemImage: icon)
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
+                .frame(minHeight: 44)
                 .background(AttuneTheme.surfaceStrong, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(AttuneTheme.border))
         }
@@ -289,6 +293,9 @@ struct HomeRecordView: View {
         .padding(14)
         .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous).stroke(color.opacity(0.26)))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityValue(detail)
     }
 
     private var formattedDuration: String {

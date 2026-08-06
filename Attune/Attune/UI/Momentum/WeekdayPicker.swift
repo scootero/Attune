@@ -64,6 +64,8 @@ struct WeekdayPicker: View {
         .buttonStyle(.plain)
         .disabled(day.isFutureDay)
         .accessibilityLabel(day.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+        .accessibilityValue(day.isFutureDay ? "Unavailable, future date" : (isSelected ? "Selected" : "Available"))
+        .accessibilityHint(day.isFutureDay ? "" : "Shows Momentum for this day")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 

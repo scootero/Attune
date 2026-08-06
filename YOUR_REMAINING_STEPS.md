@@ -7,7 +7,7 @@ The app code for subscriptions is already done.
 - StoreKit 2 subscription manager
 - Paywall with Subscribe + Restore Purchases
 - Product ID wired: `com.scottoliver.Attune.monthly`
-- Free tier: **3 check-ins per day**
+- Free tier: **one active intention and one Voice Check-In per day**
 - Paid unlocks: unlimited check-ins, All Day recording, voice Record Intentions
 - Settings → Subscription section
 - Local StoreKit test file: `Attune/Products.storekit`
@@ -28,12 +28,12 @@ The app code for subscriptions is already done.
 | Secrets file | `/Users/scott/Desktop/Attune/Attune/Attune/Attune/AI/Secrets.swift` |
 | Legal links file | `/Users/scott/Desktop/Attune/Attune/Attune/Attune/App/LegalLinks.swift` |
 | Subscription Group | `Attune Premium` |
-| Reference Name | `Attune Monthly` |
+| Reference Name | `Attune Pro Monthly` |
 | Product ID | `com.scottoliver.Attune.monthly` |
 | Duration | `1 Month` |
-| Price | `$5.99` |
-| Display Name | `Attune Monthly` |
-| Description | `Unlimited Attune check-ins, recording, and AI insights.` |
+| Price | `$4.99` |
+| Display Name | `Attune Pro Monthly` |
+| Description | `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.` |
 | Xcode project | `/Users/scott/Desktop/Attune/Attune/Attune/Attune.xcodeproj` |
 
 ---
@@ -118,7 +118,7 @@ Complete:
 - Banking
 - Tax
 
-Required before Apple will sell `$5.99/month`.
+Required before Apple will sell `$4.99/month`.
 
 ---
 
@@ -133,12 +133,12 @@ Create:
 
 | Field | Enter |
 |------|------|
-| Reference Name | `Attune Monthly` |
+| Reference Name | `Attune Pro Monthly` |
 | Product ID | `com.scottoliver.Attune.monthly` |
 | Duration | `1 Month` |
-| Price | `$5.99` |
-| Display Name | `Attune Monthly` |
-| Description | `Unlimited Attune check-ins, recording, and AI insights.` |
+| Price | `$4.99` |
+| Display Name | `Attune Pro Monthly` |
+| Description | `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.` |
 
 Also in Xcode:
 1. Select target `Attune`
@@ -192,8 +192,8 @@ Attune records voice only when the user starts a session or check-in.
 Background audio is only for an active user-started recording.
 Speech may use Apple cloud speech recognition.
 Transcripts are sent to OpenAI through Attune’s Cloudflare Worker proxy after the user accepts the in-app AI disclosure.
-Subscription product ID: com.scottoliver.Attune.monthly ($5.99/month).
-Free users get 3 check-ins/day. Subscribe unlocks unlimited check-ins, All Day recording, and voice intentions.
+Subscription product ID: com.scottoliver.Attune.monthly ($4.99/month).
+Free users get one active intention and one Voice Check-In per day. Attune Pro adds more intentions, unlimited check-ins, Listening Sessions, Insights, Momentum history, voice setup, and export.
 To demo: accept privacy sheet → start check-in → speak briefly → stop.
 Also test Settings → Subscribe and Restore Purchases.
 ```

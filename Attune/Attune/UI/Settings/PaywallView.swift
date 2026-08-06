@@ -108,6 +108,7 @@ struct PaywallView: View {
                     .font(.system(size: 36, weight: .semibold))
                     .foregroundStyle(AttuneTheme.warning)
             }
+            .accessibilityHidden(true)
 
             VStack(spacing: 6) {
                 Text(SubscriptionConfig.displayName)
@@ -136,6 +137,7 @@ struct PaywallView: View {
                 .foregroundStyle(AttuneTheme.accent)
                 .frame(width: 40, height: 40)
                 .background(AttuneTheme.accent.opacity(0.12), in: Circle())
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
@@ -149,6 +151,7 @@ struct PaywallView: View {
         }
         .padding(16)
         .attuneCard()
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -216,6 +219,7 @@ struct PaywallView: View {
             }
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(AttuneTheme.accent)
+            .frame(minHeight: 44)
             .disabled(subscriptionManager.isBusy || subscriptionManager.isLoadingProduct)
         }
     }
@@ -235,10 +239,13 @@ struct PaywallView: View {
 
     private var legalFooter: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 14) {
-                Link("Privacy", destination: LegalLinks.privacyPolicy)
-                Link("Terms", destination: LegalLinks.termsOfUse)
-                Link("Apple EULA", destination: LegalLinks.appleStandardEULA)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 14) {
+                    legalLinks
+                }
+                VStack(spacing: 0) {
+                    legalLinks
+                }
             }
             Text(legalPaymentText)
                 .multilineTextAlignment(.center)
@@ -246,6 +253,16 @@ struct PaywallView: View {
         .font(.caption)
         .foregroundStyle(AttuneTheme.textTertiary)
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var legalLinks: some View {
+        Link("Privacy", destination: LegalLinks.privacyPolicy)
+            .frame(minHeight: 44)
+        Link("Terms", destination: LegalLinks.termsOfUse)
+            .frame(minHeight: 44)
+        Link("Apple EULA", destination: LegalLinks.appleStandardEULA)
+            .frame(minHeight: 44)
     }
 
     private var purchaseButtonTitle: String {

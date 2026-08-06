@@ -10,6 +10,7 @@ import SwiftUI
 struct OnboardingView: View {
     let onComplete: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedPage = 0
 
     private let pages: [OnboardingPage] = [
@@ -63,65 +64,69 @@ struct OnboardingView: View {
                         Capsule()
                             .fill(index == selectedPage ? AttuneTheme.accent : AttuneTheme.textTertiary.opacity(0.45))
                             .frame(width: index == selectedPage ? 24 : 8, height: 8)
-                            .animation(.easeOut(duration: 0.2), value: selectedPage)
+                            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: selectedPage)
                     }
                 }
                 .accessibilityHidden(true)
                 .padding(.bottom, 22)
-
-                Button(action: advance) {
-                    Text(selectedPage == pages.count - 1 ? "Continue" : "Next")
-                }
-                .buttonStyle(AttunePrimaryButtonStyle())
-                .padding(.horizontal, 24)
-                .padding(.bottom, 28)
-                .accessibilityHint(selectedPage == pages.count - 1 ? "Continues to voice and privacy information" : "Shows the next introduction page")
             }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Button(action: advance) {
+                Text(selectedPage == pages.count - 1 ? "Continue" : "Next")
+            }
+            .buttonStyle(AttunePrimaryButtonStyle())
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
+            .accessibilityHint(selectedPage == pages.count - 1 ? "Continues to voice and privacy information" : "Shows the next introduction page")
         }
         .preferredColorScheme(.dark)
     }
 
     private func onboardingPage(_ page: OnboardingPage) -> some View {
-        VStack(spacing: 26) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 26) {
+                ZStack {
+                    Circle()
+                        .fill(AttuneTheme.accent.opacity(0.14))
+                        .frame(width: 132, height: 132)
+                    Circle()
+                        .stroke(AttuneTheme.accent.opacity(0.28), lineWidth: 1)
+                        .frame(width: 132, height: 132)
+                    Image(systemName: page.icon)
+                        .font(.system(size: 48, weight: .medium))
+                        .foregroundStyle(AttuneTheme.accent)
+                }
+                .accessibilityHidden(true)
 
-            ZStack {
-                Circle()
-                    .fill(AttuneTheme.accent.opacity(0.14))
-                    .frame(width: 132, height: 132)
-                Circle()
-                    .stroke(AttuneTheme.accent.opacity(0.28), lineWidth: 1)
-                    .frame(width: 132, height: 132)
-                Image(systemName: page.icon)
-                    .font(.system(size: 48, weight: .medium))
-                    .foregroundStyle(AttuneTheme.accent)
+                VStack(spacing: 12) {
+                    Text(page.eyebrow)
+                        .font(.caption.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundStyle(AttuneTheme.accent)
+                    Text(page.title)
+                        .font(.largeTitle.bold())
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(AttuneTheme.textPrimary)
+                    Text(page.detail)
+                        .font(.body)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 28)
             }
-
-            VStack(spacing: 12) {
-                Text(page.eyebrow)
-                    .font(.caption.weight(.bold))
-                    .tracking(1.2)
-                    .foregroundStyle(AttuneTheme.accent)
-                Text(page.title)
-                    .font(.largeTitle.bold())
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(AttuneTheme.textPrimary)
-                Text(page.detail)
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(AttuneTheme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, 28)
-
-            Spacer()
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 28)
         }
+        .scrollIndicators(.hidden)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(page.eyebrow). \(page.title). \(page.detail)")
     }
 
     private func advance() {
         if selectedPage < pages.count - 1 {
-            withAnimation(.easeOut(duration: 0.22)) {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
                 selectedPage += 1
             }
         } else {

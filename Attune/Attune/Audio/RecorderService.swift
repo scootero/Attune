@@ -242,7 +242,7 @@ class RecorderService: NSObject, ObservableObject {
         let audioSession = AVAudioSession.sharedInstance()
         
         // Set category to record, with Bluetooth microphone support
-        try audioSession.setCategory(.record, mode: .default, options: [.allowBluetooth])
+        try audioSession.setCategory(.record, mode: .default, options: [.allowBluetoothHFP])
         
         // Activate the audio session
         try audioSession.setActive(true)
@@ -377,11 +377,7 @@ class RecorderService: NSObject, ObservableObject {
     private func startTimers() {
         // Elapsed timer: fires every 1 second
         // Use .common run loop mode to continue firing when app is backgrounded
-        let elapsed = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.elapsedSec += 1
-            }
-        }
+        let elapsed = Timer(timeInterval: 1.0, target: self, selector: #selector(incrementElapsedTimer), userInfo: nil, repeats: true)
         RunLoop.current.add(elapsed, forMode: .common)
         elapsedTimer = elapsed
         
@@ -399,6 +395,10 @@ class RecorderService: NSObject, ObservableObject {
         
         rotationTimer?.invalidate()
         rotationTimer = nil
+    }
+
+    @objc private func incrementElapsedTimer() {
+        elapsedSec += 1
     }
     
     // MARK: - Interruption Handling
@@ -451,6 +451,8 @@ class RecorderService: NSObject, ObservableObject {
                 reason = "app suspended"
             case .builtInMicMuted:
                 reason = "mic muted"
+            case .routeDisconnected:
+                reason = "route disconnected"
             @unknown default:
                 reason = "unknown"
             }

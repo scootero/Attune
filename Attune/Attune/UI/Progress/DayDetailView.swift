@@ -88,7 +88,7 @@ struct DayDetailView: View {
             }
             
             // Intentions with expandable entries
-            if let set = data.intentionSet, !data.intentions.isEmpty {
+            if data.intentionSet != nil, !data.intentions.isEmpty {
                 Section("Intentions") {
                     ForEach(data.intentions, id: \.id) { intention in
                         intentionSection(dayData: data, intention: intention)

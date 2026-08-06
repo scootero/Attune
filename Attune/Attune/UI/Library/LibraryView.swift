@@ -79,6 +79,7 @@ struct LibraryView: View {
                 Image(systemName: icon)
                     .font(.caption)
                     .foregroundStyle(AttuneTheme.accent)
+                    .accessibilityHidden(true)
                 Text("\(value)")
                     .font(.headline.monospacedDigit())
                     .foregroundStyle(AttuneTheme.textPrimary)
@@ -88,6 +89,8 @@ struct LibraryView: View {
                 .foregroundStyle(AttuneTheme.textSecondary)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label), \(value)")
     }
 
     private var themesSection: some View {

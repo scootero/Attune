@@ -85,6 +85,8 @@ struct ExtractorService {
         
         // Try extraction (with one retry on decode failure)
         let extractedItems = await attemptExtraction(
+            transcriptText: transcriptText,
+            priorContextText: priorContextText,
             systemMessage: systemMessage,
             userMessage: userMessage,
             schema: schema,
@@ -107,6 +109,8 @@ struct ExtractorService {
     
     /// Attempts extraction with optional retry on decode failure
     private static func attemptExtraction(
+        transcriptText: String,
+        priorContextText: String?,
         systemMessage: String,
         userMessage: String,
         schema: [String: Any],
@@ -119,13 +123,24 @@ struct ExtractorService {
         let sessionShort = AppLogger.shortId(sessionId)
         
         do {
-            // Call OpenAI with system + user messages
-            let jsonString = try await OpenAIClient.chatCompletion(
-                model: defaultModel,
-                systemMessage: systemMessage,
-                userMessage: userMessage,
-                schema: schema
-            )
+            let jsonString: String
+            if OpenAIClient.usesServerOwnedV2(.listening) {
+                // Debug rollout: keep the existing segment and prior-context
+                // inputs while the Worker owns the extraction policy.
+                var body: [String: Any] = ["transcript": transcriptText]
+                if let priorContextText, !priorContextText.isEmpty {
+                    body["priorContext"] = priorContextText
+                }
+                jsonString = try await OpenAIClient.serverOwnedTask(.listening, body: body)
+            } else {
+                // Release fallback remains unchanged until v2 comparison is approved.
+                jsonString = try await OpenAIClient.chatCompletion(
+                    model: defaultModel,
+                    systemMessage: systemMessage,
+                    userMessage: userMessage,
+                    schema: schema
+                )
+            }
             
             // Decode strict JSON response
             let data = jsonString.data(using: .utf8)!
@@ -154,6 +169,8 @@ struct ExtractorService {
                 let strongerSystemMessage = systemMessage + "\n\nIMPORTANT: Return ONLY valid JSON matching the schema. No additional text."
                 
                 return await attemptExtraction(
+                    transcriptText: transcriptText,
+                    priorContextText: priorContextText,
                     systemMessage: strongerSystemMessage,
                     userMessage: userMessage,
                     schema: schema,

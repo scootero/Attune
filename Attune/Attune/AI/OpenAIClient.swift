@@ -65,6 +65,16 @@ struct OpenAIChatResponse: Codable {
 /// Minimal client for OpenAI Chat Completions via Attune's Cloudflare proxy.
 /// The real OpenAI key stays on the server; the app only sends appProxyToken.
 struct OpenAIClient {
+
+    /// Server-owned task routes used during the staged v2 migration.
+    /// Keep each feature opt-in separate so Debug testing cannot silently move
+    /// every AI workflow at once. Release builds remain on the proven v1 route
+    /// until the corresponding task has been compared and approved.
+    enum ServerOwnedTask: String {
+        case intentions = "/v2/intentions/parse"
+        case checkIn = "/v2/check-ins/extract"
+        case listening = "/v2/listening/extract"
+    }
     
     // MARK: - Configuration
     
@@ -73,8 +83,78 @@ struct OpenAIClient {
     
     /// Default timeout interval (30 seconds)
     private static let timeoutInterval: TimeInterval = 30.0
+
+    static func usesServerOwnedV2(_ task: ServerOwnedTask) -> Bool {
+        #if DEBUG
+        // Keep every feature independently switchable during physical-device rollout.
+        let useV2Intentions = true
+        let useV2CheckIns = true
+        let useV2Listening = true
+
+        switch task {
+        case .intentions:
+            return useV2Intentions
+        case .checkIn:
+            return useV2CheckIns
+        case .listening:
+            return useV2Listening
+        }
+        #else
+        return false
+        #endif
+    }
     
     // MARK: - Public API
+
+    /// Calls a server-owned v2 task and returns its direct structured JSON.
+    /// The Worker—not the app—chooses the model, prompts, schema, and limits.
+    static func serverOwnedTask(
+        _ task: ServerOwnedTask,
+        body: [String: Any]
+    ) async throws -> String {
+        guard AIPrivacyConsent.hasAccepted else {
+            throw OpenAIClientError.privacyConsentRequired
+        }
+
+        let startTime = Date()
+        let url = URL(string: "\(baseURL)\(task.rawValue)")!
+        var request = URLRequest(url: url, timeoutInterval: timeoutInterval)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(Secrets.appProxyToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        AppLogger.log(AppLogger.AI, "v2_request_start task=\(task.rawValue) body_bytes=\(request.httpBody?.count ?? 0)")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let elapsedMs = Int(Date().timeIntervalSince(startTime) * 1000)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            AppLogger.log(AppLogger.ERR, "v2_request_failed task=\(task.rawValue) error=\"invalid response type\"")
+            throw OpenAIClientError.invalidResponse
+        }
+
+        AppLogger.log(
+            AppLogger.AI,
+            "v2_response_received task=\(task.rawValue) status=\(httpResponse.statusCode) ms=\(elapsedMs) bytes=\(data.count)"
+        )
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let bodyString = String(data: data, encoding: .utf8)
+            AppLogger.log(
+                AppLogger.ERR,
+                "v2_request_failed task=\(task.rawValue) status=\(httpResponse.statusCode) ms=\(elapsedMs) error=\"\(bodyString ?? "no body")\""
+            )
+            throw OpenAIClientError.httpError(statusCode: httpResponse.statusCode, body: bodyString)
+        }
+
+        guard httpResponse.value(forHTTPHeaderField: "X-Attune-Contract-Version") == "1",
+              let jsonString = String(data: data, encoding: .utf8) else {
+            AppLogger.log(AppLogger.ERR, "v2_request_failed task=\(task.rawValue) error=\"invalid contract response\"")
+            throw OpenAIClientError.invalidResponse
+        }
+
+        return jsonString
+    }
     
     /// Calls OpenAI Chat Completions API with structured output (json_schema).
     /// - Parameters:

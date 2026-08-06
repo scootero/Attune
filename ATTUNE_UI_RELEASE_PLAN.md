@@ -105,7 +105,7 @@ Acceptance: app builds; all four tabs work; Settings opens and closes; Home-to-M
 - [x] Add compact summaries and consistent intention color/symbol identity.
 - [x] Validate Day, Week, and Month with removable simulator-only historical data built from Scott's existing intentions.
 
-### Phase 6 — Settings, onboarding, privacy, and paywall (UI implementation complete; production AI decision pending)
+### Phase 6 — Settings, onboarding, privacy, and paywall (UI implementation complete; production AI rollout pending)
 
 - [x] Reorganize Settings into Membership, Notifications, Privacy & Data, and Support; do not invent an account system the app does not have.
 - [x] Add readable microphone, speech-recognition, and notification permission status plus an iOS Settings entry point.
@@ -113,13 +113,25 @@ Acceptance: app builds; all four tabs work; Settings opens and closes; Home-to-M
 - [x] Add short benefit-led onboarding followed by the existing AI/privacy disclosure.
 - [x] Brand and validate the Attune Pro paywall and StoreKit loading/unavailable/error states.
 - [x] Polish About, support, legal, and data-request entry points.
-- [ ] Finalize provider-specific AI disclosure and production Worker controls after Scott approves the Cloudflare/OpenAI architecture.
+- [ ] Finalize provider-specific AI disclosure after the approved Cloudflare/OpenAI gateway rollout is complete.
+
+### Production AI gateway — staged separately from UI phases
+
+- [x] Approve Cloudflare as the server-owned OpenAI gateway and reuse its existing OpenAI secret.
+- [x] Implement backward-compatible request validation, safe limits, timeout handling, an emergency switch, metadata-only logging, and local contract tests.
+- [x] Deploy after Scott approves the reviewed Worker diff; live `/v1` verification passed.
+- [x] Implement, deploy, and live-smoke-test server-owned task endpoints for Check-In, voice intentions, and Listening Session extraction.
+- [x] Add a per-feature Debug-only iOS `/v2` switch and enable voice intention parsing first; Debug and Release builds pass and Release remains on `/v1`.
+- [x] Physically verify Debug voice intention parsing through `/v2`.
+- [ ] Migrate and physically verify Check-In through `/v2`, followed by Listening Sessions.
+- [ ] Add App Attest, StoreKit verification, D1 usage/entitlement accounting, and per-install limits.
+- [ ] Migrate the app through TestFlight and retire the shared proxy-token endpoint after physical-device validation.
 
 ### Phase 7 — Accessibility, release QA, and marketing capture
 
 - [ ] VoiceOver labels/hints and non-color status communication.
 - [ ] Dynamic Type, contrast, Reduce Motion, and touch-target audit.
-- [ ] Small/large iPhone and iPad checks.
+- [x] Small/large iPhone and iPad simulator checks.
 - [ ] Offline, denied-permission, StoreKit, and processing recovery checks.
 - [ ] Debug and Release builds.
 - [ ] App Store metadata/privacy/link review.
@@ -227,6 +239,22 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - Improved StoreKit loading, unavailable, purchase, restore, and trial states without changing the product ID or Release entitlement verification.
 - Left the existing Cloudflare/OpenAI request architecture and provider-specific disclosure unchanged pending Scott's requested production-API discussion.
 
+### 2026-08-05 — Production AI gateway rollout checkpoint
+
+- Deployed and live-verified the hardened backward-compatible `/v1/chat/completions` route.
+- Added, deployed, and live-smoke-tested server-owned `/v2` routes for voice
+  intentions, Voice Check-In, and Listening Session extraction. Each returned
+  HTTP 200, contract version 1, the expected response shape, and a request ID;
+  an unauthenticated probe correctly returned 401.
+- Added a shared iOS `/v2` task client with independent Debug-only feature
+  switches. Enabled voice intention parsing first; Check-In and Listening
+  Sessions remain on `/v1`, and all Release routing remains on `/v1`.
+- Preserved the existing parser, progress persistence, extraction queue, local
+  storage, UI, and Debug premium bypass. No Momentum files were changed for
+  this rollout.
+- Detailed request contracts and migration status are in
+  `backend/openai-proxy/V2_API.md`.
+
 ## Verification log
 
 - Pre-change build: succeeded for iPhone 17 Pro simulator on iOS 26.5.
@@ -272,7 +300,43 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - The StoreKit trial CTA uses Apple's eligibility result. Directly launching the Release app outside the Xcode StoreKit test session correctly showed the unavailable/fallback state; the real three-day trial remains an App Store Connect/Sandbox verification item.
 - Release launch purged simulator-only demo history by design. The last successful Debug build was reinstalled and the removable 17-check-in/68-entry demo set was reloaded for the concurrent Momentum work.
 - Final current-source Debug and Release builds succeeded after the subscription update; `git diff --check` passed. The latest Debug app is installed with demo data loaded and Momentum open.
+- Production Worker tests passed 20/20 after deployment; all three live `/v2`
+  synthetic task checks passed.
+- The first staged iOS migration builds successfully in Debug and Release, and
+  Scott confirmed physical-iPhone voice intention verification passed.
+- Phase 7 simulator QA passed iPhone 17e, iPhone 17 Pro, iPhone 17 Pro Max, and
+  iPad mini layouts; largest Accessibility Dynamic Type and Increase Contrast
+  were also inspected. Accessibility-sized Home headers/cards now stack, core
+  statuses include text/icon meaning, press/expansion animations honor Reduce
+  Motion, and paywall secondary/legal controls retain 44-point touch height.
+- Denied microphone access exposed Recording access is off, Open Settings, and
+  Not Now. A real simulator Check-In reached 0:03, showed the recoverable speech
+  failure with Try Again, and automatically returned to idle. Real offline,
+  VoiceOver, audio interruption, and successful transcription remain physical
+  device checks.
+- Fresh generic-device Debug and Release builds passed after Phase 7 fixes.
+  Worker contract tests passed 20/20. App-source compiler warnings were cleared;
+  Xcode still emits only its metadata note that no AppIntents dependency exists.
+- Release-link review found all four configured GitHub Pages URLs returning 404.
+  The private support/privacy email, Pages deployment, App Store Connect product
+  and trial, Sandbox purchase/restore, metadata, and App Privacy answers remain
+  external release blockers.
 
 ## New-chat restart prompt
 
-> Continue the Attune UI work from `ATTUNE_UI_RELEASE_PLAN.md`. First inspect `git status`, the plan's change log, and the current simulator/build state. Preserve the pre-existing `LegacyMomentumChartView.swift` change and local ignored secrets. Phase 6 UI is implemented, but do not change the Cloudflare/OpenAI request architecture or provider-specific disclosure until Scott approves the production API direction. The simulator may contain removable Momentum demo data; its cleanup contract is documented in `MomentumDemoDataManager.swift`. After the API decision, complete that final Phase 6 gate and continue Phase 7. Build and visually verify the work, update the plan, then stop for review.
+> Continue Attune from `ATTUNE_REMAINING_WORK.md`,
+> `ATTUNE_UI_RELEASE_PLAN.md`, and `backend/openai-proxy/V2_API.md`. First
+> inspect `git status` because another chat may have concurrent Momentum/UI
+> edits; preserve those edits, `LegacyMomentumChartView.swift`, and the ignored
+> `AI/Secrets.swift`. The hardened Worker and all three `/v2` task routes are
+> deployed and live-smoke-tested. The iOS Debug build uses v2 only for voice
+> intention parsing; Check-In and Listening Sessions still use v1, and Release
+> remains fully on v1. Scott has completed the physical-iPhone voice-intention
+> verification. Next migrate Voice Check-In behind its own Debug-only switch,
+> build it, and have Scott verify real progress and mood behavior on his phone
+> before migrating Listening Sessions. Do not alter persistence, “more” versus
+> “total today” behavior, ambiguity handling, visible UI, or the extraction queue,
+> Free/Pro rules, or UI behavior. Keep v1 as fallback until physical-device and
+> TestFlight checks pass. Then continue App Attest, server-side StoreKit/D1
+> usage enforcement, final AI disclosure, and Phase 7. Build, test, update the
+> trackers, and stop for review before deployment or submission actions.

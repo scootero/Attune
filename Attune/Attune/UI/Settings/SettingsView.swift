@@ -283,30 +283,22 @@ struct SettingsView: View {
     /// Exports all app data by sharing the Attune data directory
     /// This allows the user to access all JSON files directly via Files app or AirDrop
     private func exportData() {
-        do {
-            // Get the base Attune directory which contains all data
-            let baseDir = AppPaths.baseDir
-            
-            // Verify directory exists and has content
-            guard FileManager.default.fileExists(atPath: baseDir.path) else {
-                exportErrorMessage = "No data to export. Record some sessions first."
-                showingExportError = true
-                return
-            }
-            
-            // Share the entire Attune directory
-            // iOS will let user choose how to export (Files, AirDrop, etc.)
-            exportURL = baseDir
-            showingExportSheet = true
-            
-            AppLogger.log(AppLogger.STORE, "Data export initiated for directory: \(baseDir.path)")
-            
-        } catch {
-            // Show error alert
-            exportErrorMessage = error.localizedDescription
+        // Get the base Attune directory which contains all data
+        let baseDir = AppPaths.baseDir
+
+        // Verify directory exists and has content
+        guard FileManager.default.fileExists(atPath: baseDir.path) else {
+            exportErrorMessage = "No data to export. Record some sessions first."
             showingExportError = true
-            AppLogger.log(AppLogger.ERR, "Data export failed: \(error.localizedDescription)")
+            return
         }
+
+        // Share the entire Attune directory
+        // iOS will let user choose how to export (Files, AirDrop, etc.)
+        exportURL = baseDir
+        showingExportSheet = true
+
+        AppLogger.log(AppLogger.STORE, "Data export initiated for directory: \(baseDir.path)")
     }
     
     /// Formats a date for use in filenames (YYYY-MM-DD-HHMMSS)

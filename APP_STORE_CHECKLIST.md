@@ -16,9 +16,9 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 - [x] Rewire `OpenAIClient` to use proxy URL + app proxy token
 - [x] Replace `Secrets.openAIKey` with `proxyBaseURL` + `appProxyToken`
 - [x] Add `Secrets.swift.example` for clean checkouts
-- [ ] Deploy worker + set `OPENAI_API_KEY` and `APP_PROXY_TOKEN` (manual)
+- [x] Deploy worker + set `OPENAI_API_KEY` and `APP_PROXY_TOKEN`
 - [ ] Revoke exposed OpenAI key in OpenAI dashboard (manual)
-- [ ] Verify extraction / check-in AI calls succeed through proxy (manual)
+- [x] Verify extraction / check-in AI calls succeed through proxy
 
 ---
 
@@ -55,6 +55,10 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 - [ ] App Review notes (background audio, demo recording, AI disclosure)
 - [ ] Archive → TestFlight → Submit
 - [ ] Confirm old OpenAI key revoked
+
+Current release values are $4.99/month with a three-day introductory trial.
+Free includes one active intention and one Voice Check-In per day; use
+`ATTUNE_REMAINING_WORK.md` as the controlling release tracker.
 
 ### Suggested App Review notes (copy/paste draft)
 

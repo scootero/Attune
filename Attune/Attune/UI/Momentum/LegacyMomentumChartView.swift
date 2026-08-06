@@ -18,6 +18,7 @@ private enum LegacyMomentumChartStyle: String, CaseIterable {
 
 /// Chart view: X = time of day, Y = % accomplished. Supports >100% with expanded axis.
 struct LegacyMomentumChartView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Data points for the selected day
     let points: [MomentumPoint]
@@ -90,7 +91,7 @@ struct LegacyMomentumChartView: View {
         HStack(spacing: 2) {
             ForEach(LegacyMomentumChartStyle.allCases, id: \.self) { style in
                 Button {
-                    withAnimation(.easeOut(duration: 0.18)) {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
                         chartStyle = style
                     }
                 } label: {
@@ -98,7 +99,7 @@ struct LegacyMomentumChartView: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(chartStyle == style ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
                         .padding(.horizontal, 11)
-                        .padding(.vertical, 6)
+                        .frame(minHeight: 44)
                         .background(
                             chartStyle == style ? AttuneTheme.surfaceStrong : Color.clear,
                             in: Capsule()
@@ -133,7 +134,7 @@ struct LegacyMomentumChartView: View {
     private func selectorButton(id: String?, title: String, colorIndex: Int?) -> some View {
         let isSelected = selectedIntentionId == id
         return Button {
-            withAnimation(.easeOut(duration: 0.18)) {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
                 selectedIntentionId = id
             }
         } label: {
@@ -149,7 +150,7 @@ struct LegacyMomentumChartView: View {
             .font(.caption2.weight(.medium))
             .foregroundStyle(isSelected ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
             .padding(.horizontal, 8)
-            .padding(.vertical, 7)
+            .frame(minHeight: 44)
             .background(isSelected ? AttuneTheme.surfaceStrong : AttuneTheme.surface, in: Capsule())
             .overlay(
                 Capsule()
@@ -524,8 +525,8 @@ struct LegacyMomentumChartView: View {
     }
 
     /// Groups bars from one recording/manual adjustment into a centered cluster.
-    /// Heights ascend from left to right; a consistent partial-width step creates
-    /// controlled overlap. Draw order runs right-to-left for correct layering.
+    /// Adjacent front faces have a small gap, and the cluster expands evenly from
+    /// the shared timestamp instead of stacking toward one side.
     private func layoutBarsForCollision(points: [MomentumPoint], dayStart: Date, dayDuration: TimeInterval, chartWidth: CGFloat, barWidth: CGFloat) -> [(point: MomentumPoint, offsetPixels: CGFloat, drawOrder: Int)] {
         let cal = Calendar.current // Use calendar for minute bucketing fallback
         var bucketToPoints: [String: (anchorDate: Date, items: [MomentumPoint])] = [:] // Map grouping key to points + anchor
@@ -541,7 +542,8 @@ struct LegacyMomentumChartView: View {
                 bucketToPoints[key]?.items.append(point)
             }
         }
-        let clusterStep = barWidth * 0.68 // Consistent intentional overlap between adjacent front faces.
+        let clusterGap: CGFloat = 4 // Small visible gap between adjacent bar faces.
+        let clusterStep = barWidth + clusterGap // Preserve the shared center while fanning bars outward.
         var result: [(MomentumPoint, CGFloat, Int)] = [] // Accumulate laid-out bar metadata
         for (_, payload) in bucketToPoints { // Process each group independently
             let group = payload.items

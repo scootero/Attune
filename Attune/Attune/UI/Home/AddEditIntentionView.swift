@@ -33,6 +33,8 @@ private struct IntentionValueConfig {
 
 /// Unified add/edit screen that matches the redesigned interaction model.
 struct AddEditIntentionView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     /// Indicates whether this page is creating or editing.
     let mode: AddEditIntentionMode
     /// Initial draft payload passed in by parent.
@@ -191,8 +193,8 @@ struct AddEditIntentionView: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(isTitleFocused ? Color(red: 0.17, green: 0.75, blue: 0.84) : Color.white.opacity(0.12), lineWidth: isTitleFocused ? 1.6 : 1)
                 )
-                .scaleEffect(isTitleFocused ? 1.01 : 1.0)
-                .animation(.easeInOut(duration: 0.18), value: isTitleFocused)
+                .scaleEffect(isTitleFocused && !reduceMotion ? 1.01 : 1.0)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isTitleFocused)
         }
     }
     

@@ -48,7 +48,7 @@ final class DailyMoodStore {
         var migrated = false
         for url in files where url.pathExtension == "json" {
             guard let data = try? Data(contentsOf: url),
-                  var mood = try? decoder.decode(DailyMood.self, from: data),
+                  let mood = try? decoder.decode(DailyMood.self, from: data),
                   let score = mood.moodScore,
                   (-2...2).contains(score) else { continue }
             

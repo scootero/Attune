@@ -6,7 +6,7 @@
 //
 
 import Foundation // Needed for Date, Calendar, and date calculations used by reminder scheduling.
-import UserNotifications // Needed for local notification permission checks and scheduling notification requests.
+@preconcurrency import UserNotifications // Needed for local notification permission checks and scheduling notification requests.
 
 /// Keeps one pending reminder in sync with today's check-in/progress state.
 @MainActor // Ensures all store reads happen on main actor because app stores are main-actor isolated.

@@ -9,6 +9,7 @@ import SwiftUI
 import Charts
 
 struct MomentumChartView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let points: [MomentumPoint]
     let yAxisMax: Double
     let selectedDate: Date
@@ -154,7 +155,7 @@ struct MomentumChartView: View {
     private func selectorButton(id: String?, title: String, colorIndex: Int?) -> some View {
         let isSelected = selectedIntentionId == id
         return Button {
-            withAnimation(.easeOut(duration: 0.18)) {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
                 selectedIntentionId = id
             }
         } label: {
@@ -169,7 +170,7 @@ struct MomentumChartView: View {
             .font(.caption.weight(.medium))
             .foregroundStyle(isSelected ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
             .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .frame(minHeight: 44)
             .background(isSelected ? AttuneTheme.surfaceStrong : AttuneTheme.surface, in: Capsule())
             .overlay(Capsule().stroke(isSelected ? AttuneTheme.accent.opacity(0.7) : AttuneTheme.border, lineWidth: 1))
         }

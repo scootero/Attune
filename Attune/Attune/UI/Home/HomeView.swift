@@ -70,6 +70,8 @@ private struct IntentionProgressRow: Identifiable {
 
 struct HomeView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject var appRouter: AppRouter
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @StateObject private var checkInRecorder = CheckInRecorderService.shared
@@ -190,14 +192,12 @@ struct HomeView: View {
                 onResolve: { resolutions in
                     applyAmbiguityResolutions(resolutions, context: data)
                     ambiguitySheetData = nil
-                    loadTodaysProgress()
-                    refreshMoodAndStreak()
+                    refreshAll()
                     state = .saved(checkInId: data.checkInId)
                 },
                 onCancel: {
                     ambiguitySheetData = nil
-                    loadTodaysProgress()
-                    refreshMoodAndStreak()
+                    refreshAll()
                     state = .saved(checkInId: data.checkInId)
                 }
             )
@@ -271,37 +271,7 @@ struct HomeView: View {
     
     private var todaysProgressCard: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center) {
-                Text("Today's Intentions")
-                    .font(.headline)
-                    .foregroundStyle(AttuneTheme.textPrimary)
-                Spacer()
-                HStack(spacing: 8) {
-                    if isUpdateProgressMode { // in update mode, show only update controls (hide Add/Edit)
-                        pillActionButton( // cancel action pill styled with muted retro red gradient
-                            title: "Cancel", // visible cancel label in the pill
-                            gradient: [Color(red: 0.70, green: 0.27, blue: 0.30), Color(red: 0.62, green: 0.23, blue: 0.22)], // red-themed gradient
-                            glow: Color(red: 0.85, green: 0.32, blue: 0.34), // subtle red glow color
-                            action: cancelUpdateProgressMode // restore original values and exit update mode
-                        )
-                        pillActionButton( // save action pill styled with muted retro green gradient
-                            title: "Save", // visible save label in the pill
-                            gradient: [Color(red: 0.22, green: 0.60, blue: 0.42), Color(red: 0.17, green: 0.52, blue: 0.44)], // green/teal-themed gradient
-                            glow: Color(red: 0.28, green: 0.74, blue: 0.54), // subtle green glow color
-                            action: saveUpdateProgressMode // persist overrides and exit update mode
-                        )
-                    } else {
-                        Button(action: { showEditIntentions = true }) {
-                            Text("Manage")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AttuneTheme.accent)
-                                .frame(minWidth: 44, minHeight: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint("Add, edit, or remove intentions")
-                    }
-                }
-            }
+            progressCardHeader
             
             if todaysProgress.isEmpty {
                 HStack(spacing: 10) {
@@ -378,6 +348,58 @@ struct HomeView: View {
         .attuneCard()
     }
 
+    @ViewBuilder
+    private var progressCardHeader: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                progressCardTitle
+                progressCardActions
+            }
+        } else {
+            HStack(alignment: .center) {
+                progressCardTitle
+                Spacer()
+                progressCardActions
+            }
+        }
+    }
+
+    private var progressCardTitle: some View {
+        Text("Today's Intentions")
+            .font(.headline)
+            .foregroundStyle(AttuneTheme.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var progressCardActions: some View {
+        HStack(spacing: 8) {
+            if isUpdateProgressMode {
+                pillActionButton(
+                    title: "Cancel",
+                    gradient: [Color(red: 0.70, green: 0.27, blue: 0.30), Color(red: 0.62, green: 0.23, blue: 0.22)],
+                    glow: Color(red: 0.85, green: 0.32, blue: 0.34),
+                    action: cancelUpdateProgressMode
+                )
+                pillActionButton(
+                    title: "Save",
+                    gradient: [Color(red: 0.22, green: 0.60, blue: 0.42), Color(red: 0.17, green: 0.52, blue: 0.44)],
+                    glow: Color(red: 0.28, green: 0.74, blue: 0.54),
+                    action: saveUpdateProgressMode
+                )
+            } else {
+                Button(action: { showEditIntentions = true }) {
+                    Text("Manage")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.accent)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Add, edit, or remove intentions")
+            }
+        }
+    }
+
     private func intentionProgressSummaryText(for row: IntentionProgressRow) -> String {
         let currentValue = sliderValues[row.intention.id] ?? row.total
         let isWeekly = row.intention.timeframe.lowercased() == "weekly"
@@ -430,17 +452,28 @@ struct HomeView: View {
             appRouter.navigateToMomentum(date: Date())  // Jump to Library → Momentum showing today
         }) {
             VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Text("This Week")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textPrimary)
-                    Spacer()
-                    Text("View Momentum")
-                        .font(.caption)
-                        .foregroundStyle(AttuneTheme.accent)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.accent)
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("This Week")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AttuneTheme.textPrimary)
+                        Label("View Momentum", systemImage: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(AttuneTheme.accent)
+                    }
+                } else {
+                    HStack {
+                        Text("This Week")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AttuneTheme.textPrimary)
+                        Spacer()
+                        Text("View Momentum")
+                            .font(.caption)
+                            .foregroundStyle(AttuneTheme.accent)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AttuneTheme.accent)
+                    }
                 }
                 
                 HStack(alignment: .bottom, spacing: 4) {
@@ -651,7 +684,7 @@ struct HomeView: View {
                 .lineLimit(1) // force single-line titles
                 .minimumScaleFactor(0.9) // allow slight downscale instead of truncation
                 .frame(minWidth: 72) // prevent narrow collapse that can look like vertical bars
-                .frame(height: 36) // enforce consistent pill height
+                .frame(height: 44) // meet the minimum touch target while keeping a compact pill
                 .padding(.horizontal, 10) // horizontal breathing room around text
                 .background(
                     LinearGradient( // apply red/green gradient theme for action intent
@@ -700,58 +733,75 @@ struct HomeView: View {
     // MARK: - C) Mood and streak
 
     private var moodAndStreakCard: some View {
-        HStack(spacing: 0) {
-            Button(action: { showMoodEditor = true }) {
-                HStack(spacing: 10) {
-                    Text(moodEmoji)
-                        .font(.system(size: 27))
-                        .frame(width: 38, height: 38)
-                        .background(AttuneTheme.accent.opacity(0.14), in: Circle())
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Mood")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AttuneTheme.textPrimary)
-                        Text(compactMoodSummaryText)
-                            .font(.caption)
-                            .foregroundStyle(AttuneTheme.textSecondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                    Spacer(minLength: 4)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 0) {
+                    moodControl
+                    Divider().overlay(AttuneTheme.border)
+                    streakSummary
                 }
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-                .contentShape(Rectangle())
+            } else {
+                HStack(spacing: 0) {
+                    moodControl
+                    Rectangle()
+                        .fill(AttuneTheme.border)
+                        .frame(width: 1, height: 40)
+                    streakSummary
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(hasMoodSet ? "Mood \(moodScoreToday) out of 10, \(moodSummaryText)" : "Set today's mood")
+        }
+        .attuneCard()
+    }
 
-            Rectangle()
-                .fill(AttuneTheme.border)
-                .frame(width: 1, height: 40)
-
-            HStack(spacing: 9) {
-                Image(systemName: "flame.fill")
-                    .font(.title3)
-                    .foregroundStyle(AttuneTheme.accent)
-                    .frame(width: 34, height: 34)
+    private var moodControl: some View {
+        Button(action: { showMoodEditor = true }) {
+            HStack(spacing: 10) {
+                Text(moodEmoji)
+                    .font(.system(size: 27))
+                    .frame(width: 38, height: 38)
                     .background(AttuneTheme.accent.opacity(0.14), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Streak")
+                    Text("Mood")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AttuneTheme.textPrimary)
-                    Text("\(streak) \(streak == 1 ? "day" : "days")")
+                    Text(compactMoodSummaryText)
                         .font(.caption)
                         .foregroundStyle(AttuneTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: 4)
             }
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-            .accessibilityElement(children: .combine)
+            .contentShape(Rectangle())
         }
-        .attuneCard()
+        .buttonStyle(.plain)
+        .accessibilityLabel(hasMoodSet ? "Mood \(moodScoreToday) out of 10, \(moodSummaryText)" : "Set today's mood")
+    }
+
+    private var streakSummary: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "flame.fill")
+                .font(.title3)
+                .foregroundStyle(AttuneTheme.accent)
+                .frame(width: 34, height: 34)
+                .background(AttuneTheme.accent.opacity(0.14), in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Streak")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text("\(streak) \(streak == 1 ? "day" : "days")")
+                    .font(.caption)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Streak")
+        .accessibilityValue("\(streak) \(streak == 1 ? "day" : "days")")
     }
 
     private var moodEmoji: String {
@@ -880,12 +930,16 @@ struct HomeView: View {
                     .fill(AttuneTheme.recording)
                     .frame(width: 10, height: 10)
                     .shadow(color: AttuneTheme.recording.opacity(0.7), radius: 6)
+                    .accessibilityHidden(true)
                 Text("Listening")
                     .font(.headline)
                 Spacer()
                 Text(elapsedFormatted)
                     .font(.headline.monospacedDigit())
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Recording check-in")
+            .accessibilityValue(elapsedFormatted)
             Text("Name the intention and amount. Say “more” or “total today.” Mood is optional.")
                 .font(.subheadline)
                 .foregroundStyle(AttuneTheme.textSecondary)
@@ -1045,6 +1099,9 @@ struct HomeView: View {
         .padding(10)
         .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous).stroke(color.opacity(0.26)))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityValue(detail)
     }
 
     private func friendlyCheckInError(_ message: String) -> String {
@@ -1075,7 +1132,7 @@ struct HomeView: View {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: delay)
             guard state == newState else { return }
-            withAnimation(.easeOut(duration: 0.2)) {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
                 state = .idle
             }
         }
@@ -1264,10 +1321,51 @@ struct HomeView: View {
                     sourceCheckInId: context.checkInId,
                     tookPlaceAt: resolveTookPlaceAt(update: r.update, checkInCreatedAt: ambiguityCheckInCreatedAt) // compute effective time using loaded check-in timestamp fallback
                 )
+                try advanceManualOverrideIfNeeded(
+                    dateKey: context.dateKey,
+                    intentionId: r.update.intentionId,
+                    updateType: updateType,
+                    amount: r.update.amount,
+                    unit: r.update.unit
+                )
             } catch {
                 AppLogger.log(AppLogger.ERR, "Ambiguity resolve save failed id=\(AppLogger.shortId(r.update.intentionId)) error=\"\(error.localizedDescription)\"")
             }
         }
+    }
+
+    /// Keeps a prior manual total moving when a later voice update arrives.
+    /// Without this, the saved override masks new entries on the Today screen.
+    private func advanceManualOverrideIfNeeded(
+        dateKey: String,
+        intentionId: String,
+        updateType: String,
+        amount: Double,
+        unit: String
+    ) throws {
+        guard let existing = OverrideStore.shared.loadOverride(
+            dateKey: dateKey,
+            intentionId: intentionId
+        ) else { return }
+
+        let updatedAmount: Double
+        switch updateType {
+        case "TOTAL":
+            updatedAmount = amount
+        case "INCREMENT":
+            updatedAmount = existing.amount + amount
+        default:
+            return
+        }
+
+        try OverrideStore.shared.setOverride(
+            ManualProgressOverride(
+                dateKey: dateKey,
+                intentionId: intentionId,
+                amount: max(0, updatedAmount),
+                unit: unit.isEmpty ? existing.unit : unit
+            )
+        )
     }
     
     /// Resolves the effective occurrence Date for a progress update using local time components when explicit. // centralizes fallback behavior
@@ -1456,14 +1554,25 @@ struct HomeView: View {
                         sourceCheckInId: checkInId,
                         tookPlaceAt: resolveTookPlaceAt(update: update, checkInCreatedAt: checkIn.createdAt) // resolve explicit or fallback time for plotting
                     )
+                    try advanceManualOverrideIfNeeded(
+                        dateKey: dateKey,
+                        intentionId: update.intentionId,
+                        updateType: update.updateType,
+                        amount: update.amount,
+                        unit: update.unit
+                    )
                     // Log applied update with new total for debugging
                     let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: intentionSet.id)
+                    let currentOverride = OverrideStore.shared.loadOverride(
+                        dateKey: dateKey,
+                        intentionId: update.intentionId
+                    )?.amount
                     let newTotal = ProgressCalculator.totalForIntention(
                         entries: entries,
                         dateKey: dateKey,
                         intentionId: update.intentionId,
                         intentionSetId: intentionSet.id,
-                        overrideAmount: overrides[update.intentionId]
+                        overrideAmount: currentOverride
                     )
                     let title = intentionById[update.intentionId]?.title ?? "?"
                     AppLogger.log(AppLogger.AI, "checkin_applied intentionId=\(AppLogger.shortId(update.intentionId)) title=\"\(title)\" delta=\(update.amount) \(update.unit) newTotal=\(newTotal)")
@@ -1485,8 +1594,7 @@ struct HomeView: View {
                 }
             }
 
-            loadTodaysProgress()
-            refreshMoodAndStreak()
+            refreshAll()
 
             // Clear processing placeholder; show real row with green flash
             processingCheckInId = nil

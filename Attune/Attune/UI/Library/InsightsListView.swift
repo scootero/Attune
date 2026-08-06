@@ -83,10 +83,11 @@ struct InsightsListView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(selectedType == value ? AttuneTheme.background : AttuneTheme.textSecondary)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 7)
+                .frame(minHeight: 44)
                 .background(selectedType == value ? AttuneTheme.accent : AttuneTheme.surfaceStrong, in: Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(selectedType == value ? .isSelected : [])
     }
 
     private var capturesContent: some View {

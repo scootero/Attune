@@ -117,9 +117,9 @@ struct MomentumPointAdapter {
         ) ?? targetDay
     }
 
-    /// Buckets points by (intentionId, minute) and keeps one bar per bucket with max percent.
+    /// Buckets points by (intentionId, minute) and keeps the latest value per bucket.
     /// Fixes stacked bars when multiple check-ins for same intention occur within the same minute.
-    /// Uses max percent within bucket (robust when users repeat themselves).
+    /// The latest value matters when a manual total intentionally lowers progress.
     private static func deduplicateByMinuteBucket(from points: [MomentumPoint]) -> [MomentumPoint] {
         let cal = Calendar.current
         // Group by (intentionId, minute-bucket). Bucket = year, month, day, hour, minute (truncate seconds).
@@ -127,14 +127,16 @@ struct MomentumPointAdapter {
         for point in points {
             let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: point.date)
             guard let bucketDate = cal.date(from: comps) else { continue }
-            let recordingPart = point.recordingId ?? "noRec" // Use recording id when present so buckets remain stable per source
-            let key = "\(point.intentionId)-\(recordingPart)-\(bucketDate.timeIntervalSince1970)"
+            let key = "\(point.intentionId)-\(bucketDate.timeIntervalSince1970)"
             bucketToPoints[key, default: []].append(point)
         }
-        // For each bucket: keep single point with max percent; use bucket timestamp as date for consistent x-position.
+        // For each bucket: keep the latest point and normalize it to the bucket timestamp.
         var result: [MomentumPoint] = []
         for (_, group) in bucketToPoints {
-            guard let best = group.max(by: { $0.percent < $1.percent }) else { continue }
+            guard let best = group.max(by: { lhs, rhs in
+                if lhs.date != rhs.date { return lhs.date < rhs.date }
+                return lhs.percent < rhs.percent
+            }) else { continue }
             let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: best.date)
             let bucketDate = cal.date(from: comps) ?? best.date
             let recordingPart = best.recordingId ?? "noRec"

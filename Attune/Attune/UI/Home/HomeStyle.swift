@@ -285,6 +285,8 @@ extension View {
 /// Dedicated style for Record Check-In button: blue gradient, light red/orange border, subtle glow.
 /// Does not vary by mood; consistent inviting look.
 struct RecordCheckInButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var fullWidth: Bool = true
     
     func makeBody(configuration: Configuration) -> some View {
@@ -321,8 +323,8 @@ struct RecordCheckInButtonStyle: ButtonStyle {
                     .shadow(color: NeonPalette.recordButtonBorder.opacity(0.6), radius: 6, x: 0, y: 0)
             )
             // Use immediate spring animation for more responsive feel (no delay)
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1.0)
+            .animation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
             // Reduce opacity slightly when pressed for additional visual feedback
             .opacity(configuration.isPressed ? 0.9 : 1.0)
     }
@@ -334,6 +336,8 @@ struct RecordCheckInButtonStyle: ButtonStyle {
 /// Features: gradient fill, halo blur behind, inner highlight stroke, bloom shadows, press scale animation.
 /// Padding: more vertical (off the text) and moderate horizontal—user prefers padding around text, not stretched sides.
 struct NeonPillButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let moodTier: MoodTier   // Determines color/halo based on mood
     var fullWidth: Bool = true  // When true, button spans available width; padding is around text only
     
@@ -375,8 +379,8 @@ struct NeonPillButtonStyle: ButtonStyle {
             .shadow(color: MoodTier.haloColor(for: moodTier).opacity(0.6), radius: 20, x: 0, y: 8)  // Stronger bloom
             .shadow(color: MoodTier.haloColor(for: moodTier).opacity(0.25), radius: 32, x: 0, y: 12)  // Outer soft glow
             .shadow(color: NeonPalette.darkShadow, radius: 10, x: 0, y: 5)                           // Depth shadow
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)  // Slight press scale animation
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1.0)  // Slight press scale animation
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 

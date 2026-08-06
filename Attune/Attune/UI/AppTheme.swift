@@ -95,6 +95,8 @@ struct AttuneCardModifier: ViewModifier {
 }
 
 struct AttunePrimaryButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
@@ -109,9 +111,9 @@ struct AttunePrimaryButtonStyle: ButtonStyle {
                 ),
                 in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous)
             )
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
             .opacity(configuration.isPressed ? 0.86 : 1)
-            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 

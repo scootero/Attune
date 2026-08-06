@@ -26,12 +26,22 @@ struct IntentionsParserService { // encapsulates parsing behavior
         let userMessage = buildUserMessage(transcript: transcript) // prepare user prompt with transcript + contract
         let schema = buildSchema() // build strict JSON schema
         
-        let jsonString = try await OpenAIClient.chatCompletion( // call OpenAI client for structured output
-            model: defaultModel, // specify model name
-            systemMessage: systemMessage, // pass system prompt
-            userMessage: userMessage, // pass user prompt
-            schema: schema // provide strict schema
-        ) // end call
+        let jsonString: String // direct task JSON from v2 or extracted task JSON from v1
+        if OpenAIClient.usesServerOwnedV2(.intentions) {
+            // Debug rollout: the Worker owns the model, prompt, schema, and output limit.
+            jsonString = try await OpenAIClient.serverOwnedTask(
+                .intentions,
+                body: ["transcript": transcript]
+            )
+        } else {
+            // Release fallback remains unchanged until v2 comparison is approved.
+            jsonString = try await OpenAIClient.chatCompletion(
+                model: defaultModel,
+                systemMessage: systemMessage,
+                userMessage: userMessage,
+                schema: schema
+            )
+        }
         
         return try parseResponse(jsonString: jsonString) // parse JSON string into ParsedIntentions
     } // end parse
