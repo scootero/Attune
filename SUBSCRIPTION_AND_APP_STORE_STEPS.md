@@ -280,7 +280,10 @@ Upload screenshots for:
 - Check-in / recording
 - Paywall (after subscription UI exists)
 - iPhone required sizes
-- iPad too if iPad support stays on
+
+Attune 1.0 is configured as an iPhone-only app, so native iPad screenshots are
+not required. Apple may still make an iPhone-only app available on iPad in
+compatibility mode.
 
 Review notes paste:
 

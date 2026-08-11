@@ -46,8 +46,8 @@ struct PaywallView: View {
                             )
                             proFeature(
                                 icon: "waveform.badge.mic",
-                                title: "Listening Sessions with Insights",
-                                detail: "Start a session when you choose. Attune organizes clear intentions, commitments, events, and states, then groups repeated ideas into themes."
+                                title: "Talk it out with Insights",
+                                detail: "Talk through what’s on your mind. Attune organizes clear intentions, commitments, events, and states, then groups repeated ideas into themes."
                             )
                             proFeature(
                                 icon: "chart.line.uptrend.xyaxis",

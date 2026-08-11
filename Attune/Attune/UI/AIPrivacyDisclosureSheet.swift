@@ -19,7 +19,7 @@ struct AIPrivacyDisclosureSheet: View {
                 Text("How Attune uses your voice")
                     .font(.title2.bold())
 
-                Text("Attune records your voice when you choose to check in or run a session. Speech recognition may use Apple’s cloud services to turn audio into text.")
+                Text("Attune records your voice when you choose to check in or use Talk it out. Speech recognition may use Apple’s cloud services to turn audio into text.")
                     .font(.body)
                     .foregroundColor(.secondary)
 

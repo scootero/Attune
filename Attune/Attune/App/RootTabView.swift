@@ -36,14 +36,15 @@ struct RootTabView: View {
                     HomeRecordView()
                 } else {
                     ProLockedFeatureView(
-                        title: "Listening Sessions",
-                        detail: "Start a longer capture when you choose. Attune organizes clear intentions, commitments, events, and states into reviewable Insights.",
+                        title: "Talk it out",
+                        detail: "Talk through what’s on your mind. Attune organizes clear intentions, commitments, events, and states into reviewable Insights.",
                         icon: "waveform.badge.mic"
                     )
                 }
             }
                 .tabItem {
-                    Label("Record", systemImage: "waveform.circle.fill")
+                    Label("Talk", systemImage: "waveform.circle.fill")
+                        .accessibilityLabel("Talk it out")
                 }
                 .tag(RootTab.allDay)
             
@@ -54,7 +55,7 @@ struct RootTabView: View {
                 } else {
                     ProLockedFeatureView(
                         title: "Insights",
-                        detail: "Review what Attune found in your Listening Sessions and notice themes that repeat over time.",
+                        detail: "Review what Attune found when you talked things out and notice themes that repeat over time.",
                         icon: "sparkles"
                     )
                 }

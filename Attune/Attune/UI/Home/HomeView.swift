@@ -127,11 +127,17 @@ struct HomeView: View {
             
             ScrollView {
                 VStack(spacing: 0) {
-                    HStack {
+                    HStack(spacing: 12) {
+                        Color.clear
+                            .frame(width: 44, height: 44)
+                            .accessibilityHidden(true)
+                        Spacer(minLength: 0)
                         Text("Attune")
                             .font(.title2.bold())
                             .foregroundStyle(AttuneTheme.textPrimary)
-                        Spacer()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Spacer(minLength: 0)
                         Button {
                             showSettings = true
                         } label: {

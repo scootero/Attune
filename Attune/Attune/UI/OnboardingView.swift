@@ -22,9 +22,9 @@ struct OnboardingView: View {
         ),
         OnboardingPage(
             icon: "sparkles",
-            eyebrow: "LISTENING SESSIONS",
+            eyebrow: "TALK IT OUT",
             title: "Notice what keeps coming up.",
-            detail: "Start a session when you want to reflect. Attune organizes clear intentions, commitments, events, and states—then groups repeated ideas into themes in Insights."
+            detail: "Talk through what’s on your mind. Attune organizes clear intentions, commitments, events, and states—then groups repeated ideas into themes in Insights."
         ),
         OnboardingPage(
             icon: "chart.line.uptrend.xyaxis",
@@ -39,14 +39,22 @@ struct OnboardingView: View {
             AttuneScreenBackground()
 
             VStack(spacing: 0) {
-                HStack {
-                    Text("Attune")
-                        .font(.title2.bold())
-                        .foregroundStyle(AttuneTheme.textPrimary)
-                    Spacer()
-                    Text("\(selectedPage + 1) of \(pages.count)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(AttuneTheme.textTertiary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Attune")
+                            .font(.title2.bold())
+                            .foregroundStyle(AttuneTheme.textPrimary)
+                        Spacer()
+                        Text("\(selectedPage + 1) of \(pages.count)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(AttuneTheme.textTertiary)
+                    }
+                    if selectedPage == 0 {
+                        Text("Track what matters. Talk out the rest.")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 22)

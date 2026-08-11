@@ -16,8 +16,8 @@ struct SessionListView: View {
             if sessions.isEmpty {
                 insightsEmptyState(
                     icon: "waveform",
-                    title: "No listening sessions yet",
-                    detail: "Start one from Record when you want Attune to organize what you say."
+                    title: "No past sessions yet",
+                    detail: "Open Talk when you want to think out loud and let Attune organize what you say."
                 )
             } else {
                 List(sessions.sorted { $0.startedAt > $1.startedAt }) { session in
@@ -30,7 +30,7 @@ struct SessionListView: View {
             }
         }
         .background(AttuneScreenBackground())
-        .navigationTitle("Listening Sessions")
+        .navigationTitle("Past sessions")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -64,7 +64,7 @@ struct SessionListView: View {
 
     private func activeState(_ status: String) -> String? {
         switch status {
-        case "recording": return "Listening"
+        case "recording": return "Talking"
         case "stopping", "processing": return "Organizing"
         default: return nil
         }

@@ -148,7 +148,8 @@ screenshot inventory. Scott completes or confirms the App Store Connect entries.
   EULA; do not invent or publish a custom legal agreement without approval.
 - [ ] Complete App Privacy answers for audio, transcripts/user content, optional mood/wellness-related content where Apple asks, and third-party OpenAI processing through Attune's Worker.
 - [ ] Prepare the app name, subtitle, description, keywords, category, age rating, copyright, and contact information.
-- [ ] Prepare iPhone screenshots; prepare iPad screenshots too if iPad support remains enabled.
+- [ ] Prepare iPhone screenshots. Attune 1.0 is configured as an iPhone-only app,
+  so native iPad screenshots are not required.
 - [ ] Include the paywall/subscription experience in review preparation.
 - [ ] Draft App Review notes explaining user-started recording, Apple Speech, AI processing, Free/Pro limits, Subscribe, Restore, and how to reach the demo flows.
 - [ ] Create at least one Sandbox Apple Account for later purchase testing.
@@ -166,8 +167,9 @@ Recommended choices and checks:
   mood/wellness-related information where applicable, and processing through
   Attune's Cloudflare Worker and OpenAI. Separate data kept locally from data
   transmitted for processing.
-- If iPad remains a supported device family, prepare the required iPad assets;
-  do not discover this only at submission time.
+- Attune 1.0 is configured for the iPhone device family only. Apple may still
+  offer an iPhone-only app on iPad in compatibility mode, but no native iPad
+  listing or iPad screenshot set is planned.
 - Create the Sandbox tester in App Store Connect under **Users and Access** >
   **Sandbox**. Use a test email that is eligible for a Sandbox account. Later,
   use it on the development-signed physical-iPhone build to test purchase,

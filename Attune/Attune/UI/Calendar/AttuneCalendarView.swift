@@ -234,7 +234,7 @@ struct AttuneCalendarView: View {
             Text("Nothing scheduled from your captures")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AttuneTheme.textPrimary)
-            Text("Event-like details with a clear date or time will appear here after a Listening Session is processed.")
+            Text("Event-like details with a clear date or time will appear here after Attune processes what you said.")
                 .font(.caption)
                 .foregroundStyle(AttuneTheme.textSecondary)
                 .multilineTextAlignment(.center)

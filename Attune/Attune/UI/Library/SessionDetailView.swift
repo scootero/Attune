@@ -14,6 +14,7 @@ struct SessionDetailView: View {
     @State private var session: Session?
     @State private var captures: [ExtractedItem] = []
     @State private var corrections: [String: ItemCorrection] = [:]
+    @State private var recap: SessionRecap?
 
     var body: some View {
         ZStack {
@@ -23,6 +24,10 @@ struct SessionDetailView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         sessionHeader(session)
+
+                        if SessionRecapFeature.isEnabled, let recap {
+                            SessionRecapView(recap: recap)
+                        }
 
                         if !visibleCaptures.isEmpty {
                             VStack(alignment: .leading, spacing: 10) {
@@ -53,18 +58,18 @@ struct SessionDetailView: View {
                 ContentUnavailableView(
                     "Session not found",
                     systemImage: "waveform.slash",
-                    description: Text("This listening session is no longer available.")
+                    description: Text("This session is no longer available.")
                 )
             }
         }
-        .navigationTitle("Listening Session")
+        .navigationTitle("Talk it out")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: loadData)
     }
 
     private func sessionHeader(_ session: Session) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Listening session", systemImage: "waveform")
+            Label("Talk it out", systemImage: "waveform")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AttuneTheme.accent)
 
@@ -72,11 +77,15 @@ struct SessionDetailView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(AttuneTheme.textPrimary)
 
-            HStack(spacing: 14) {
-                if let duration = session.durationFormatted {
-                    Label(duration, systemImage: "clock")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 14) {
+                    sessionMetadata(session)
                 }
-                Label("\(visibleCaptures.count) captured", systemImage: "sparkles")
+                .fixedSize(horizontal: true, vertical: false)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    sessionMetadata(session)
+                }
             }
             .font(.caption)
             .foregroundStyle(AttuneTheme.textSecondary)
@@ -84,6 +93,14 @@ struct SessionDetailView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .attuneCard()
+    }
+
+    @ViewBuilder
+    private func sessionMetadata(_ session: Session) -> some View {
+        if let duration = session.durationFormatted {
+            Label(duration, systemImage: "clock")
+        }
+        Label("\(visibleCaptures.count) captured", systemImage: "sparkles")
     }
 
     private func transcriptCard(_ transcript: String) -> some View {
@@ -136,6 +153,20 @@ struct SessionDetailView: View {
         captures = ExtractionStore.shared.loadExtractions(sessionId: sessionId)
             .sorted { $0.createdAt > $1.createdAt }
         corrections = CorrectionsStore.shared.loadCorrections()
+
+        guard SessionRecapFeature.isEnabled, let session else {
+            recap = nil
+            return
+        }
+
+        recap = SessionRecapBuilder.makeRecap(
+            currentSession: session,
+            currentItems: captures,
+            allSessions: SessionStore.shared.loadAllSessions(),
+            allItems: ExtractionStore.shared.loadAllExtractions(),
+            topics: SessionRecapTopicSnapshotReader.load(),
+            corrections: corrections
+        )
     }
 }
 

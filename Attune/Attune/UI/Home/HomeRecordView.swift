@@ -35,6 +35,7 @@ struct HomeRecordView: View {
     @State private var showSessionsSheet = false
     @State private var showInsightsSheet = false
     @State private var showPaywall = false
+    @State private var completedRecapSessionId: String?
 
     var body: some View {
         ZStack {
@@ -67,7 +68,7 @@ struct HomeRecordView: View {
         .sheet(isPresented: $showSessionsSheet, onDismiss: { loadTodayCounts() }) {
             NavigationView {
                 SessionListView(sessions: SessionStore.shared.loadAllSessions())
-                    .navigationTitle("Listening Sessions")
+                    .navigationTitle("Past sessions")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
@@ -89,17 +90,27 @@ struct HomeRecordView: View {
             }
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView(reason: "Listening Sessions and the Insights they create are included with Attune Pro.")
+            PaywallView(reason: "Talk it out and the Insights it creates are included with Attune Pro.")
                 .environmentObject(subscriptionManager)
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { completedRecapSessionId != nil },
+                set: { if !$0 { completedRecapSessionId = nil } }
+            )
+        ) {
+            if let sessionId = completedRecapSessionId {
+                SessionRecapSheet(sessionId: sessionId)
+            }
         }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("Record")
+            Text("Talk it out")
                 .font(.title.bold())
                 .foregroundStyle(AttuneTheme.textPrimary)
-            Text("Start a session when you want to capture ideas and notice recurring patterns.")
+            Text("Think out loud, clear your head, and notice what keeps coming up.")
                 .font(.subheadline)
                 .foregroundStyle(AttuneTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -108,7 +119,7 @@ struct HomeRecordView: View {
 
     private var sessionHero: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("LISTENING SESSION", systemImage: "waveform.badge.mic")
+            Label("TALK IT OUT", systemImage: "waveform.badge.mic")
                 .font(.caption.weight(.bold))
                 .tracking(1.1)
                 .foregroundStyle(AttuneTheme.accent)
@@ -135,11 +146,21 @@ struct HomeRecordView: View {
                 Text("Say what’s on your mind")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(AttuneTheme.textPrimary)
-                Text("Attune records only after you start. It organizes clear intentions, commitments, events, and states, then groups repeated ideas into themes in Insights. You can leave the app or lock your phone while the session is active.")
+                Text("Attune records only after you start. It organizes clear intentions, commitments, events, and states, then groups repeated ideas into themes in Insights. You can leave the app or lock your phone while you’re talking.")
                     .font(.subheadline)
                     .foregroundStyle(AttuneTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Think out loud about a decision.")
+                Text("Brain dump everything on your mind.")
+                Text("Talk through your day.")
+            }
+            .font(.footnote)
+            .foregroundStyle(AttuneTheme.textSecondary)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Ideas for using Talk it out: Think out loud about a decision. Brain dump everything on your mind. Talk through your day.")
 
             if let startErrorMessage {
                 Label(startErrorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -149,10 +170,10 @@ struct HomeRecordView: View {
             }
 
             Button(action: startListeningSession) {
-                Label("Start Listening Session", systemImage: "record.circle")
+                Label("Start talking", systemImage: "record.circle")
             }
             .buttonStyle(AttunePrimaryButtonStyle())
-            .accessibilityHint("Starts a background session that organizes captured ideas and themes")
+            .accessibilityHint("Starts recording so Attune can organize captured ideas and themes")
         }
     }
 
@@ -164,7 +185,7 @@ struct HomeRecordView: View {
                     .frame(width: 11, height: 11)
                     .shadow(color: AttuneTheme.recording.opacity(0.75), radius: 7)
                     .accessibilityHidden(true)
-                Text("Listening Session active")
+                Text("You’re talking it out")
                     .font(.headline)
                     .foregroundStyle(AttuneTheme.textPrimary)
                 Spacer()
@@ -173,7 +194,7 @@ struct HomeRecordView: View {
                     .foregroundStyle(AttuneTheme.textPrimary)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Listening Session active")
+            .accessibilityLabel("You’re talking it out")
             .accessibilityValue(formattedDuration)
 
             Text("Keep talking naturally. Repeated ideas are grouped into recurring themes in Insights.")
@@ -182,7 +203,7 @@ struct HomeRecordView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Button(action: stopListeningSession) {
-                Label("End Listening Session", systemImage: "stop.fill")
+                Label("Finish", systemImage: "stop.fill")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
@@ -200,7 +221,7 @@ struct HomeRecordView: View {
     private var processingContent: some View {
         statusPanel(
             icon: "sparkles",
-            title: "Organizing your session…",
+            title: "Organizing what you said…",
             detail: "Attune is transcribing and grouping captured intentions and themes.",
             color: AttuneTheme.accentSecondary,
             showsProgress: true
@@ -222,7 +243,7 @@ struct HomeRecordView: View {
             statusPanel(
                 icon: "mic.slash.fill",
                 title: "Recording access is off",
-                detail: "Allow Microphone and Speech Recognition in Settings to use listening sessions.",
+                detail: "Allow Microphone and Speech Recognition in Settings to use Talk it out.",
                 color: AttuneTheme.warning
             )
             Button("Open Settings") {
@@ -253,7 +274,7 @@ struct HomeRecordView: View {
 
             HStack(spacing: 10) {
                 historyButton(
-                    title: "Sessions",
+                    title: "Past sessions",
                     icon: "waveform",
                     isHighlighted: showsRecentSessionCompletion,
                     action: { showSessionsSheet = true }
@@ -499,6 +520,9 @@ struct HomeRecordView: View {
     /// Displays completion feedback only after this session's transcription and captures are saved.
     private func showCompletionFeedback(for sessionId: String) {
         recentInsightsAddedCount = ExtractionStore.shared.loadExtractions(sessionId: sessionId).count
+        if SessionRecapFeature.isEnabled {
+            completedRecapSessionId = sessionId
+        }
         let token = UUID()
         completionFeedbackToken = token
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {

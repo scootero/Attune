@@ -146,7 +146,7 @@ struct LibraryView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeader(
                         title: "Recent captures",
-                        subtitle: "Organized from your Listening Sessions.",
+                        subtitle: "Organized when you talk things out.",
                         destination: InsightsListView(initialTab: .captures)
                     )
 
@@ -189,7 +189,7 @@ struct LibraryView: View {
             VStack(spacing: 0) {
                 NavigationLink(destination: SessionListView(sessions: sessions)) {
                     historyRow(
-                        title: "Listening sessions",
+                        title: "Past sessions",
                         detail: "\(sessions.count) saved",
                         icon: "waveform"
                     )
@@ -292,7 +292,7 @@ struct LibraryView: View {
             Text("Your patterns will appear here")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(AttuneTheme.textPrimary)
-            Text("Start a Listening Session and speak naturally. Attune will organize clear intentions, commitments, events, and states—and group related ideas over time.")
+            Text("Use Talk it out and speak naturally. Attune will organize clear intentions, commitments, events, and states—and group related ideas over time.")
                 .font(.subheadline)
                 .foregroundStyle(AttuneTheme.textSecondary)
                 .multilineTextAlignment(.center)

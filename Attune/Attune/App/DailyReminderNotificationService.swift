@@ -8,6 +8,11 @@
 import Foundation // Needed for Date, Calendar, and date calculations used by reminder scheduling.
 @preconcurrency import UserNotifications // Needed for local notification permission checks and scheduling notification requests.
 
+enum DailyReminderCopy {
+    static let title = "A quick check-in"
+    static let body = "Anything you'd like to log today?"
+}
+
 /// Keeps one pending reminder in sync with today's check-in/progress state.
 @MainActor // Ensures all store reads happen on main actor because app stores are main-actor isolated.
 final class DailyReminderNotificationService {
@@ -36,8 +41,7 @@ final class DailyReminderNotificationService {
             return // Stop because we only schedule for the current day in this version.
         }
         
-        let reminderState = buildReminderState(for: now) // Compute whether reminder is needed and what percent text to show.
-        guard reminderState.shouldNotify else { // If user already checked in and is >= 50%, no reminder should exist.
+        guard shouldNotify(for: now) else { // If user already checked in and is >= 50%, no reminder should exist.
             notificationCenter.removePendingNotificationRequests(withIdentifiers: [reminderRequestId]) // Clear pending reminder to avoid false nudges.
             return // Exit early because there is nothing to schedule.
         }
@@ -48,8 +52,8 @@ final class DailyReminderNotificationService {
             guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return } // Only schedule when notifications are currently allowed.
             
             let content = UNMutableNotificationContent() // Build the visible content for the local reminder.
-            content.title = "Attune Check-in Reminder" // Short title shown above body text in notification UI.
-            content.body = "You're only at \(reminderState.percent)% of your intentions today. You can do it!" // Motivational body including current completion percentage.
+            content.title = DailyReminderCopy.title // Short, neutral title shown above body text in notification UI.
+            content.body = DailyReminderCopy.body // Neutral prompt without a percentage, guilt framing, or private quote.
             content.sound = .default // Plays the default notification sound so the user can hear it.
             
             let calendar = Calendar.current // Use local calendar/timezone for trigger construction.
@@ -64,10 +68,10 @@ final class DailyReminderNotificationService {
         }
     }
     
-    /// Computes whether user still needs a reminder and derives display percent text.
-    private func buildReminderState(for now: Date) -> (shouldNotify: Bool, percent: Int) {
+    /// Computes whether the user still needs a reminder using the existing scheduling threshold.
+    private func shouldNotify(for now: Date) -> Bool {
         guard let intentionSet = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else { // If no intention set exists yet, do not notify by default.
-            return (false, 0) // Safe default avoids reminders before user has setup data.
+            return false // Safe default avoids reminders before user has setup data.
         }
         
         let dateKey = ProgressCalculator.dateKey(for: now) // Convert current date into app's local YYYY-MM-DD key.
@@ -89,11 +93,9 @@ final class DailyReminderNotificationService {
         }
         
         let overallPercent = ProgressCalculator.overallPercentComplete(intentions: intentions, totalsByIntentionId: totalsByIntentionId) // Compute average completion ratio across eligible active intentions.
-        let percentInt = max(0, min(100, Int((overallPercent * 100).rounded()))) // Convert 0...1 ratio into clamped whole-number percentage for user-facing text.
         let hasCheckedInToday = !checkIns.isEmpty // Condition A: whether at least one check-in exists today.
         let isBelowFiftyPercent = overallPercent < 0.5 // Condition B: progress threshold trigger requested by product requirement.
-        let shouldNotify = (!hasCheckedInToday) || isBelowFiftyPercent // Notify when either condition is true (no check-in OR below 50%).
-        return (shouldNotify, percentInt) // Return computed decision + text value for notification body.
+        return (!hasCheckedInToday) || isBelowFiftyPercent // Notify when either condition is true (no check-in OR below 50%).
     }
     
     /// Returns today's configured reminder date only when it is still upcoming.

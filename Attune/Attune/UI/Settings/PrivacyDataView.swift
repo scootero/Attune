@@ -40,7 +40,7 @@ struct PrivacyDataView: View {
                 privacyPoint(
                     icon: "record.circle",
                     title: "Recording is always user-started",
-                    detail: "Attune records only after you start a Voice Check-In or Listening Session."
+                    detail: "Attune records only after you start a Voice Check-In or tap Start talking in Talk it out."
                 )
                 privacyPoint(
                     icon: "text.bubble.fill",

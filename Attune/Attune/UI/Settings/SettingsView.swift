@@ -129,7 +129,7 @@ struct SettingsView: View {
         } header: {
             Text("Membership")
         } footer: {
-            Text("Free includes one active intention, one Voice Check-In per day, today's Momentum, and the daily reminder. Attune Pro adds more active intentions and Listening Sessions for \(subscriptionManager.priceText).")
+            Text("Free includes one active intention, one Voice Check-In per day, today's Momentum, and the daily reminder. Attune Pro adds more active intentions and Talk it out for \(subscriptionManager.priceText).")
         }
     }
 
@@ -155,7 +155,7 @@ struct SettingsView: View {
         } header: {
             Text("Notifications")
         } footer: {
-            Text("When enabled, Attune can remind you if you have not checked in or your tracked intentions are below 50% for the day.")
+            Text("When enabled, Attune can send one neutral reminder at your chosen time when a check-in may still be useful.")
         }
     }
 
@@ -311,7 +311,7 @@ struct SettingsView: View {
 
         // Verify directory exists and has content
         guard FileManager.default.fileExists(atPath: baseDir.path) else {
-            exportErrorMessage = "No data to export. Record some sessions first."
+            exportErrorMessage = "No data to export. Use Talk it out or record a Voice Check-In first."
             showingExportError = true
             return
         }

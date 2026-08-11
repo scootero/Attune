@@ -97,7 +97,7 @@ struct InsightsListView: View {
                     icon: searchText.isEmpty && selectedType == "all" ? "waveform.badge.mic" : "magnifyingglass",
                     title: searchText.isEmpty && selectedType == "all" ? "Nothing captured yet" : "No matching captures",
                     detail: searchText.isEmpty && selectedType == "all"
-                        ? "Start a Listening Session and speak naturally. Clear intentions, commitments, events, and states will appear here."
+                        ? "Use Talk it out and speak naturally. Clear intentions, commitments, events, and states will appear here."
                         : "Try another search or filter."
                 )
             } else {
@@ -126,7 +126,7 @@ struct InsightsListView: View {
                     icon: searchText.isEmpty ? "repeat" : "magnifyingglass",
                     title: searchText.isEmpty ? "No themes yet" : "No matching themes",
                     detail: searchText.isEmpty
-                        ? "Themes form as Attune groups related ideas from your Listening Sessions. Repeated ideas will show a higher mention count."
+                        ? "Themes form as Attune groups related ideas when you talk things out. Repeated ideas will show a higher mention count."
                         : "Try another search."
                 )
             } else {

@@ -56,8 +56,8 @@ struct AboutView: View {
                 )
                 aboutPoint(
                     icon: "waveform.badge.mic",
-                    title: "Listening Sessions",
-                    detail: "Start a session to capture clear intentions, commitments, events, and states from what you say."
+                    title: "Talk it out",
+                    detail: "Think out loud while Attune captures clear intentions, commitments, events, and states from what you say."
                 )
                 aboutPoint(
                     icon: "sparkles",
@@ -72,7 +72,7 @@ struct AboutView: View {
             }
 
             Section("Important to Know") {
-                Text("Listening Sessions run only after you start one. Event-like details remain reviewable captures; Attune does not currently add calendar appointments or event reminders.")
+                Text("Attune records in Talk it out only after you tap Start talking. Event-like details remain reviewable captures; Attune does not currently add calendar appointments or event reminders.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

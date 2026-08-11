@@ -20,7 +20,7 @@ struct TopicsListView: View {
                     icon: searchText.isEmpty ? "repeat" : "magnifyingglass",
                     title: searchText.isEmpty ? "No themes yet" : "No matching themes",
                     detail: searchText.isEmpty
-                        ? "Related ideas from Listening Sessions will be grouped here."
+                        ? "Related ideas from what you say in Talk it out will be grouped here."
                         : "Try another search."
                 )
             } else {
