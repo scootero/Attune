@@ -71,45 +71,53 @@ enum IntentionSuggestionEngine {
         calendar: Calendar = .current,
         now: Date = Date()
     ) -> IntentionSuggestionDecision {
-        guard !isAtIntentionLimit else { return .none }
+        // A full intention list can still receive a suggestion because the UI
+        // offers an explicit, reviewable swap instead of silently adding one.
+        _ = isAtIntentionLimit
         if let outstanding = snapshot.outstanding { return .show(outstanding) }
         if let attempt = snapshot.lastGenerationAttemptAt,
            now.timeIntervalSince(attempt) < 24 * 60 * 60 { return .none }
 
         let declined = snapshot.history.filter { $0.outcome == .declined }
         let available = topics.filter { topic in
-            !declined.contains { $0.topicKey == topic.topicKey && now.timeIntervalSince($0.decidedAt) < 90 * 24 * 60 * 60 }
+            // "Not for me" is durable for both the exact action and the theme
+            // that produced it. Do not quietly bring the same kind of suggestion
+            // back after an arbitrary cooling-off period.
+            !declined.contains { $0.topicKey == topic.topicKey }
         }
-        if let latestDecision = snapshot.history.map(\.decidedAt).max(),
-           now.timeIntervalSince(latestDecision) < 7 * 24 * 60 * 60 {
+        // The feature gets its own introduction clock for every user. It starts
+        // responsive, then deliberately quiets down as Attune learns more.
+        let programStart = snapshot.firstLaunchAt ?? now
+        let days = max(0, calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: programStart),
+            to: calendar.startOfDay(for: now)
+        ).day ?? 0)
+        let minimumSessions: Int
+        let minimumSpan: TimeInterval
+        let cooldown: TimeInterval
+        switch days {
+        case 0...20:
+            minimumSessions = 2
+            minimumSpan = 0
+            cooldown = 4 * 24 * 60 * 60
+        case 21...50:
+            minimumSessions = 3
+            minimumSpan = 0
+            cooldown = 7 * 24 * 60 * 60
+        default:
+            minimumSessions = 4
+            minimumSpan = 14 * 24 * 60 * 60
+            cooldown = 14 * 24 * 60 * 60
+        }
+
+        guard completedSessionCount >= minimumSessions else {
+            if days <= 20,
+               snapshot.lastNudgeAt.map({ now.timeIntervalSince($0) >= cooldown }) ?? true {
+                return .nudgeToRecord(opportunityKey: "intro-record-more")
+            }
             return .none
         }
-
-        let days = snapshot.firstLaunchAt.map { max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: $0), to: calendar.startOfDay(for: now)).day ?? 0) }
-        var opportunity: (key: String, minimumSessions: Int)?
-        if !snapshot.isExistingInstall, let days {
-            if (3...9).contains(days), !snapshot.completedOpportunityKeys.contains("day3") {
-                opportunity = ("day3", 2)
-            } else if days >= 10, !snapshot.completedOpportunityKeys.contains("day10") {
-                opportunity = ("day10", 2)
-            }
-        }
-
-        if let opportunity {
-            guard completedSessionCount >= 3 else {
-                if let last = snapshot.lastNudgeAt, now.timeIntervalSince(last) < 7 * 24 * 60 * 60 { return .none }
-                return .nudgeToRecord(opportunityKey: opportunity.key)
-            }
-            guard let topic = bestTopic(available.filter { $0.distinctSessionCount >= opportunity.minimumSessions }) else {
-                return .consume(opportunityKey: opportunity.key)
-            }
-            return .request(topic: topic, opportunityKey: opportunity.key)
-        }
-
-        let isRamp = !snapshot.isExistingInstall && (days ?? 25) < 25
-        let minimumSessions = isRamp ? 3 : 4
-        let minimumSpan: TimeInterval = isRamp ? 0 : 14 * 24 * 60 * 60
-        let cooldown: TimeInterval = isRamp ? 7 * 24 * 60 * 60 : 14 * 24 * 60 * 60
         if let latest = snapshot.history.map(\.decidedAt).max(), now.timeIntervalSince(latest) < cooldown { return .none }
         return bestTopic(available.filter {
             $0.distinctSessionCount >= minimumSessions && $0.lastSessionAt.timeIntervalSince($0.firstSessionAt) >= minimumSpan
@@ -118,6 +126,33 @@ enum IntentionSuggestionEngine {
 
     static func isPermanentlyDeclined(actionId: String, history: [IntentionSuggestionHistoryEntry]) -> Bool {
         history.contains { $0.actionId == actionId && $0.outcome == .declined }
+    }
+
+    static func isCoveredByActiveIntention(
+        suggestionTitle: String,
+        activeIntentions: [Intention]
+    ) -> Bool {
+        let suggestionTerms = coverageTerms(in: suggestionTitle)
+        guard !suggestionTerms.isEmpty else { return false }
+        return activeIntentions.contains { intention in
+            let activeTerms = coverageTerms(in: ([intention.title] + intention.aliases).joined(separator: " "))
+            return !suggestionTerms.isDisjoint(with: activeTerms)
+        }
+    }
+
+    private static func coverageTerms(in value: String) -> Set<String> {
+        let ignored: Set<String> = [
+            "a", "an", "and", "at", "daily", "do", "for", "from", "in", "minute", "minutes",
+            "my", "of", "one", "short", "take", "the", "this", "times", "to", "today", "two", "weekly"
+        ]
+        let words = value.lowercased().split { !$0.isLetter && !$0.isNumber }
+        return Set(words.compactMap { word -> String? in
+            var term = String(word)
+            if term.count > 5, term.hasSuffix("ing") { term.removeLast(3) }
+            else if term.count > 4, term.hasSuffix("ed") { term.removeLast(2) }
+            else if term.count > 4, term.hasSuffix("s") { term.removeLast() }
+            return term.count >= 3 && !ignored.contains(term) ? term : nil
+        })
     }
 
     private static func bestTopic(_ topics: [IntentionSuggestionTopic]) -> IntentionSuggestionTopic? {

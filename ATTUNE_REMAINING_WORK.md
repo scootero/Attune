@@ -69,6 +69,10 @@ Debug AI paths are currently opted into their server-owned `/v2` routes.
   for a minimum server authorization, entitlement, usage-limit, and spending-control plan.
 - [ ] Remove shipped reusable backend credentials and add server-side entitlement
   verification plus reasonable per-install, request, duration, output, and daily ceilings.
+- [x] Implement a privacy-minimal, configurable monthly AI allowance with 80% warning,
+  friendly cutoff handling, and Talk it out preflight. It remains in Cloudflare shadow
+  mode until the updated build and D1 path pass physical/TestFlight verification; see
+  `AI_USAGE_LIMIT_HANDOFF.md`.
 - [ ] Evaluate App Attest, D1, and App Store Server Notifications individually;
   use them only when the approved version 1.0 design justifies them.
 - [ ] Move the iOS client to the task endpoints, validate in TestFlight, then retire the shared `APP_PROXY_TOKEN` path.

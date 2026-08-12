@@ -23,6 +23,23 @@ a later phase.
 
 Never place real tokens or transcripts in committed fixtures or documentation.
 
+## Monthly AI allowance
+
+`GET /v2/usage` returns the anonymous installation's current calendar-month usage,
+warning threshold, limit, and reset date. Updated app builds send
+`X-Attune-Installation-Id` on every gateway request. The Worker hashes it before D1
+storage and stores usage metadata only—never transcripts or extracted content.
+
+All `/v1` and `/v2` OpenAI calls are counted using actual weighted token usage after
+success. Input tokens count as one unit and output tokens as four units, matching the
+GPT-4o mini price ratio verified August 12, 2026. Provider failures release their
+reservation. The initial cap is 10,000,000 units with an 80% warning and a calendar-
+month reset.
+
+The deployed Worker version `18888ceb-47f5-4ac7-b7be-8a40330257bf` runs in `shadow`
+mode: it records updated builds but does not block. Change to `enforced` only after
+the updated iOS/TestFlight build passes the checklist in `AI_USAGE_LIMIT_HANDOFF.md`.
+
 ## Voice Check-In
 
 `POST /v2/check-ins/extract`
@@ -101,8 +118,9 @@ Success:
 `POST /v2/intentions/suggest-action`
 
 Deployed August 12, 2026 in Worker version
-`a897f40b-59fd-4e76-8bee-825f3da7cfde`; authenticated synthetic smoke test
-returned HTTP 200 with contract version 1.
+`9c8c4fb2-e261-4340-a69d-bbab4b05d09f`; authenticated synthetic learning-theme
+smoke test returned HTTP 200 with contract version 1 and a catalog-hydrated
+retrieval-practice action.
 
 The app sends one already-qualified recurring topic, two to five distinct-session
 evidence quotes, active intention titles/aliases, and permanently declined action

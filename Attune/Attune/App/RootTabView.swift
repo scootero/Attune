@@ -80,6 +80,12 @@ struct RootTabView: View {
         }
         .tint(AttuneTheme.accent)
         .preferredColorScheme(.dark)
+        .onChange(of: appRouter.selectedRootTab) { _, selectedTab in
+            guard selectedTab == .home else { return }
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.84)) {
+                IntentionSuggestionToastCenter.shared.presentPendingHomeSuggestion()
+            }
+        }
         .onAppear {
             // Perform recovery on first appearance only
             if !hasPerformedRecovery {

@@ -3,7 +3,7 @@ import XCTest
 @testable import Attune
 
 final class MomentumDailyLayoutTests: XCTestCase {
-    func testDailyDomainStartsTwoHoursBeforeFirstEventAndDefaultsToTenPM() {
+    func testDailyDomainPadsBothSidesOfActivity() {
         let calendar = utcCalendar()
         let day = date(year: 2026, month: 8, day: 10, hour: 12, calendar: calendar)
         let first = point(
@@ -16,7 +16,7 @@ final class MomentumDailyLayoutTests: XCTestCase {
         let domain = DailyMomentumTimeDomain.make(points: [first], selectedDate: day, calendar: calendar)
 
         XCTAssertEqual(calendar.component(.hour, from: domain.start), 6)
-        XCTAssertEqual(calendar.component(.hour, from: domain.end), 22)
+        XCTAssertEqual(calendar.component(.hour, from: domain.end), 11)
         XCTAssertTrue(domain.omitsMidnight)
     }
 
@@ -36,7 +36,7 @@ final class MomentumDailyLayoutTests: XCTestCase {
         XCTAssertEqual(calendar.component(.hour, from: domain.end), 0)
     }
 
-    func testDailyDomainProvidesAnHourlyTickForEveryCoveredHour() {
+    func testDailyDomainUsesACompactSetOfTimeLabels() {
         let calendar = utcCalendar()
         let day = date(year: 2026, month: 8, day: 10, hour: 12, calendar: calendar)
         let first = point(
@@ -48,10 +48,25 @@ final class MomentumDailyLayoutTests: XCTestCase {
 
         let domain = DailyMomentumTimeDomain.make(points: [first], selectedDate: day, calendar: calendar)
 
-        XCTAssertEqual(domain.tickDates.count, 17)
-        XCTAssertTrue(zip(domain.tickDates, domain.tickDates.dropFirst()).allSatisfy {
-            $1.timeIntervalSince($0) == 60 * 60
-        })
+        XCTAssertLessThanOrEqual(domain.tickDates.count, 5)
+        XCTAssertEqual(domain.tickDates.first, domain.start)
+        XCTAssertEqual(domain.tickDates.last, domain.end)
+    }
+
+    func testBarEntranceWaveSettlesWithinTwoSeconds() {
+        let duration = MomentumBarEntranceAnimation.totalDuration(barCount: 12)
+
+        XCTAssertGreaterThanOrEqual(duration, 1.5)
+        XCTAssertLessThanOrEqual(duration, 2.0)
+        XCTAssertGreaterThan(
+            MomentumBarEntranceAnimation.scale(clock: 0.25, index: 0, barCount: 12, reduceMotion: false),
+            MomentumBarEntranceAnimation.scale(clock: 0.25, index: 4, barCount: 12, reduceMotion: false)
+        )
+        XCTAssertEqual(
+            MomentumBarEntranceAnimation.scale(clock: duration, index: 11, barCount: 12, reduceMotion: false),
+            1,
+            accuracy: 0.001
+        )
     }
 
     func testSameMinuteBarsKeepEqualWidthAndOrderLowToHighFromLeftToRight() {

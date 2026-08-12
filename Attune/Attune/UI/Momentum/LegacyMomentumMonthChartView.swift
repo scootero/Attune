@@ -11,7 +11,9 @@ import Charts
 /// Renders one daily bar across the selected calendar month. Missing days receive
 /// only a neutral baseline marker.
 struct LegacyMomentumMonthChartView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let bars: [MonthDayBar]
+    @State private var barEntranceClock = 0.0
 
     var body: some View {
         Group {
@@ -23,14 +25,25 @@ struct LegacyMomentumMonthChartView: View {
                     .glassCard()
             }
         }
+        .task(id: barAnimationIdentity) {
+            await runBarEntranceAnimation()
+        }
     }
 
     private var chart: some View {
         Chart {
-            ForEach(elapsedBars) { bar in
+            ForEach(Array(elapsedBars.enumerated()), id: \.element.id) { index, bar in
                 BarMark(
                     x: .value("Day", bar.date, unit: .day),
-                    y: .value("Momentum", barHeight(for: bar))
+                    y: .value(
+                        "Momentum",
+                        barHeight(for: bar) * MomentumBarEntranceAnimation.scale(
+                            clock: barEntranceClock,
+                            index: index,
+                            barCount: elapsedBars.count,
+                            reduceMotion: reduceMotion
+                        )
+                    )
                 )
                 .foregroundStyle(barColor(for: bar).gradient)
                 .cornerRadius(4)
@@ -70,6 +83,30 @@ struct LegacyMomentumMonthChartView: View {
 
     private var elapsedBars: [MonthDayBar] {
         bars.filter { !$0.isFutureDay }
+    }
+
+    private var barAnimationIdentity: String {
+        let barsIdentity = elapsedBars
+            .map { "\($0.id):\($0.ratio ?? -1)" }
+            .joined(separator: "|")
+        return "\(barsIdentity)|reduce:\(reduceMotion)"
+    }
+
+    @MainActor
+    private func runBarEntranceAnimation() async {
+        let duration = MomentumBarEntranceAnimation.totalDuration(barCount: elapsedBars.count)
+        var resetTransaction = Transaction()
+        resetTransaction.disablesAnimations = true
+        withTransaction(resetTransaction) {
+            barEntranceClock = reduceMotion ? duration : 0
+        }
+
+        guard !reduceMotion, !elapsedBars.isEmpty else { return }
+        await Task.yield()
+        guard !Task.isCancelled else { return }
+        withAnimation(.linear(duration: duration)) {
+            barEntranceClock = duration
+        }
     }
 
     private var monthDomain: ClosedRange<Date> {

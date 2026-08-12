@@ -47,6 +47,11 @@ struct AppPaths {
     static var intentionSuggestionsFileURL: URL {
         baseDir.appendingPathComponent("IntentionSuggestions.json")
     }
+
+    /// Reversible UI-only focus state; never changes the active IntentionSet.
+    static var oneThingModeFileURL: URL {
+        baseDir.appendingPathComponent("OneThingMode.json")
+    }
     
     /// Audio directory for a specific session: Documents/Attune/Audio/<sessionId>/
     /// Each session has its own audio subdirectory

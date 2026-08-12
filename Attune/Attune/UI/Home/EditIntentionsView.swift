@@ -72,12 +72,21 @@ struct EditIntentionsView: View {
     @State private var showIntentionLimitPaywall = false
     private let initialAddDraft: DraftIntention?
     private let onSuggestedIntentionSaved: (() -> Void)?
+    private let replacementIntentionId: String?
+    private let replacementIntentionTitle: String?
     /// Shared haptic generator for slider snaps.
     private let hapticEngine = UIImpactFeedbackGenerator(style: .light) // reused to avoid reallocating per snap
 
-    init(initialAddDraft: DraftIntention? = nil, onSuggestedIntentionSaved: (() -> Void)? = nil) {
+    init(
+        initialAddDraft: DraftIntention? = nil,
+        onSuggestedIntentionSaved: (() -> Void)? = nil,
+        replacementIntentionId: String? = nil,
+        replacementIntentionTitle: String? = nil
+    ) {
         self.initialAddDraft = initialAddDraft
         self.onSuggestedIntentionSaved = onSuggestedIntentionSaved
+        self.replacementIntentionId = replacementIntentionId
+        self.replacementIntentionTitle = replacementIntentionTitle
         _addDraft = State(initialValue: initialAddDraft ?? DraftIntention.empty())
         _isAddExpanded = State(initialValue: initialAddDraft != nil)
     }
@@ -104,6 +113,21 @@ struct EditIntentionsView: View {
                                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 6, trailing: 12))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
+
+                            if let replacementIntentionTitle, initialAddDraft != nil {
+                                Label(
+                                    "Ready to replace “\(replacementIntentionTitle)” with this suggestion. Nothing changes until you tap Save.",
+                                    systemImage: "arrow.triangle.swap"
+                                )
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(AttuneTheme.warning)
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(AttuneTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                            }
 
                             if hasValidationIssue {
                                 Label("Each intention needs a name and a target greater than zero.", systemImage: "exclamationmark.circle.fill")
@@ -458,7 +482,7 @@ struct EditIntentionsView: View {
             // Defer UI update to next run loop so sheet animation can complete;
             // avoids "multiple updates per frame" and keyboard snapshot errors.
             DispatchQueue.main.async {
-                draftIntentions = results.map { r in
+                draftIntentions = results.filter { $0.id != replacementIntentionId }.map { r in
                     DraftIntention(
                         id: r.id,
                         title: r.title,
@@ -467,7 +491,9 @@ struct EditIntentionsView: View {
                         timeframe: r.timeframe
                     )
                 }
-                baselineDrafts = draftIntentions // capture baseline for dirty tracking
+                baselineDrafts = results.map { r in
+                    DraftIntention(id: r.id, title: r.title, targetValue: r.targetValue, unit: r.unit, timeframe: r.timeframe)
+                } // keep the full saved baseline so replacement is an explicit pending deletion
                 addDraft = initialAddDraft ?? DraftIntention.empty() // optionally review a suggested intention
                 baselineAddDraft = DraftIntention.empty() // suggestion remains an explicit unsaved change
                 expandedEditId = nil // collapse edits on load

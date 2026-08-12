@@ -16,6 +16,48 @@ private enum LegacyMomentumChartStyle: String, CaseIterable {
     case line = "Line"
 }
 
+/// A short left-to-right wave driven by an underdamped spring response. The
+/// clock stops once every bar has settled, so the chart does no idle animation.
+enum MomentumBarEntranceAnimation {
+    private static let settleDuration = 1.25
+    private static let maximumWaveDuration = 0.65
+
+    static func totalDuration(barCount: Int) -> Double {
+        settleDuration + stagger(barCount: barCount) * Double(max(0, barCount - 1))
+    }
+
+    static func scale(
+        clock: Double,
+        index: Int,
+        barCount: Int,
+        reduceMotion: Bool
+    ) -> Double {
+        guard !reduceMotion else { return 1 }
+
+        let localTime = clock - (Double(index) * stagger(barCount: barCount))
+        guard localTime > 0 else { return 0 }
+
+        let time = localTime / settleDuration
+        guard time < 1 else { return 1 }
+
+        // Closed-form underdamped spring with zero initial velocity. It rises
+        // quickly, overshoots once, then makes one smaller correction to rest.
+        let damping = 4.8
+        let angularFrequency = 10.5
+        let decay = exp(-damping * time)
+        let response = 1 - decay * (
+            cos(angularFrequency * time)
+            + (damping / angularFrequency) * sin(angularFrequency * time)
+        )
+        return min(1.12, max(0, response))
+    }
+
+    private static func stagger(barCount: Int) -> Double {
+        guard barCount > 1 else { return 0 }
+        return min(0.075, maximumWaveDuration / Double(barCount - 1))
+    }
+}
+
 /// One deterministic, chart-wide layout pass for the daily 3D bars.
 /// Every bar keeps one consistent width. Same-minute bars fan out around their
 /// timestamp and neighboring clusters shift just enough to keep front faces apart.
@@ -135,7 +177,10 @@ struct DailyMomentumTimeDomain {
     var duration: TimeInterval { end.timeIntervalSince(start) }
 
     var tickDates: [Date] {
-        let step: TimeInterval = 60 * 60
+        let coveredHours = max(1, Int(ceil(duration / (60 * 60))))
+        let rawStep = Int(ceil(Double(coveredHours) / 4.0))
+        let stepHours = [1, 2, 3, 4, 6].first(where: { $0 >= rawStep }) ?? 6
+        let step = TimeInterval(stepHours * 60 * 60)
         var result = [start]
         var next = start.addingTimeInterval(step)
         while next < end {
@@ -154,24 +199,25 @@ struct DailyMomentumTimeDomain {
         let midnight = calendar.startOfDay(for: selectedDate)
         let nextMidnight = calendar.date(byAdding: .day, value: 1, to: midnight)
             ?? midnight.addingTimeInterval(24 * 60 * 60)
-        let defaultEnd = calendar.date(bySettingHour: 22, minute: 0, second: 0, of: midnight)
-            ?? midnight.addingTimeInterval(22 * 60 * 60)
+        let defaultEnd = nextMidnight
 
         guard let earliest = points.map(\.date).min(),
               let latest = points.map(\.date).max() else {
             return DailyMomentumTimeDomain(start: midnight, end: defaultEnd, omitsMidnight: false)
         }
 
-        let twoHoursBefore = calendar.date(byAdding: .hour, value: -2, to: earliest) ?? earliest
-        let hourComponents = calendar.dateComponents([.year, .month, .day, .hour], from: twoHoursBefore)
-        let roundedStart = calendar.date(from: hourComponents) ?? twoHoursBefore
+        let earliestHour = calendar.date(
+            from: calendar.dateComponents([.year, .month, .day, .hour], from: earliest)
+        ) ?? earliest
+        let roundedStart = calendar.date(byAdding: .hour, value: -2, to: earliestHour) ?? earliestHour
         let start = max(midnight, roundedStart)
 
-        // Reserve roughly an hour after the latest event. Once that margin would
-        // cross the normal 10 PM boundary, show the complete day through midnight.
-        let lateThreshold = calendar.date(byAdding: .hour, value: -1, to: defaultEnd)
-            ?? defaultEnd.addingTimeInterval(-60 * 60)
-        let end = latest >= lateThreshold ? nextMidnight : defaultEnd
+        let latestHour = calendar.date(
+            from: calendar.dateComponents([.year, .month, .day, .hour], from: latest)
+        ) ?? latest
+        let nextHour = calendar.date(byAdding: .hour, value: 1, to: latestHour) ?? latestHour
+        let paddedEnd = calendar.date(byAdding: .hour, value: 2, to: nextHour) ?? nextHour
+        let end = min(nextMidnight, paddedEnd)
 
         return DailyMomentumTimeDomain(
             start: start,
@@ -199,6 +245,9 @@ struct LegacyMomentumChartView: View {
 
     /// Preserve the original 3D bars as the default presentation.
     @State private var chartStyle: LegacyMomentumChartStyle = .bar
+
+    @State private var barEntranceStartedAt = Date.distantPast
+    @State private var barEntranceComplete = true
 
     var body: some View {
         let _ = logChartReceive() // Debug: emit chart input summary when body evaluates
@@ -249,6 +298,9 @@ struct LegacyMomentumChartView: View {
             if let selectedIntentionId, !intentionIds.contains(selectedIntentionId) {
                 self.selectedIntentionId = nil
             }
+        }
+        .task(id: barAnimationIdentity) {
+            await runBarEntranceAnimation()
         }
     }
 
@@ -350,10 +402,17 @@ struct LegacyMomentumChartView: View {
     private var chartContent: some View {
         let domain = timeDomain
         let hasCompletedBar = filteredPoints.contains { $0.percent >= 100 }
-        return TimelineView(.animation(minimumInterval: 1.0 / 8.0, paused: reduceMotion || !hasCompletedBar)) { timeline in
+        let entranceDuration = MomentumBarEntranceAnimation.totalDuration(barCount: filteredPoints.count)
+        return TimelineView(.animation(
+            minimumInterval: barEntranceComplete ? 1.0 / 8.0 : 1.0 / 60.0,
+            paused: reduceMotion || (barEntranceComplete && !hasCompletedBar)
+        )) { timeline in
             GeometryReader { geometry in
                 Canvas { context, size in
                     let seconds = timeline.date.timeIntervalSinceReferenceDate
+                    let entranceClock = barEntranceComplete
+                        ? entranceDuration
+                        : min(entranceDuration, max(0, timeline.date.timeIntervalSince(barEntranceStartedAt)))
                     let completionPulse = reduceMotion
                         ? 1.0
                         : 0.72 + (0.28 * ((sin(seconds * .pi * 2 / 3) + 1) / 2))
@@ -380,7 +439,7 @@ struct LegacyMomentumChartView: View {
                 drawDayBoundarySymbols(context: context, chartWidth: chartWidth, chartHeight: chartHeight, leftPadding: leftPadding)
                 
                 // Draw 3D bars with depth
-                draw3DBars(context: context, chartWidth: chartWidth, chartHeight: chartHeight, leftPadding: leftPadding, bottomPadding: bottomPadding, depthOffset: depthOffset, perspectiveAngle: perspectiveAngle, domain: domain, completionPulse: completionPulse)
+                draw3DBars(context: context, chartWidth: chartWidth, chartHeight: chartHeight, leftPadding: leftPadding, bottomPadding: bottomPadding, depthOffset: depthOffset, perspectiveAngle: perspectiveAngle, domain: domain, completionPulse: completionPulse, entranceClock: entranceClock)
                 }
                 .frame(height: 220)
             }
@@ -611,7 +670,7 @@ struct LegacyMomentumChartView: View {
     
     /// Draws deliberately overlapped 3D clusters. The rightmost bar is drawn first
     /// at the back; each bar moving left is drawn later, one layer closer.
-    private func draw3DBars(context: GraphicsContext, chartWidth: CGFloat, chartHeight: CGFloat, leftPadding: CGFloat, bottomPadding: CGFloat, depthOffset: CGFloat, perspectiveAngle: CGFloat, domain: DailyMomentumTimeDomain, completionPulse: Double) {
+    private func draw3DBars(context: GraphicsContext, chartWidth: CGFloat, chartHeight: CGFloat, leftPadding: CGFloat, bottomPadding: CGFloat, depthOffset: CGFloat, perspectiveAngle: CGFloat, domain: DailyMomentumTimeDomain, completionPulse: Double, entranceClock: Double) {
         let baseBarWidth: CGFloat = 20
 
         let laidOut = DailyMomentumBarLayout.makeItems(
@@ -631,6 +690,12 @@ struct LegacyMomentumChartView: View {
             return a.point.id < b.point.id
         }
 
+        let entranceOrdered = laidOut.sorted { a, b in
+            if a.centerX != b.centerX { return a.centerX < b.centerX }
+            if a.point.percent != b.point.percent { return a.point.percent < b.point.percent }
+            return a.point.id < b.point.id
+        }
+
         for item in drawOrdered {
             let point = item.point
             let barWidth = item.barWidth
@@ -639,7 +704,14 @@ struct LegacyMomentumChartView: View {
             let xPos = leftPadding + item.centerX - (barWidth / 2)
 
             // Y position and height from percent
-            let barHeightRatio = CGFloat(min(point.percent, yAxisMax) / yAxisMax)
+            let entranceIndex = entranceOrdered.firstIndex { $0.point.id == point.id } ?? 0
+            let entranceScale = MomentumBarEntranceAnimation.scale(
+                clock: entranceClock,
+                index: entranceIndex,
+                barCount: entranceOrdered.count,
+                reduceMotion: reduceMotion
+            )
+            let barHeightRatio = CGFloat(min(point.percent, yAxisMax) / yAxisMax * entranceScale)
             let barHeight = barHeightRatio * chartHeight
             let yPos = chartHeight - barHeight + 10
 
@@ -718,7 +790,7 @@ struct LegacyMomentumChartView: View {
             }
             
             let isOverflow = point.percent > yAxisMax // Check if the actual percent is higher than the visible axis cap so we know when to show an overflow cue.
-            if isOverflow { // Only draw the arrow and label when the bar exceeds the current y-axis maximum to keep the chart clean otherwise.
+            if isOverflow && entranceScale > 0.95 { // Let the overflow cue arrive with its bar instead of floating above the baseline.
                 let arrowHeight: CGFloat = 8 // Small arrow height to keep the indicator subtle while still noticeable.
                 let arrowWidth: CGFloat = 10 // Arrow width sized to sit neatly centered atop the bar without overhanging too much.
                 let arrowSpacing: CGFloat = 4 // Gap between the top of the bar and the arrow so the shapes do not visually merge.
@@ -751,20 +823,42 @@ struct LegacyMomentumChartView: View {
         DailyMomentumTimeDomain.make(points: points, selectedDate: selectedDate)
     }
 
+    private var barAnimationIdentity: String {
+        let pointIdentity = filteredPoints
+            .sorted { $0.date < $1.date }
+            .map { "\($0.id):\($0.percent)" }
+            .joined(separator: "|")
+        return "\(chartStyle.rawValue)|\(pointIdentity)|reduce:\(reduceMotion)"
+    }
+
+    @MainActor
+    private func runBarEntranceAnimation() async {
+        let duration = MomentumBarEntranceAnimation.totalDuration(barCount: filteredPoints.count)
+        guard !reduceMotion, chartStyle == .bar, !filteredPoints.isEmpty else {
+            barEntranceComplete = true
+            return
+        }
+        barEntranceStartedAt = Date()
+        barEntranceComplete = false
+        await Task.yield()
+        guard !Task.isCancelled else { return }
+        try? await Task.sleep(for: .seconds(duration))
+        guard !Task.isCancelled else { return }
+        barEntranceComplete = true
+    }
+
     private func axisLabel(for date: Date, showsOmission: Bool) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "h a"
+        formatter.dateFormat = "HH:mm"
         formatter.timeZone = TimeZone.current
-        let time = formatter.string(from: date)
-        return showsOmission ? "… \(time)" : time
+        return formatter.string(from: date)
     }
 
     private func compactAxisLabel(for date: Date, showsOmission: Bool) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "ha"
+        formatter.dateFormat = "HH:mm"
         formatter.timeZone = TimeZone.current
-        let time = formatter.string(from: date).lowercased()
-        return showsOmission ? "…\(time)" : time
+        return formatter.string(from: date)
     }
 
     private func isActivityHour(_ date: Date) -> Bool {

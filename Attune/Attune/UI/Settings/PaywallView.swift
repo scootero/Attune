@@ -41,8 +41,8 @@ struct PaywallView: View {
                             )
                             proFeature(
                                 icon: "mic.fill",
-                                title: "Unlimited Voice Check-Ins",
-                                detail: "Update your tracked intentions and optional mood as often as you need."
+                                title: "Voice Check-Ins",
+                                detail: "Update your tracked intentions and optional mood within Pro’s included monthly AI allowance."
                             )
                             proFeature(
                                 icon: "waveform.badge.mic",
@@ -123,6 +123,10 @@ struct PaywallView: View {
             Text("\(subscriptionManager.priceText). Cancel anytime.")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AttuneTheme.accent)
+            Text("Includes a generous monthly AI processing allowance that refreshes each calendar month.")
+                .font(.footnote)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(AttuneTheme.textTertiary)
         }
         .frame(maxWidth: .infinity)
     }

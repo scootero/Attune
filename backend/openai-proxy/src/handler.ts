@@ -8,13 +8,19 @@
 
 import { buildTask, isTaskPath, type BuiltTask } from "./tasks";
 import { suggestionAction } from "./intention-suggestion-actions";
-
-interface Env {
-  APP_PROXY_TOKEN?: string;
-  OPENAI_API_KEY?: string;
-  /** Set to the literal string "false" to stop AI requests without an app update. */
-  AI_ENABLED?: string;
-}
+import type { GatewayEnv } from "./env";
+import {
+  actualWeightedUnits,
+  reconcileUsage,
+  reserveUsage,
+  usageHeaders,
+  usageModeHeader,
+  usageSnapshotForRequest,
+  USAGE_PATH,
+  UsageRequestError,
+  type UsageReservation,
+  type UsageSnapshot,
+} from "./usage";
 
 type UpstreamFetch = (
   input: RequestInfo | URL,
@@ -56,7 +62,7 @@ const ALLOWED_TOP_LEVEL_KEYS = new Set([
 /** Exported for local Worker-runtime tests; production uses the default handler. */
 export async function handleRequest(
   request: Request,
-  env: Env,
+  env: GatewayEnv,
   upstreamFetch: UpstreamFetch,
 ): Promise<Response> {
   const startedAt = Date.now();
@@ -68,9 +74,13 @@ export async function handleRequest(
     return corsResponse(null, 204, requestId);
   }
 
+  const isUsageEndpoint = pathname === USAGE_PATH;
   const isLegacyEndpoint = pathname === ENDPOINT;
   const isServerOwnedTask = isTaskPath(pathname);
-  if (request.method !== "POST" || (!isLegacyEndpoint && !isServerOwnedTask)) {
+  const supportedRequest =
+    (request.method === "GET" && isUsageEndpoint) ||
+    (request.method === "POST" && (isLegacyEndpoint || isServerOwnedTask));
+  if (!supportedRequest) {
     return jsonError("Not found", 404, requestId);
   }
 
@@ -80,6 +90,19 @@ export async function handleRequest(
 
   if (!env.APP_PROXY_TOKEN || !(await hasValidAuthorization(request, env.APP_PROXY_TOKEN))) {
     return jsonError("Unauthorized", 401, requestId);
+  }
+
+  if (isUsageEndpoint) {
+    try {
+      const snapshot = await usageSnapshotForRequest(request, env);
+      return corsResponse(JSON.stringify(snapshot ?? unlimitedUsageSnapshot()), 200, requestId, {
+        "Content-Type": "application/json",
+        ...usageHeaders(snapshot),
+        ...usageModeHeader(env),
+      });
+    } catch (error) {
+      return usageErrorResponse(error, requestId);
+    }
   }
 
   if (!env.OPENAI_API_KEY) {
@@ -117,7 +140,24 @@ export async function handleRequest(
   if (isServerOwnedTask) {
     const task = buildTask(pathname, rawBody);
     if (!task.ok) return jsonError(task.error, 400, requestId);
-    return performServerOwnedTask(task.value, env.OPENAI_API_KEY, upstreamFetch, requestId, startedAt);
+    let reservation: UsageReservation | null;
+    try {
+      reservation = await reserveUsage(
+        request,
+        env,
+        estimatedTaskUnits(task.value),
+      );
+    } catch (error) {
+      return usageErrorResponse(error, requestId, { "X-Attune-Contract-Version": "1" });
+    }
+    return performServerOwnedTask(
+      task.value,
+      env,
+      upstreamFetch,
+      requestId,
+      startedAt,
+      reservation,
+    );
   }
 
   const validation = validateChatRequest(rawBody);
@@ -135,6 +175,16 @@ export async function handleRequest(
     0,
   );
   const schemaName = chatRequest.response_format.json_schema.name;
+  let reservation: UsageReservation | null;
+  try {
+    reservation = await reserveUsage(
+      request,
+      env,
+      estimatedLegacyUnits(messageCharacters),
+    );
+  } catch (error) {
+    return usageErrorResponse(error, requestId);
+  }
 
   try {
     const upstreamResponse = await upstreamFetch(OPENAI_URL, {
@@ -149,6 +199,13 @@ export async function handleRequest(
     });
 
     const responseBody = await upstreamResponse.arrayBuffer();
+    const usageSnapshot = await safeReconcileUsage(
+      env,
+      reservation,
+      actualWeightedUnits(responseBody),
+      upstreamResponse.ok,
+      requestId,
+    );
     const openAIRequestId = upstreamResponse.headers.get("x-request-id") ?? undefined;
     console.log({
       event: "gateway_request",
@@ -164,8 +221,11 @@ export async function handleRequest(
     return corsResponse(responseBody, upstreamResponse.status, requestId, {
       "Content-Type":
         upstreamResponse.headers.get("Content-Type") ?? "application/json",
+      ...usageHeaders(usageSnapshot),
+      ...usageModeHeader(env),
     });
   } catch (error) {
+    const usageSnapshot = await safeReconcileUsage(env, reservation, null, false, requestId);
     const timedOut = error instanceof DOMException && error.name === "TimeoutError";
     console.error({
       event: "gateway_upstream_failure",
@@ -180,22 +240,24 @@ export async function handleRequest(
       timedOut ? "AI provider timed out" : "AI provider unavailable",
       timedOut ? 504 : 502,
       requestId,
+      usageHeaders(usageSnapshot),
     );
   }
 }
 
 async function performServerOwnedTask(
   task: BuiltTask,
-  openAIAPIKey: string,
+  env: GatewayEnv,
   upstreamFetch: UpstreamFetch,
   requestId: string,
   startedAt: number,
+  reservation: UsageReservation | null,
 ): Promise<Response> {
   try {
     const upstreamResponse = await upstreamFetch(OPENAI_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${openAIAPIKey}`,
+        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
         "Content-Type": "application/json",
         "X-Client-Request-Id": requestId,
       },
@@ -203,6 +265,13 @@ async function performServerOwnedTask(
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
     const responseBody = await upstreamResponse.arrayBuffer();
+    const usageSnapshot = await safeReconcileUsage(
+      env,
+      reservation,
+      actualWeightedUnits(responseBody),
+      upstreamResponse.ok,
+      requestId,
+    );
     const openAIRequestId = upstreamResponse.headers.get("x-request-id") ?? undefined;
 
     console.log({
@@ -222,6 +291,8 @@ async function performServerOwnedTask(
         "Content-Type":
           upstreamResponse.headers.get("Content-Type") ?? "application/json",
         "X-Attune-Contract-Version": "1",
+        ...usageHeaders(usageSnapshot),
+        ...usageModeHeader(env),
       });
     }
 
@@ -235,14 +306,19 @@ async function performServerOwnedTask(
       });
       return jsonError("AI provider returned an invalid response", 502, requestId, {
         "X-Attune-Contract-Version": "1",
+        ...usageHeaders(usageSnapshot),
+        ...usageModeHeader(env),
       });
     }
 
     return corsResponse(JSON.stringify(taskOutput.value), 200, requestId, {
       "Content-Type": "application/json",
       "X-Attune-Contract-Version": "1",
+      ...usageHeaders(usageSnapshot),
+      ...usageModeHeader(env),
     });
   } catch (error) {
+    const usageSnapshot = await safeReconcileUsage(env, reservation, null, false, requestId);
     const timedOut = error instanceof DOMException && error.name === "TimeoutError";
     console.error({
       event: "gateway_task_upstream_failure",
@@ -255,9 +331,68 @@ async function performServerOwnedTask(
       timedOut ? "AI provider timed out" : "AI provider unavailable",
       timedOut ? 504 : 502,
       requestId,
-      { "X-Attune-Contract-Version": "1" },
+      {
+        "X-Attune-Contract-Version": "1",
+        ...usageHeaders(usageSnapshot),
+      },
     );
   }
+}
+
+function estimatedTaskUnits(task: BuiltTask): number {
+  return Math.ceil(task.inputCharacters / 3) + task.request.max_completion_tokens * 4;
+}
+
+function estimatedLegacyUnits(messageCharacters: number): number {
+  return Math.ceil(messageCharacters / 3) + 16_384 * 4;
+}
+
+async function safeReconcileUsage(
+  env: GatewayEnv,
+  reservation: UsageReservation | null,
+  actualUnits: number | null,
+  succeeded: boolean,
+  requestId: string,
+): Promise<UsageSnapshot | null> {
+  try {
+    return await reconcileUsage(env, reservation, actualUnits, succeeded);
+  } catch {
+    console.error({ event: "usage_reconcile_failed", requestId });
+    return null;
+  }
+}
+
+function usageErrorResponse(
+  error: unknown,
+  requestId: string,
+  headers: HeadersInit = {},
+): Response {
+  if (!(error instanceof UsageRequestError)) {
+    console.error({ event: "usage_service_failure", requestId });
+    return jsonError("AI usage service is temporarily unavailable", 503, requestId, headers);
+  }
+  const body = {
+    error: error.message,
+    code: error.code,
+    ...(error.snapshot ?? {}),
+  };
+  return corsResponse(JSON.stringify(body), error.status, requestId, {
+    "Content-Type": "application/json",
+    ...headers,
+    ...usageHeaders(error.snapshot ?? null),
+  });
+}
+
+function unlimitedUsageSnapshot(): UsageSnapshot {
+  return {
+    usedUnits: 0,
+    limitUnits: 0,
+    warningAtUnits: 0,
+    warning: false,
+    limited: false,
+    resetsAt: "",
+    period: "",
+  };
 }
 
 function parseStructuredTaskOutput(
@@ -411,8 +546,8 @@ function corsResponse(
     status,
     headers: {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Authorization, Content-Type",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Attune-Installation-Id",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "X-Attune-Request-Id": requestId,
       ...headers,
     },

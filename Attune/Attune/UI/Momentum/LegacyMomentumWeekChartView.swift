@@ -21,23 +21,29 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
     let days: [LegacyWeekDayChartData] // Input data: per-day columns with intention bars.
     let yAxisMax: Double // Axis cap (100 or 150) to scale bar heights.
     @State private var dimension: LegacyWeekDimension = .threeD
+    @State private var barEntranceClock = 0.0
     
     var body: some View {
-        if allBars.isEmpty {
-            VStack(spacing: 16) {
-                HStack {
-                    Spacer()
-                    dimensionSwitcher
-                }
+        Group {
+            if allBars.isEmpty {
+                VStack(spacing: 16) {
+                    HStack {
+                        Spacer()
+                        dimensionSwitcher
+                    }
 
-                MomentumEmptyChartView(period: "week")
+                    MomentumEmptyChartView(period: "week")
+                }
+                .padding(16)
+                .glassCard()
+            } else if dimension == .threeD {
+                threeDContent
+            } else {
+                twoDContent
             }
-            .padding(16)
-            .glassCard()
-        } else if dimension == .threeD {
-            threeDContent
-        } else {
-            twoDContent
+        }
+        .task(id: barAnimationIdentity) {
+            await runBarEntranceAnimation()
         }
     }
 
@@ -129,7 +135,8 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
                     let centerIndex = CGFloat(max(sortedBars.count - 1, 0)) / 2
                     let positionedBars = sortedBars.enumerated().map { barIndex, bar in
                         let xCenter = clusterCenter + (CGFloat(barIndex) - centerIndex) * clusterStep
-                        return (bar: bar, xCenter: xCenter)
+                        let entranceIndex = days.prefix(idx).reduce(0) { $0 + $1.bars.count } + barIndex
+                        return (bar: bar, xCenter: xCenter, entranceIndex: entranceIndex)
                     }
 
                     // Paint from right to left: the rightmost bar is the back layer,
@@ -137,7 +144,13 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
                     for positioned in positionedBars.reversed() {
                         let bar = positioned.bar
                         let clamped = min(bar.percent, yAxisMax) // Clamp percent to axis max.
-                        let heightRatio = CGFloat(clamped / yAxisMax) // Normalize height ratio.
+                        let entranceScale = MomentumBarEntranceAnimation.scale(
+                            clock: barEntranceClock,
+                            index: positioned.entranceIndex,
+                            barCount: allBars.count,
+                            reduceMotion: reduceMotion
+                        )
+                        let heightRatio = CGFloat(clamped / yAxisMax * entranceScale) // Normalize height ratio and apply the spring entrance.
                         let barHeight = heightRatio * chartHeight // Actual bar height in pixels.
                         let x = positioned.xCenter - (barWidth / 2) // Left x for rectangle.
                         let y = chartHeight - barHeight // Top y (bars grow upward from baseline).
@@ -209,11 +222,19 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                 }
 
-                ForEach(days) { day in
-                    ForEach(day.bars) { bar in
+                ForEach(Array(days.enumerated()), id: \.element.id) { dayIndex, day in
+                    ForEach(Array(day.bars.enumerated()), id: \.element.id) { barIndex, bar in
                         BarMark(
                             x: .value("Day", day.date, unit: .day),
-                            y: .value("Progress", bar.percent)
+                            y: .value(
+                                "Progress",
+                                bar.percent * MomentumBarEntranceAnimation.scale(
+                                    clock: barEntranceClock,
+                                    index: days.prefix(dayIndex).reduce(0) { $0 + $1.bars.count } + barIndex,
+                                    barCount: allBars.count,
+                                    reduceMotion: reduceMotion
+                                )
+                            )
                         )
                         .position(by: .value("Intention", bar.intentionId))
                         .foregroundStyle(MomentumPalette.color(forIndex: bar.colorIndex).gradient)
@@ -248,6 +269,31 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
 
     private var allBars: [LegacyWeekIntentionBar] {
         days.flatMap(\.bars)
+    }
+
+    private var barAnimationIdentity: String {
+        let barsIdentity = days.flatMap { day in
+            day.bars.map { "\(day.id):\($0.id):\($0.percent)" }
+        }
+        .joined(separator: "|")
+        return "\(dimension.rawValue)|\(barsIdentity)|reduce:\(reduceMotion)"
+    }
+
+    @MainActor
+    private func runBarEntranceAnimation() async {
+        let duration = MomentumBarEntranceAnimation.totalDuration(barCount: allBars.count)
+        var resetTransaction = Transaction()
+        resetTransaction.disablesAnimations = true
+        withTransaction(resetTransaction) {
+            barEntranceClock = reduceMotion ? duration : 0
+        }
+
+        guard !reduceMotion, !allBars.isEmpty else { return }
+        await Task.yield()
+        guard !Task.isCancelled else { return }
+        withAnimation(.linear(duration: duration)) {
+            barEntranceClock = duration
+        }
     }
 
     private var dimensionSwitcher: some View {

@@ -7,6 +7,21 @@ name = "attune-openai-proxy"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 
+[vars]
+# Shadow mode records anonymous installation usage without blocking older builds.
+# Change to "enforced" only after the updated iOS build passes TestFlight verification.
+USAGE_LIMIT_MODE = "shadow"
+# GPT-4o mini weighted units: input token = 1, output token = 4.
+# 10M units is approximately $1.50 at the pricing verified on 2026-08-12.
+MONTHLY_AI_UNIT_LIMIT = "10000000"
+MONTHLY_AI_WARNING_FRACTION = "0.8"
+
+[[d1_databases]]
+binding = "USAGE_DB"
+database_name = "attune-ai-usage"
+database_id = "6dc6369c-3c30-4644-9a60-4d2d0e07c713"
+migrations_dir = "migrations"
+
 [observability]
 enabled = true
 head_sampling_rate = 1

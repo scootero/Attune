@@ -197,6 +197,9 @@ struct HomeView: View {
     @State private var isGeneratingSuggestion = false
     @State private var showSuggestionEditor = false
     @State private var showSuggestionEvidence = false
+    @ObservedObject private var suggestionToastCenter = IntentionSuggestionToastCenter.shared
+    @State private var oneThingMode = OneThingModeState.empty
+    @State private var suggestedReplacement: Intention?
     
     var body: some View {
         NavigationView {
@@ -254,6 +257,26 @@ struct HomeView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
+
+            if let suggestion = suggestionToastCenter.homeSuggestion {
+                IntentionSuggestionToast(
+                    suggestion: suggestion,
+                    onReview: {
+                        suggestionToastCenter.dismissHomeSuggestion(id: suggestion.id)
+                        intentionSuggestion = suggestion
+                        showSuggestionEditor = true
+                    },
+                    onDismiss: { declineSuggestion(suggestion) }
+                )
+                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.bottom, 76)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .transition(suggestionToastTransition(edge: .bottom))
+                .zIndex(4)
+                .task(id: suggestion.id) {
+                    await autoDismissHomeSuggestion(suggestion)
+                }
+            }
         }
         .navigationBarHidden(true)
         .onChange(of: state) { _, newState in
@@ -265,6 +288,20 @@ struct HomeView: View {
             try? AppPaths.ensureDirectoriesExist()
             Task { await evaluateIntentionSuggestion() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .attuneListeningSessionDidFinishProcessing)) { _ in
+            Task { await evaluateIntentionSuggestion(shouldPresentToast: true) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .attuneReviewIntentionSuggestion)) { notification in
+            guard let suggestion = notification.object as? SuggestedIntentionAction else { return }
+            intentionSuggestion = suggestion
+            suggestionToastCenter.dismissHomeSuggestion(id: suggestion.id)
+            showSuggestionEditor = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .attuneIntentionSuggestionDidResolve)) { notification in
+            guard let suggestionId = notification.object as? String,
+                  intentionSuggestion?.id == suggestionId else { return }
+            intentionSuggestion = nil
+        }
         .sheet(isPresented: $showEditIntentions) {
             EditIntentionsView()
                 .environmentObject(subscriptionManager)
@@ -273,7 +310,11 @@ struct HomeView: View {
         .sheet(isPresented: $showMoodEditor) {
             MoodEditorView(dateKey: ProgressCalculator.dateKey(for: Date()), onSaved: { refreshMoodAndStreak() })
         }
-        .sheet(isPresented: $showSuggestionEditor) {
+        .sheet(isPresented: $showSuggestionEditor, onDismiss: {
+            // The editor persists synchronously, but Home can otherwise render
+            // one stale frame while the sheet is being torn down.
+            refreshAll()
+        }) {
             if let suggestion = intentionSuggestion {
                 EditIntentionsView(
                     initialAddDraft: DraftIntention(
@@ -283,7 +324,9 @@ struct HomeView: View {
                         unit: suggestion.unit,
                         timeframe: suggestion.timeframe
                     ),
-                    onSuggestedIntentionSaved: { acceptSuggestion(suggestion) }
+                    onSuggestedIntentionSaved: { acceptSuggestion(suggestion) },
+                    replacementIntentionId: suggestedReplacement?.id,
+                    replacementIntentionTitle: suggestedReplacement?.title
                 )
                 .environmentObject(subscriptionManager)
             }
@@ -389,13 +432,18 @@ struct HomeView: View {
                         .font(.caption)
                         .foregroundStyle(AttuneTheme.textTertiary)
                 }
+                if let replacement = suggestedReplacement {
+                    Text("Maybe let “\(replacement.title)” rest for now and try this instead. It can come off the bench later.")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                }
                 HStack {
                     Button("Why this?") { showSuggestionEvidence = true }
                         .buttonStyle(.borderless)
                     Spacer()
                     Button("Not for me") { declineSuggestion(suggestion) }
                         .buttonStyle(.borderless)
-                    Button("Add this") { showSuggestionEditor = true }
+                    Button(suggestedReplacement == nil ? "Add this" : "Review swap") { showSuggestionEditor = true }
                         .buttonStyle(.borderedProminent)
                 }
             }
@@ -474,6 +522,10 @@ struct HomeView: View {
     private var todaysProgressCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             progressCardHeader
+
+            if OneThingModeFeature.isEnabled && oneThingMode.isActive {
+                oneThingModeBanner
+            }
             
             if todaysProgress.isEmpty {
                 HStack(spacing: 10) {
@@ -534,6 +586,7 @@ struct HomeView: View {
                         reduceMotion ? nil : .easeInOut(duration: 0.45),
                         value: highlightedProgressIntentionIDs
                     )
+                    .opacity(oneThingMode.isActive && oneThingMode.focusedIntentionId != row.id ? 0.38 : 1)
                     .accessibilityElement(children: .combine)
                 }
                 
@@ -559,7 +612,34 @@ struct HomeView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .attuneCard()
+        .todayIntentionsCard()
+    }
+
+    private var oneThingModeBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("ONE THING MODE", systemImage: "lock.shield")
+                .font(.caption.weight(.bold))
+                .tracking(0.9)
+                .foregroundStyle(AttuneTheme.warning)
+            Text("Two quiet days. The juggling act is off duty—pick one thing to move.")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AttuneTheme.textPrimary)
+            HStack {
+                Menu {
+                    ForEach(todaysProgress) { row in
+                        Button(row.intention.title) { selectOneThing(row.intention.id) }
+                    }
+                } label: {
+                    Label("Switch focus", systemImage: "arrow.triangle.swap")
+                }
+                Spacer()
+                Button("Exit") { exitOneThingMode() }
+            }
+            .font(.caption.weight(.semibold))
+        }
+        .padding(12)
+        .background(AttuneTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(AttuneTheme.warning.opacity(0.35)))
     }
 
     @ViewBuilder
@@ -1489,9 +1569,11 @@ struct HomeView: View {
         loadIntentionsBreakdown()
         loadWeekMomentum()
         loadLowestProgressIntention()
+        evaluateOneThingMode()
+        updateSuggestedReplacement()
     }
 
-    private func evaluateIntentionSuggestion() async {
+    private func evaluateIntentionSuggestion(shouldPresentToast: Bool = false) async {
         guard IntentionSuggestionFeature.isEnabled else { return }
         do {
             try IntentionSuggestionStore.shared.bootstrapExistingInstallIfNeeded()
@@ -1505,6 +1587,10 @@ struct HomeView: View {
             )
             let activeSet = IntentionSetStore.shared.loadCurrentIntentionSet()
             let activeIntentions = IntentionStore.shared.loadIntentions(ids: activeSet?.intentionIds ?? [])
+            suggestedReplacement = replacementCandidateIfNeeded(
+                activeIntentions: activeIntentions,
+                intentionSet: activeSet
+            )
             let decision = IntentionSuggestionEngine.decide(
                 snapshot: snapshot,
                 topics: topics,
@@ -1513,8 +1599,24 @@ struct HomeView: View {
             )
             switch decision {
             case .show(let suggestion):
+                guard !IntentionSuggestionEngine.isCoveredByActiveIntention(
+                    suggestionTitle: suggestion.title,
+                    activeIntentions: activeIntentions
+                ) else {
+                    // Covers outstanding suggestions created before the active
+                    // intention existed, including older app versions.
+                    try IntentionSuggestionStore.shared.decide(.accepted, suggestion: suggestion)
+                    intentionSuggestion = nil
+                    suggestionToastCenter.resolveSuggestion(id: suggestion.id)
+                    return
+                }
                 intentionSuggestion = suggestion
                 suggestionNudge = nil
+                if shouldPresentToast {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.84)) {
+                        suggestionToastCenter.presentAfterProcessing(suggestion)
+                    }
+                }
             case .nudgeToRecord(let key):
                 suggestionNudge = "Talk it out a few times so Attune can notice a recurring theme before suggesting anything."
                 try IntentionSuggestionStore.shared.recordNudge(opportunityKey: key)
@@ -1532,28 +1634,34 @@ struct HomeView: View {
                     activeIntentions: activeIntentions,
                     declinedActionIds: declinedIds
                 ) else { return }
-                let activeNames = Set(activeIntentions.flatMap { [$0.title] + $0.aliases }.map(normalizedSuggestionName))
-                guard !activeNames.contains(normalizedSuggestionName(suggestion.title)),
+                guard !IntentionSuggestionEngine.isCoveredByActiveIntention(
+                          suggestionTitle: suggestion.title,
+                          activeIntentions: activeIntentions
+                      ),
                       !IntentionSuggestionEngine.isPermanentlyDeclined(actionId: suggestion.actionId, history: snapshot.history) else {
                     return
                 }
                 try IntentionSuggestionStore.shared.setOutstanding(suggestion)
                 intentionSuggestion = suggestion
                 suggestionNudge = nil
+                if shouldPresentToast {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.84)) {
+                        suggestionToastCenter.presentAfterProcessing(suggestion)
+                    }
+                }
             }
         } catch {
             AppLogger.log(AppLogger.ERR, "Intention suggestion unavailable error=\"\(error.localizedDescription)\"")
         }
     }
 
-    private func normalizedSuggestionName(_ value: String) -> String {
-        value.lowercased().filter { $0.isLetter || $0.isNumber }
-    }
-
     private func declineSuggestion(_ suggestion: SuggestedIntentionAction) {
         do {
             try IntentionSuggestionStore.shared.decide(.declined, suggestion: suggestion)
             intentionSuggestion = nil
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.34)) {
+                suggestionToastCenter.resolveSuggestion(id: suggestion.id)
+            }
         } catch {
             AppLogger.log(AppLogger.ERR, "Suggestion decline failed error=\"\(error.localizedDescription)\"")
         }
@@ -1563,9 +1671,139 @@ struct HomeView: View {
         do {
             try IntentionSuggestionStore.shared.decide(.accepted, suggestion: suggestion)
             intentionSuggestion = nil
+            suggestionToastCenter.resolveSuggestion(id: suggestion.id)
             refreshAll()
         } catch {
             AppLogger.log(AppLogger.ERR, "Suggestion acceptance state failed error=\"\(error.localizedDescription)\"")
+        }
+    }
+
+    private func autoDismissHomeSuggestion(_ suggestion: SuggestedIntentionAction) async {
+        guard !UIAccessibility.isVoiceOverRunning else { return }
+        try? await Task.sleep(nanoseconds: 5_000_000_000)
+        guard !Task.isCancelled else { return }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.78)) {
+            suggestionToastCenter.dismissHomeSuggestion(id: suggestion.id)
+        }
+    }
+
+    private func suggestionToastTransition(edge: Edge) -> AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .asymmetric(
+                insertion: .move(edge: edge).combined(with: .opacity),
+                removal: .move(edge: edge).combined(with: .opacity)
+            )
+    }
+
+    private func evaluateOneThingMode(now: Date = Date()) {
+        guard OneThingModeFeature.isEnabled else {
+            oneThingMode = .empty
+            return
+        }
+        guard let intentionSet = IntentionSetStore.shared.loadCurrentIntentionSet() else {
+            oneThingMode = .empty
+            return
+        }
+        let intentions = IntentionStore.shared.loadIntentions(ids: intentionSet.intentionIds).filter(\.isActive)
+        var state = OneThingModeStore.shared.load()
+        if state.isActive, !intentions.contains(where: { $0.id == state.focusedIntentionId }) {
+            if let first = intentions.first {
+                try? OneThingModeStore.shared.select(first.id)
+                state = OneThingModeStore.shared.load()
+            } else {
+                try? OneThingModeStore.shared.exit(now: now)
+                state = .empty
+            }
+        }
+
+        let activityKeys = recentActivityDateKeys(days: 2, intentionSet: intentionSet, now: now)
+        if OneThingModePolicy.shouldActivate(
+            state: state,
+            intentionSetStartedAt: intentionSet.startedAt,
+            activeIntentionCount: intentions.count,
+            activityDateKeys: activityKeys,
+            now: now
+        ), let first = intentions.first {
+            do {
+                try OneThingModeStore.shared.activate(focusedIntentionId: first.id, now: now)
+                state = OneThingModeStore.shared.load()
+            } catch {
+                AppLogger.log(AppLogger.ERR, "One Thing Mode activation failed error=\"\(error.localizedDescription)\"")
+            }
+        }
+        oneThingMode = state
+    }
+
+    private func selectOneThing(_ intentionId: String) {
+        do {
+            try OneThingModeStore.shared.select(intentionId)
+            oneThingMode = OneThingModeStore.shared.load()
+        } catch {
+            AppLogger.log(AppLogger.ERR, "One Thing Mode selection failed error=\"\(error.localizedDescription)\"")
+        }
+    }
+
+    private func exitOneThingMode() {
+        do {
+            try OneThingModeStore.shared.exit()
+            oneThingMode = OneThingModeStore.shared.load()
+        } catch {
+            AppLogger.log(AppLogger.ERR, "One Thing Mode exit failed error=\"\(error.localizedDescription)\"")
+        }
+    }
+
+    private func updateSuggestedReplacement() {
+        guard let set = IntentionSetStore.shared.loadCurrentIntentionSet() else {
+            suggestedReplacement = nil
+            return
+        }
+        let active = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
+        suggestedReplacement = replacementCandidateIfNeeded(activeIntentions: active, intentionSet: set)
+    }
+
+    private func replacementCandidateIfNeeded(
+        activeIntentions: [Intention],
+        intentionSet: IntentionSet?
+    ) -> Intention? {
+        guard !subscriptionManager.canAddIntention(currentCount: activeIntentions.count),
+              let intentionSet else { return nil }
+        let keys = previousDateKeys(days: 3)
+        var totals: [String: [Double]] = [:]
+        for key in keys {
+            let entries = ProgressStore.shared.loadEntries(dateKey: key, intentionSetId: intentionSet.id)
+            let overrides = OverrideStore.shared.loadOverridesForDate(dateKey: key)
+            for intention in activeIntentions {
+                totals[intention.id, default: []].append(
+                    ProgressCalculator.totalForIntention(
+                        entries: entries,
+                        dateKey: key,
+                        intentionId: intention.id,
+                        intentionSetId: intentionSet.id,
+                        overrideAmount: overrides[intention.id]
+                    )
+                )
+            }
+        }
+        return OneThingModePolicy.replacementCandidate(intentions: activeIntentions, dailyTotals: totals)
+    }
+
+    private func recentActivityDateKeys(days: Int, intentionSet: IntentionSet, now: Date) -> Set<String> {
+        let keys = Set(previousDateKeys(days: days, now: now))
+        var active = Set(ProgressStore.shared.loadAllProgressEntries().filter {
+            $0.intentionSetId == intentionSet.id && keys.contains($0.dateKey)
+        }.map(\.dateKey))
+        for key in keys where !OverrideStore.shared.loadOverrideRecordsForDate(dateKey: key).isEmpty {
+            active.insert(key)
+        }
+        return active
+    }
+
+    private func previousDateKeys(days: Int, now: Date = Date()) -> [String] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        return (1...days).compactMap { offset in
+            calendar.date(byAdding: .day, value: -offset, to: today).map { ProgressCalculator.dateKey(for: $0) }
         }
     }
     

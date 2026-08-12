@@ -7,17 +7,24 @@
 //
 
 import SwiftUI
+
+extension Notification.Name {
+    static let attuneListeningSessionDidFinishProcessing = Notification.Name("attune.listening.session.didFinishProcessing")
+}
 import UIKit
 
 struct HomeRecordView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var appRouter: AppRouter
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
+    @ObservedObject private var suggestionToastCenter = IntentionSuggestionToastCenter.shared
     @StateObject private var recorder = RecorderService.shared
     @StateObject private var transcriptionQueue = TranscriptionQueue.shared
     @StateObject private var extractionQueue = ExtractionQueue.shared
 
     @State private var isRequestingPermission = false
+    @State private var isCheckingAIUsage = false
     @State private var isProcessing = false
     @State private var processingSessionId: String?
     @State private var activeSessionId: String?
@@ -35,7 +42,9 @@ struct HomeRecordView: View {
     @State private var showSessionsSheet = false
     @State private var showInsightsSheet = false
     @State private var showPaywall = false
-    @State private var completedRecapSessionId: String?
+    @State private var recapPreview: (sessionId: String, recap: SessionRecap)?
+    @State private var recapDetailSessionId: String?
+    @State private var recapPreviewToken = UUID()
 
     var body: some View {
         ZStack {
@@ -52,6 +61,45 @@ struct HomeRecordView: View {
                 .padding(.bottom, 104)
             }
             .scrollIndicators(.hidden)
+
+            if let recapPreview {
+                Button {
+                    openRecapDetails(sessionId: recapPreview.sessionId)
+                } label: {
+                    SessionRecapPreviewCard(recap: recapPreview.recap)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.bottom, 88)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .transition(
+                    reduceMotion
+                        ? .opacity
+                        : .asymmetric(
+                            insertion: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.96, anchor: .bottom)),
+                            removal: .move(edge: .bottom).combined(with: .opacity)
+                        )
+                )
+                .zIndex(2)
+                .accessibilityLabel("Session highlight. \(recapPreview.recap.headline)")
+                .accessibilityHint("Opens the full session details")
+            }
+
+            if let suggestion = suggestionToastCenter.talkSuggestion {
+                IntentionSuggestionToast(
+                    suggestion: suggestion,
+                    onReview: { reviewSuggestionFromTalk(suggestion) },
+                    onDismiss: { declineSuggestionFromTalk(suggestion) }
+                )
+                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.top, 8)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .transition(suggestionToastTransition(edge: .top))
+                .zIndex(3)
+                .task(id: suggestion.id) {
+                    await autoDismissTalkSuggestion(suggestion)
+                }
+            }
         }
         .onAppear {
             loadTodayCounts()
@@ -95,11 +143,11 @@ struct HomeRecordView: View {
         }
         .sheet(
             isPresented: Binding(
-                get: { completedRecapSessionId != nil },
-                set: { if !$0 { completedRecapSessionId = nil } }
+                get: { recapDetailSessionId != nil },
+                set: { if !$0 { recapDetailSessionId = nil } }
             )
         ) {
-            if let sessionId = completedRecapSessionId {
+            if let sessionId = recapDetailSessionId {
                 SessionRecapSheet(sessionId: sessionId)
             }
         }
@@ -175,9 +223,15 @@ struct HomeRecordView: View {
             }
 
             Button(action: startListeningSession) {
-                Label("Start talking", systemImage: "record.circle")
+                if isCheckingAIUsage {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Label("Start talking", systemImage: "record.circle")
+                }
             }
             .buttonStyle(AttunePrimaryButtonStyle())
+            .disabled(isCheckingAIUsage)
             .accessibilityHint("Starts recording so Attune can organize captured ideas and themes")
         }
     }
@@ -399,6 +453,22 @@ struct HomeRecordView: View {
         }
 
         startErrorMessage = nil
+        isCheckingAIUsage = true
+        Task { @MainActor in
+            defer { isCheckingAIUsage = false }
+            do {
+                let status = try await OpenAIClient.usageStatus()
+                guard !status.limited else { return }
+                requestRecordingPermissionIfNeeded()
+            } catch let error as OpenAIClientError {
+                startErrorMessage = error.errorDescription
+            } catch {
+                startErrorMessage = "Couldn’t check AI availability. Check your connection and try again."
+            }
+        }
+    }
+
+    private func requestRecordingPermissionIfNeeded() {
         switch PermissionsHelper.recordingPermissionState {
         case .ready:
             beginRecording()
@@ -525,8 +595,13 @@ struct HomeRecordView: View {
     /// Displays completion feedback only after this session's transcription and captures are saved.
     private func showCompletionFeedback(for sessionId: String) {
         recentInsightsAddedCount = ExtractionStore.shared.loadExtractions(sessionId: sessionId).count
+        NotificationCenter.default.post(
+            name: .attuneListeningSessionDidFinishProcessing,
+            object: nil,
+            userInfo: ["sessionId": sessionId]
+        )
         if SessionRecapFeature.isEnabled {
-            completedRecapSessionId = sessionId
+            showRecapPreview(for: sessionId)
         }
         let token = UUID()
         completionFeedbackToken = token
@@ -542,6 +617,91 @@ struct HomeRecordView: View {
             }
             recentInsightsAddedCount = 0
         }
+    }
+
+    private func showRecapPreview(for sessionId: String) {
+        guard let session = SessionStore.shared.loadSession(id: sessionId) else { return }
+
+        let captures = ExtractionStore.shared.loadExtractions(sessionId: sessionId)
+        let recap = SessionRecapBuilder.makeRecap(
+            currentSession: session,
+            currentItems: captures,
+            allSessions: SessionStore.shared.loadAllSessions(),
+            allItems: ExtractionStore.shared.loadAllExtractions(),
+            topics: SessionRecapTopicSnapshotReader.load(),
+            corrections: CorrectionsStore.shared.loadCorrections()
+        )
+        let token = UUID()
+        recapPreviewToken = token
+
+        withAnimation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.82)) {
+            recapPreview = (sessionId, recap)
+        }
+
+        // Keep transient content available while VoiceOver is reading it.
+        guard !UIAccessibility.isVoiceOverRunning else { return }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard recapPreviewToken == token else { return }
+            dismissRecapPreview()
+        }
+    }
+
+    private func openRecapDetails(sessionId: String) {
+        dismissRecapPreview()
+        recapDetailSessionId = sessionId
+    }
+
+    private func dismissRecapPreview() {
+        recapPreviewToken = UUID()
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.38)) {
+            recapPreview = nil
+        }
+    }
+
+    private func reviewSuggestionFromTalk(_ suggestion: SuggestedIntentionAction) {
+        suggestionToastCenter.dismissTalkSuggestion(id: suggestion.id)
+        appRouter.selectedRootTab = .home
+        Task { @MainActor in
+            await Task.yield()
+            NotificationCenter.default.post(
+                name: .attuneReviewIntentionSuggestion,
+                object: suggestion
+            )
+        }
+    }
+
+    private func declineSuggestionFromTalk(_ suggestion: SuggestedIntentionAction) {
+        do {
+            try IntentionSuggestionStore.shared.decide(.declined, suggestion: suggestion)
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.34)) {
+                suggestionToastCenter.resolveSuggestion(id: suggestion.id)
+            }
+            NotificationCenter.default.post(
+                name: .attuneIntentionSuggestionDidResolve,
+                object: suggestion.id
+            )
+        } catch {
+            AppLogger.log(AppLogger.ERR, "Suggestion decline failed error=\"\(error.localizedDescription)\"")
+        }
+    }
+
+    private func autoDismissTalkSuggestion(_ suggestion: SuggestedIntentionAction) async {
+        guard !UIAccessibility.isVoiceOverRunning else { return }
+        try? await Task.sleep(nanoseconds: 5_000_000_000)
+        guard !Task.isCancelled else { return }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.78)) {
+            suggestionToastCenter.dismissTalkSuggestion(id: suggestion.id)
+        }
+    }
+
+    private func suggestionToastTransition(edge: Edge) -> AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .asymmetric(
+                insertion: .move(edge: edge).combined(with: .opacity),
+                removal: .move(edge: edge).combined(with: .opacity)
+            )
     }
 }
 

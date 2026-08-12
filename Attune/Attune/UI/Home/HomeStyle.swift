@@ -278,6 +278,96 @@ extension View {
     func glassCard() -> some View {
         self.modifier(GlassCardModifier())
     }
+
+    /// A quieter retro-glass treatment reserved for Today's intentions.
+    func todayIntentionsCard() -> some View {
+        modifier(TodayIntentionsCardModifier())
+    }
+}
+
+private struct TodayIntentionsCardModifier: ViewModifier {
+    private let shape = RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: shape)
+            .background(
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            AttuneTheme.accent.opacity(0.13),
+                            AttuneTheme.backgroundRaised.opacity(0.72),
+                            AttuneTheme.accentSecondary.opacity(0.11)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+
+                    RadialGradient(
+                        colors: [AttuneTheme.accent.opacity(0.12), .clear],
+                        center: .topTrailing,
+                        startRadius: 4,
+                        endRadius: 230
+                    )
+
+                    RetroDistanceTexture()
+                        .opacity(0.22)
+                }
+                .clipShape(shape)
+                .allowsHitTesting(false)
+            )
+            .overlay {
+                shape
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                AttuneTheme.accent.opacity(0.48),
+                                Color.white.opacity(0.10),
+                                AttuneTheme.accentSecondary.opacity(0.34)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.7
+                    )
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: AttuneTheme.accent.opacity(0.08), radius: 13, x: 0, y: 6)
+            .shadow(color: Color.black.opacity(0.23), radius: 12, x: 0, y: 7)
+    }
+}
+
+private struct RetroDistanceTexture: View {
+    var body: some View {
+        Canvas { context, size in
+            let horizon = size.height * 0.42
+
+            for y in stride(from: horizon, through: size.height, by: 8) {
+                let progress = (y - horizon) / max(size.height - horizon, 1)
+                var line = Path()
+                line.move(to: CGPoint(x: 0, y: y))
+                line.addLine(to: CGPoint(x: size.width, y: y))
+                context.stroke(
+                    line,
+                    with: .color(AttuneTheme.accent.opacity(0.05 + progress * 0.08)),
+                    lineWidth: 0.45
+                )
+            }
+
+            let centerX = size.width * 0.5
+            for x in stride(from: -size.width, through: size.width * 2, by: 28) {
+                var ray = Path()
+                ray.move(to: CGPoint(x: centerX, y: horizon))
+                ray.addLine(to: CGPoint(x: x, y: size.height))
+                context.stroke(
+                    ray,
+                    with: .color(AttuneTheme.accentSecondary.opacity(0.07)),
+                    lineWidth: 0.45
+                )
+            }
+        }
+        .blur(radius: 0.45)
+    }
 }
 
 // MARK: - RecordCheckInButtonStyle

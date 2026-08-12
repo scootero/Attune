@@ -114,15 +114,59 @@ function buildIntentionSuggestionTask(rawBody: unknown): ValidationResult {
   }
   if (!Array.isArray(rawBody.declinedActionIds) || rawBody.declinedActionIds.length > 100 || !rawBody.declinedActionIds.every((v) => typeof v === "string" && v.length <= 100)) return invalid("declinedActionIds must be an array of action IDs");
 
-  const catalog = SUGGESTION_ACTIONS.filter((action) => action.categories.some((category) => (rawBody.topic as Record<string, unknown>).categories instanceof Array && ((rawBody.topic as Record<string, unknown>).categories as string[]).includes(category)));
+  const topicCategories = rawBody.topic.categories as string[];
+  const evidenceText = `${title.value} ${evidence.map((item) => item.quote).join(" ")}`.toLowerCase();
+  const declinedActionIds = rawBody.declinedActionIds as string[];
+  const catalog = isSensitiveSuggestionEvidence(evidenceText)
+    ? []
+    : SUGGESTION_ACTIONS.filter((action) =>
+        action.categories.some((category) => topicCategories.includes(category))
+        && matchesSpecializedActionFamily(action.actionId, topicCategories, evidenceText)
+        && !declinedActionIds.includes(action.actionId)
+        && !isActionCoveredByActiveIntentions(action.title, activeIntentions)
+      );
   const systemMessage = INTENTION_SUGGESTION_SYSTEM_PROMPT;
   const userMessage = JSON.stringify({ topic: { key: key.value, title: title.value, categories: rawBody.topic.categories }, evidence, activeIntentions, declinedActionIds: rawBody.declinedActionIds, allowedActions: catalog.map(({ actionId, title, targetValue, unit, timeframe, categories }) => ({ actionId, title, targetValue, unit, timeframe, categories })) });
   return valid({
     taskName: "intention_suggestion",
     inputCharacters: systemMessage.length + userMessage.length,
-    suggestionContext: { evidenceItemIds: evidence.map((item) => item.itemId), declinedActionIds: rawBody.declinedActionIds as string[], allowedActionIds: catalog.map((action) => action.actionId) },
+    suggestionContext: { evidenceItemIds: evidence.map((item) => item.itemId), declinedActionIds, allowedActionIds: catalog.map((action) => action.actionId) },
     request: chatRequest(systemMessage, userMessage, INTENTION_SUGGESTION_SCHEMA, 500),
   });
+}
+
+function matchesSpecializedActionFamily(
+  actionId: string,
+  categories: string[],
+  evidenceText: string,
+): boolean {
+  const learningTheme = categories.includes("personal_growth")
+    && /\b(learn|learning|study|studying|remember|retention|read|reading|course|class|notes?|understand|explain)\b/.test(evidenceText);
+  if (learningTheme) return actionId.startsWith("learning.");
+  return !actionId.startsWith("learning.");
+}
+
+function isActionCoveredByActiveIntentions(
+  actionTitle: string,
+  activeIntentions: Array<{ title: string; aliases: string[] }>,
+): boolean {
+  const actionTerms = coverageTerms(actionTitle);
+  return activeIntentions.some((intention) => {
+    const activeTerms = coverageTerms([intention.title, ...intention.aliases].join(" "));
+    return actionTerms.some((term) => activeTerms.has(term));
+  });
+}
+
+function coverageTerms(value: string): Set<string> {
+  const ignored = new Set([
+    "a", "an", "and", "at", "daily", "do", "for", "from", "in", "minute", "minutes",
+    "my", "of", "one", "short", "take", "the", "this", "times", "to", "today", "two", "weekly",
+  ]);
+  return new Set(value.toLowerCase().split(/[^a-z0-9]+/).filter((term) => term.length >= 3 && !ignored.has(term)));
+}
+
+function isSensitiveSuggestionEvidence(value: string): boolean {
+  return /\b(chest pain|suicid|self[- ]?harm|eating disorder|anorexia|bulimia|pregnan|medication|prescription|injur|severe pain|can'?t breathe|cannot breathe|investment advice|which stock|bankrupt|debt settlement)\b/.test(value);
 }
 
 function buildCheckInTask(rawBody: unknown): ValidationResult {
@@ -501,10 +545,10 @@ CALENDAR CANDIDATES:
 Return ONLY valid JSON matching the schema. No markdown, no explanations.
 If nothing meets the quality bar, return: {"items": []}`;
 
-const INTENTION_SUGGESTION_SYSTEM_PROMPT = `Choose at most one small, realistic action from allowedActions that is supported by the user's repeated evidence.
+const INTENTION_SUGGESTION_SYSTEM_PROMPT = `Choose at most one small, realistic, genuinely useful action from allowedActions that is supported by the user's repeated evidence. Prefer a creative but practical action that helps the user learn, notice, practice, or make a concrete next move—not one that merely repeats the topic title or an active intention.
 Return null when the connection is weak, an active intention already covers it, or the evidence mentions injury, pain, pregnancy, medication, eating disorders, acute symptoms, crisis, debt strategy, investing, or another situation requiring individualized professional guidance.
 Never diagnose, prescribe, infer emotion, invent personal facts, or write a new action. Use an allowed actionId exactly. Do not select a declinedActionId.
-The reason must be calm, specific to the repeated theme, under 140 characters, and must not claim guaranteed outcomes. Cite one or more supplied evidenceItemIds. Return JSON only.`;
+The reason must be specific to the repeated theme, under 140 characters, lightly clever when natural, professional, never mocking, and must not claim guaranteed outcomes. Cite one or more supplied evidenceItemIds. Return JSON only.`;
 
 const CHECK_IN_SCHEMA: ServerOwnedChatRequest["response_format"]["json_schema"] = {
   name: "checkin_extraction",

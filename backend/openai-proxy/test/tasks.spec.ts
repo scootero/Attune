@@ -137,6 +137,36 @@ describe("server-owned v2 task routes", () => {
     expect(body.suggestion.sourceURL).toContain("consumerfinance.gov");
   });
 
+  it("hydrates a learning action that is more useful than repeating the topic", async () => {
+    const learningBody = { ...suggestionBody, topic: { key: "personal_growth|learning", title: "Learning", categories: ["personal_growth"] } };
+    const response = await handleRequest(
+      taskRequest(TASK_PATHS.intentionSuggestion, learningBody), env,
+      async () => chatCompletion({ actionId: "learning.teach_one_daily", reason: "Your learning theme keeps returning; teaching one idea turns review into retrieval.", evidenceItemIds: ["item-1", "item-2"] }),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as { suggestion: Record<string, unknown> };
+    expect(body.suggestion.title).toBe("Teach one idea from memory");
+    expect(body.suggestion.sourceURL).toContain("doi.org");
+  });
+
+  it("rejects a generic action for an obvious learning theme", async () => {
+    const learningBody = { ...suggestionBody, topic: { key: "personal_growth|learning", title: "Learning", categories: ["personal_growth"] }, evidence: [
+      { itemId: "item-1", sessionDate: "2026-08-01T12:00:00Z", quote: "I want to remember what I study." },
+      { itemId: "item-2", sessionDate: "2026-08-08T12:00:00Z", quote: "I want to explain what I learn." },
+    ] };
+    const response = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, learningBody), env, async () => chatCompletion({ actionId: "routine.next_step_10_daily", reason: "Too generic", evidenceItemIds: ["item-1"] }));
+    expect(response.status).toBe(502);
+  });
+
+  it("allows no catalog action for sensitive individualized evidence", async () => {
+    const sensitiveBody = { ...suggestionBody, topic: { key: "fitness_health|pain", title: "Pain", categories: ["fitness_health"] }, evidence: [
+      { itemId: "item-1", sessionDate: "2026-08-01T12:00:00Z", quote: "I have severe pain after my medication." },
+      { itemId: "item-2", sessionDate: "2026-08-08T12:00:00Z", quote: "The injury keeps getting worse." },
+    ] };
+    const response = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, sensitiveBody), env, async () => chatCompletion({ actionId: "movement.walk_5_daily", reason: "Unsafe", evidenceItemIds: ["item-1"] }));
+    expect(response.status).toBe(502);
+  });
+
   it("returns no suggestion when the conservative model declines", async () => {
     const response = await handleRequest(
       taskRequest(TASK_PATHS.intentionSuggestion, suggestionBody),
@@ -165,6 +195,19 @@ describe("server-owned v2 task routes", () => {
     const response = await handleRequest(
       taskRequest(TASK_PATHS.intentionSuggestion, fitnessBody), env,
       async () => chatCompletion({ actionId: "finance.review_spending_5_daily", reason: "Wrong category", evidenceItemIds: ["item-1"] }),
+    );
+    expect(response.status).toBe(502);
+  });
+
+  it("removes actions already covered by an active intention", async () => {
+    const fitnessBody = {
+      ...suggestionBody,
+      topic: { key: "fitness_health|walking", title: "Walking", categories: ["fitness_health"] },
+      activeIntentions: [{ title: "Walk", aliases: [] }],
+    };
+    const response = await handleRequest(
+      taskRequest(TASK_PATHS.intentionSuggestion, fitnessBody), env,
+      async () => chatCompletion({ actionId: "movement.walk_5_daily", reason: "Duplicate", evidenceItemIds: ["item-1"] }),
     );
     expect(response.status).toBe(502);
   });

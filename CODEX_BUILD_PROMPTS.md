@@ -396,6 +396,21 @@ timeframe, source, and safety note. It must return no suggestion for medical,
 acute-symptom, eating-disorder, investment, debt-strategy, or otherwise
 individualized contexts. This is one extra AI call only after a topic qualifies.
 
+**Approved cadence revision:** Reevaluate immediately whenever a Talk it out
+session finishes processing. Every user gets an introduction period for this
+new feature: days 0-20 use a two-distinct-session floor and four-day cooldown;
+days 21-50 use three sessions and a seven-day cooldown; steady state uses four
+sessions spanning 14 days and a 14-day cooldown. Completion observation must
+not modify `ExtractionQueue`.
+
+**Approved focus-mode revision:** After the previous two full local-calendar
+days contain no progress entry or manual override, Home may enter a reversible
+One Thing Mode. It focuses the first intention and visually mutes the others,
+but never changes or deletes the IntentionSet. The user can switch or exit.
+When a suggestion arrives at the tier limit, stage an explicit replacement of
+the first zero-progress intention, otherwise the lowest three-day average, in
+the normal editor; persist only on Save.
+
 ## On the onboarding cadence
 
 Your instinct is right: a pure "4+ mentions across 2+ weeks" gate means a new

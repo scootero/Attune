@@ -15,6 +15,7 @@ enum OpenAIClientError: Error, LocalizedError {
     case timeout
     case networkError(Error)
     case decodingError(Error)
+    case monthlyUsageLimitReached(resetDate: Date?)
     /// User has not accepted the AI & privacy disclosure yet.
     case privacyConsentRequired
     
@@ -30,6 +31,11 @@ enum OpenAIClientError: Error, LocalizedError {
             return "Network error: \(error.localizedDescription)"
         case .decodingError(let error):
             return "Failed to decode response: \(error.localizedDescription)"
+        case .monthlyUsageLimitReached(let resetDate):
+            if let resetDate {
+                return "Monthly AI limit reached. Your allowance refreshes \(resetDate.formatted(date: .abbreviated, time: .omitted))."
+            }
+            return "Monthly AI limit reached. Your allowance refreshes next month."
         case .privacyConsentRequired:
             return "AI privacy consent is required before sending transcripts"
         }
@@ -85,6 +91,11 @@ struct OpenAIClient {
     /// Default timeout interval (30 seconds)
     private static let timeoutInterval: TimeInterval = 30.0
 
+    private static func applyGatewayHeaders(to request: inout URLRequest) {
+        request.setValue("Bearer \(Secrets.appProxyToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(AIInstallationIdentity.value, forHTTPHeaderField: "X-Attune-Installation-Id")
+    }
+
     static func usesServerOwnedV2(_ task: ServerOwnedTask) -> Bool {
         #if DEBUG
         // Keep every feature independently switchable during physical-device rollout.
@@ -110,6 +121,25 @@ struct OpenAIClient {
     
     // MARK: - Public API
 
+    /// Checks the server allowance before beginning a long recording.
+    static func usageStatus() async throws -> AIUsageStatus {
+        let url = URL(string: "\(baseURL)/v2/usage")!
+        var request = URLRequest(url: url, timeoutInterval: timeoutInterval)
+        request.httpMethod = "GET"
+        applyGatewayHeaders(to: &request)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OpenAIClientError.invalidResponse
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            try await throwGatewayError(statusCode: httpResponse.statusCode, data: data)
+        }
+        let status = try JSONDecoder().decode(AIUsageStatus.self, from: data)
+        AIUsageNoticeCenter.shared.consume(status)
+        return status
+    }
+
     /// Calls a server-owned v2 task and returns its direct structured JSON.
     /// The Worker—not the app—chooses the model, prompts, schema, and limits.
     static func serverOwnedTask(
@@ -124,7 +154,7 @@ struct OpenAIClient {
         let url = URL(string: "\(baseURL)\(task.rawValue)")!
         var request = URLRequest(url: url, timeoutInterval: timeoutInterval)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(Secrets.appProxyToken)", forHTTPHeaderField: "Authorization")
+        applyGatewayHeaders(to: &request)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -148,8 +178,10 @@ struct OpenAIClient {
                 AppLogger.ERR,
                 "v2_request_failed task=\(task.rawValue) status=\(httpResponse.statusCode) ms=\(elapsedMs) error=\"\(bodyString ?? "no body")\""
             )
-            throw OpenAIClientError.httpError(statusCode: httpResponse.statusCode, body: bodyString)
+            try await throwGatewayError(statusCode: httpResponse.statusCode, data: data)
         }
+
+        await publishUsageHeaders(httpResponse)
 
         guard httpResponse.value(forHTTPHeaderField: "X-Attune-Contract-Version") == "1",
               let jsonString = String(data: data, encoding: .utf8) else {
@@ -193,7 +225,7 @@ struct OpenAIClient {
         request.httpMethod = "POST"
         
         // Headers (never log the Authorization header) — app proxy token, not OpenAI key
-        request.setValue("Bearer \(Secrets.appProxyToken)", forHTTPHeaderField: "Authorization")
+        applyGatewayHeaders(to: &request)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         // Request body
@@ -230,8 +262,10 @@ struct OpenAIClient {
                 AppLogger.ERR,
                 "request_failed status=\(httpResponse.statusCode) ms=\(elapsedMs) error=\"\(bodyString ?? "no body")\""
             )
-            throw OpenAIClientError.httpError(statusCode: httpResponse.statusCode, body: bodyString)
+            try await throwGatewayError(statusCode: httpResponse.statusCode, data: data)
         }
+
+        await publishUsageHeaders(httpResponse)
         
         // Full AI JSON only in Debug — avoid persisting transcripts/insights in Release logs.
         #if DEBUG
@@ -300,7 +334,7 @@ struct OpenAIClient {
         request.httpMethod = "POST"
         
         // Headers (never log the Authorization header) — app proxy token, not OpenAI key
-        request.setValue("Bearer \(Secrets.appProxyToken)", forHTTPHeaderField: "Authorization")
+        applyGatewayHeaders(to: &request)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         // Request body
@@ -335,8 +369,10 @@ struct OpenAIClient {
                 AppLogger.ERR,
                 "request_failed status=\(httpResponse.statusCode) ms=\(elapsedMs) error=\"\(bodyString ?? "no body")\""
             )
-            throw OpenAIClientError.httpError(statusCode: httpResponse.statusCode, body: bodyString)
+            try await throwGatewayError(statusCode: httpResponse.statusCode, data: data)
         }
+
+        await publishUsageHeaders(httpResponse)
         
         // Decode response
         let decoder = JSONDecoder()
@@ -362,5 +398,46 @@ struct OpenAIClient {
         #endif
         
         return content
+    }
+
+    private static func throwGatewayError(statusCode: Int, data: Data) async throws -> Never {
+        if statusCode == 429,
+           let payload = try? JSONDecoder().decode(AIUsageErrorPayload.self, from: data),
+           payload.code == "monthly_ai_limit_reached" {
+            let resetDate = payload.resetsAt.flatMap { ISO8601DateFormatter().date(from: $0) }
+            AIUsageNoticeCenter.shared.showLimit(resetDate: resetDate)
+            throw OpenAIClientError.monthlyUsageLimitReached(resetDate: resetDate)
+        }
+        throw OpenAIClientError.httpError(
+            statusCode: statusCode,
+            body: String(data: data, encoding: .utf8)
+        )
+    }
+
+    private static func publishUsageHeaders(_ response: HTTPURLResponse) async {
+        guard
+            let usedText = response.value(forHTTPHeaderField: "X-Attune-Usage-Used"),
+            let limitText = response.value(forHTTPHeaderField: "X-Attune-Usage-Limit"),
+            let warningText = response.value(forHTTPHeaderField: "X-Attune-Usage-Warning-At"),
+            let reset = response.value(forHTTPHeaderField: "X-Attune-Usage-Reset"),
+            let period = response.value(forHTTPHeaderField: "X-Attune-Usage-Period"),
+            let enforcedText = response.value(forHTTPHeaderField: "X-Attune-Usage-Enforced"),
+            let used = Int(usedText),
+            let limit = Int(limitText),
+            let warningAt = Int(warningText),
+            limit > 0
+        else { return }
+
+        AIUsageNoticeCenter.shared.consume(
+            AIUsageStatus(
+                usedUnits: used,
+                limitUnits: limit,
+                warningAtUnits: warningAt,
+                warning: used >= warningAt,
+                limited: enforcedText == "true" && used >= limit,
+                resetsAt: reset,
+                period: period
+            )
+        )
     }
 }
