@@ -68,6 +68,14 @@ private struct IntentionProgressRow: Identifiable {
     var id: String { intention.id }
 }
 
+/// Prevents opening and saving the manual editor from creating chart events for
+/// intentions whose totals were not actually changed.
+enum ManualProgressSavePolicy {
+    static func hasChanged(current: Double, original: Double, epsilon: Double = 0.000_001) -> Bool {
+        abs(current - original) > epsilon
+    }
+}
+
 struct HomeView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -644,7 +652,7 @@ struct HomeView: View {
         loadIntentionsBreakdown() // recompute counts from live data
     }
     
-    /// Saves overrides for each intention based on slider values, then exits mode.
+    /// Saves overrides only for intentions whose slider totals actually changed.
     private func saveUpdateProgressMode() {
         guard currentIntentionSet != nil else { // ensure we have a set
             isUpdateProgressMode = false // bail out to safe state
@@ -652,13 +660,17 @@ struct HomeView: View {
         }
         let previousPercents = displayedProgressPercentages()
         let dateKey = ProgressCalculator.dateKey(for: Date()) // today’s date key
+        let savedAt = Date() // one timestamp keeps multiple real changes in the same manual chart cluster
         for row in todaysProgress { // iterate intentions shown
             let value = sliderValues[row.intention.id] ?? row.total // use slider or existing total
+            let originalValue = originalTotals[row.intention.id] ?? row.total
+            guard ManualProgressSavePolicy.hasChanged(current: value, original: originalValue) else { continue }
             let override = ManualProgressOverride( // build override payload
                 dateKey: dateKey, // apply to today
                 intentionId: row.intention.id, // target intention
                 amount: value, // slider total
-                unit: row.intention.unit // preserve unit for display
+                unit: row.intention.unit, // preserve unit for display
+                updatedAt: savedAt
             )
             try? OverrideStore.shared.setOverride(override) // persist override; silent fail to avoid blocking UI
         }

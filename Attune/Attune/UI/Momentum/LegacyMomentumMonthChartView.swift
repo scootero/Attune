@@ -14,6 +14,18 @@ struct LegacyMomentumMonthChartView: View {
     let bars: [MonthDayBar]
 
     var body: some View {
+        Group {
+            if hasMomentumData {
+                chart
+            } else {
+                MomentumEmptyChartView(period: "month")
+                    .padding(16)
+                    .glassCard()
+            }
+        }
+    }
+
+    private var chart: some View {
         Chart {
             ForEach(elapsedBars) { bar in
                 BarMark(
@@ -50,6 +62,10 @@ struct LegacyMomentumMonthChartView: View {
         .accessibilityLabel("Monthly progress chart")
         .padding(16)
         .glassCard()
+    }
+
+    private var hasMomentumData: Bool {
+        elapsedBars.contains { ($0.ratio ?? 0) > 0 }
     }
 
     private var elapsedBars: [MonthDayBar] {

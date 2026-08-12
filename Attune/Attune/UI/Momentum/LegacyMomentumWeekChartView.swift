@@ -23,12 +23,21 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
     @State private var dimension: LegacyWeekDimension = .threeD
     
     var body: some View {
-        Group {
-            if dimension == .threeD {
-                threeDContent
-            } else {
-                twoDContent
+        if allBars.isEmpty {
+            VStack(spacing: 16) {
+                HStack {
+                    Spacer()
+                    dimensionSwitcher
+                }
+
+                MomentumEmptyChartView(period: "week")
             }
+            .padding(16)
+            .glassCard()
+        } else if dimension == .threeD {
+            threeDContent
+        } else {
+            twoDContent
         }
     }
 
@@ -193,75 +202,52 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
                 dimensionSwitcher
             }
 
-            if allBars.isEmpty {
-                twoDEmptyState
-            } else {
-                Chart {
-                    if yAxisMax > 100 {
-                        RuleMark(y: .value("Target", 100))
-                            .foregroundStyle(AttuneTheme.success.opacity(0.5))
-                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    }
+            Chart {
+                if yAxisMax > 100 {
+                    RuleMark(y: .value("Target", 100))
+                        .foregroundStyle(AttuneTheme.success.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                }
 
-                    ForEach(days) { day in
-                        ForEach(day.bars) { bar in
-                            BarMark(
-                                x: .value("Day", day.date, unit: .day),
-                                y: .value("Progress", bar.percent)
-                            )
-                            .position(by: .value("Intention", bar.intentionId))
-                            .foregroundStyle(MomentumPalette.color(forIndex: bar.colorIndex).gradient)
-                            .cornerRadius(4)
-                            .accessibilityLabel("\(bar.intentionTitle), \(day.date.formatted(.dateTime.weekday(.wide)))")
-                            .accessibilityValue("\(Int(bar.percent.rounded())) percent")
-                        }
-                    }
-
-                }
-                .chartYScale(domain: 0...yAxisMax)
-                .chartXAxis {
-                    AxisMarks(values: days.map(\.date)) { value in
-                        AxisValueLabel(format: .dateTime.weekday(.narrow))
-                            .foregroundStyle(AttuneTheme.textSecondary)
+                ForEach(days) { day in
+                    ForEach(day.bars) { bar in
+                        BarMark(
+                            x: .value("Day", day.date, unit: .day),
+                            y: .value("Progress", bar.percent)
+                        )
+                        .position(by: .value("Intention", bar.intentionId))
+                        .foregroundStyle(MomentumPalette.color(forIndex: bar.colorIndex).gradient)
+                        .cornerRadius(4)
+                        .accessibilityLabel("\(bar.intentionTitle), \(day.date.formatted(.dateTime.weekday(.wide)))")
+                        .accessibilityValue("\(Int(bar.percent.rounded())) percent")
                     }
                 }
-                .chartYAxis {
-                    AxisMarks(position: .leading, values: .stride(by: 25)) { value in
-                        AxisGridLine().foregroundStyle(AttuneTheme.border)
-                        AxisValueLabel {
-                            if let number = value.as(Double.self) {
-                                Text("\(Int(number))%")
-                            }
-                        }
-                        .foregroundStyle(AttuneTheme.textSecondary)
-                    }
-                }
-                .frame(height: 220)
-                .accessibilityLabel("Weekly progress chart")
             }
+            .chartYScale(domain: 0...yAxisMax)
+            .chartXAxis {
+                AxisMarks(values: days.map(\.date)) { value in
+                    AxisValueLabel(format: .dateTime.weekday(.narrow))
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .stride(by: 25)) { value in
+                    AxisGridLine().foregroundStyle(AttuneTheme.border)
+                    AxisValueLabel {
+                        if let number = value.as(Double.self) {
+                            Text("\(Int(number))%")
+                        }
+                    }
+                    .foregroundStyle(AttuneTheme.textSecondary)
+                }
+            }
+            .frame(height: 220)
+            .accessibilityLabel("Weekly progress chart")
         }
     }
 
     private var allBars: [LegacyWeekIntentionBar] {
         days.flatMap(\.bars)
-    }
-
-    private var twoDEmptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "calendar.badge.clock")
-                .font(.system(size: 30, weight: .medium))
-                .foregroundStyle(AttuneTheme.accent)
-            Text("No recorded progress this week")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
-            Text("Progress appears after a check-in records a numeric update.")
-                .font(.caption)
-                .foregroundStyle(AttuneTheme.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 210)
-        .padding(.horizontal, 20)
     }
 
     private var dimensionSwitcher: some View {
