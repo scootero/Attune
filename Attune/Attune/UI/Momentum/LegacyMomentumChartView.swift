@@ -17,15 +17,15 @@ private enum LegacyMomentumChartStyle: String, CaseIterable {
 }
 
 /// One deterministic, chart-wide layout pass for the daily 3D bars.
-/// Same-minute bars divide a single centered slot, while neighboring time
-/// clusters shrink horizontally when their rendered 3D footprints would collide.
+/// Every bar keeps one consistent width. Same-minute bars fan out around their
+/// timestamp and neighboring clusters shift just enough to keep front faces apart.
 struct DailyMomentumBarLayout {
     struct Item {
         let point: MomentumPoint
         let centerX: CGFloat
         let barWidth: CGFloat
 
-        var footprintLeft: CGFloat { centerX - (barWidth * 1.5) }
+        var footprintLeft: CGFloat { centerX - (barWidth * 1.05) }
         var footprintRight: CGFloat { centerX + (barWidth * 0.5) }
     }
 
@@ -33,18 +33,19 @@ struct DailyMomentumBarLayout {
         let points: [MomentumPoint]
         let anchorX: CGFloat
         var centerX: CGFloat
-        var memberWidth: CGFloat
+        let memberWidth: CGFloat
 
         var leftReach: CGFloat {
-            CGFloat(points.count + 2) * memberWidth / 2
+            frontHalfWidth + (memberWidth * 0.55)
         }
 
         var rightReach: CGFloat {
-            CGFloat(points.count) * memberWidth / 2
+            frontHalfWidth
         }
 
-        var frontFaceReach: CGFloat {
-            CGFloat(points.count) * memberWidth / 2
+        var frontHalfWidth: CGFloat {
+            let step = memberWidth + 4
+            return (CGFloat(max(0, points.count - 1)) * step + memberWidth) / 2
         }
     }
 
@@ -72,60 +73,54 @@ struct DailyMomentumBarLayout {
             }
             let minuteOffset = TimeInterval(minute * 60)
             let anchorX = CGFloat(minuteOffset / dayDuration) * chartWidth
-            let width = max(minimumBarWidth, baseBarWidth / CGFloat(sorted.count))
+            let width = max(minimumBarWidth, baseBarWidth)
             return Cluster(points: sorted, anchorX: anchorX, centerX: anchorX, memberWidth: width)
         }
         .sorted { $0.anchorX < $1.anchorX }
 
-        // Width reduction is global: every neighboring time cluster participates,
-        // including bars originating from different recordings or manual updates.
-        if clusters.count > 1 {
-            for _ in 0..<4 {
-                for index in 0..<(clusters.count - 1) {
-                    shrinkPairIfNeeded(index, in: &clusters, gap: clusterGap, minimumBarWidth: minimumBarWidth)
-                }
-                for index in stride(from: clusters.count - 2, through: 0, by: -1) {
-                    shrinkPairIfNeeded(index, in: &clusters, gap: clusterGap, minimumBarWidth: minimumBarWidth)
-                }
-            }
+        // Preserve widths and resolve crowding by moving clusters, never by making
+        // some activities visually less important with thinner bars.
+        for index in clusters.indices {
+            let minimumCenter = index == clusters.startIndex
+                ? clusters[index].leftReach
+                : clusters[index - 1].centerX + clusters[index - 1].rightReach + clusters[index].leftReach + clusterGap
+            clusters[index].centerX = max(clusters[index].anchorX, minimumCenter)
         }
 
-        // Keep front faces inside the plot without moving valid timestamps merely
-        // because their decorative 3D depth projects left of the first grid line.
-        for index in clusters.indices {
-            let minimumCenter = clusters[index].frontFaceReach
-            let maximumCenter = chartWidth - clusters[index].frontFaceReach
-            if minimumCenter <= maximumCenter {
-                clusters[index].centerX = min(max(clusters[index].anchorX, minimumCenter), maximumCenter)
+        if let lastIndex = clusters.indices.last {
+            let overflow = clusters[lastIndex].centerX + clusters[lastIndex].rightReach - chartWidth
+            if overflow > 0 {
+                for index in clusters.indices { clusters[index].centerX -= overflow }
+            }
+
+            for index in stride(from: lastIndex, through: clusters.startIndex, by: -1) {
+                let maximumCenter = index == lastIndex
+                    ? chartWidth - clusters[index].rightReach
+                    : clusters[index + 1].centerX - clusters[index].rightReach - clusters[index + 1].leftReach - clusterGap
+                clusters[index].centerX = min(clusters[index].centerX, maximumCenter)
             }
         }
 
         return clusters.flatMap { cluster in
             let centerIndex = CGFloat(cluster.points.count - 1) / 2
+            let memberStep = cluster.memberWidth + 4
             return cluster.points.enumerated().map { index, point in
                 Item(
                     point: point,
-                    centerX: cluster.centerX + (CGFloat(index) - centerIndex) * cluster.memberWidth,
+                    centerX: cluster.centerX + (CGFloat(index) - centerIndex) * memberStep,
                     barWidth: cluster.memberWidth
                 )
             }
         }
     }
 
-    private static func shrinkPairIfNeeded(
-        _ leftIndex: Int,
-        in clusters: inout [Cluster],
-        gap: CGFloat,
-        minimumBarWidth: CGFloat
-    ) {
-        let rightIndex = leftIndex + 1
-        let distance = clusters[rightIndex].anchorX - clusters[leftIndex].anchorX
-        let required = clusters[leftIndex].rightReach + clusters[rightIndex].leftReach + gap
-        guard required > distance, required > 0 else { return }
+}
 
-        let scale = max(0, (distance - gap) / required)
-        clusters[leftIndex].memberWidth = max(minimumBarWidth, clusters[leftIndex].memberWidth * scale)
-        clusters[rightIndex].memberWidth = max(minimumBarWidth, clusters[rightIndex].memberWidth * scale)
+enum DailyMomentumBarStyle {
+    /// Preserve the intention color through the first 20%, then progressively
+    /// increase the neon treatment at each fifth of the goal.
+    static func neonIntensity(for percent: Double) -> Double {
+        min(1, max(0, (percent - 20) / 80))
     }
 }
 
@@ -140,7 +135,7 @@ struct DailyMomentumTimeDomain {
     var duration: TimeInterval { end.timeIntervalSince(start) }
 
     var tickDates: [Date] {
-        let step: TimeInterval = 4 * 60 * 60
+        let step: TimeInterval = 60 * 60
         var result = [start]
         var next = start.addingTimeInterval(step)
         while next < end {
@@ -354,8 +349,14 @@ struct LegacyMomentumChartView: View {
     /// 3D Chart with perspective view from upper left corner. Bars have 6px depth, grid lines are 3D.
     private var chartContent: some View {
         let domain = timeDomain
-        return GeometryReader { geometry in
-            Canvas { context, size in
+        let hasCompletedBar = filteredPoints.contains { $0.percent >= 100 }
+        return TimelineView(.animation(minimumInterval: 1.0 / 8.0, paused: reduceMotion || !hasCompletedBar)) { timeline in
+            GeometryReader { geometry in
+                Canvas { context, size in
+                    let seconds = timeline.date.timeIntervalSinceReferenceDate
+                    let completionPulse = reduceMotion
+                        ? 1.0
+                        : 0.72 + (0.28 * ((sin(seconds * .pi * 2 / 3) + 1) / 2))
                 // 3D perspective settings: viewing from upper left corner
                 let depthOffset: CGFloat = 60 // Increase depth 10x so grid lines and bars project much further back into space for a stronger 3D effect.
                 let perspectiveAngle: CGFloat = 0.32 // Slightly steeper angle so the extended depth remains visible without flattening.
@@ -374,11 +375,15 @@ struct LegacyMomentumChartView: View {
                 
                 // Draw X-axis labels
                 drawXAxisLabels(context: context, chartWidth: chartWidth, chartHeight: chartHeight, leftPadding: leftPadding, bottomPadding: bottomPadding, domain: domain)
+
+                // Subtle day boundary markers anchor the waking-to-sleep timeline.
+                drawDayBoundarySymbols(context: context, chartWidth: chartWidth, chartHeight: chartHeight, leftPadding: leftPadding)
                 
                 // Draw 3D bars with depth
-                draw3DBars(context: context, chartWidth: chartWidth, chartHeight: chartHeight, leftPadding: leftPadding, bottomPadding: bottomPadding, depthOffset: depthOffset, perspectiveAngle: perspectiveAngle, domain: domain)
+                draw3DBars(context: context, chartWidth: chartWidth, chartHeight: chartHeight, leftPadding: leftPadding, bottomPadding: bottomPadding, depthOffset: depthOffset, perspectiveAngle: perspectiveAngle, domain: domain, completionPulse: completionPulse)
+                }
+                .frame(height: 220)
             }
-            .frame(height: 220)
         }
         .frame(height: 220)
     }
@@ -425,10 +430,12 @@ struct LegacyMomentumChartView: View {
                 AxisGridLine().foregroundStyle(AttuneTheme.border)
                 AxisValueLabel {
                     if let date = value.as(Date.self) {
-                        Text(axisLabel(for: date, showsOmission: domain.omitsMidnight && date == domain.start))
+                        let hasActivity = isActivityHour(date)
+                        Text(compactAxisLabel(for: date, showsOmission: domain.omitsMidnight && date == domain.start))
+                            .font(.system(size: hasActivity ? 9 : 8, weight: hasActivity ? .bold : .regular))
+                            .foregroundStyle(hasActivity ? AttuneTheme.accent : AttuneTheme.textSecondary)
                     }
                 }
-                .foregroundStyle(AttuneTheme.textSecondary)
             }
         }
         .chartYAxis {
@@ -560,26 +567,52 @@ struct LegacyMomentumChartView: View {
         for (index, tick) in domain.tickDates.enumerated() {
             let ratio = CGFloat(tick.timeIntervalSince(domain.start) / domain.duration)
             let xPos = leftPadding + ratio * chartWidth
-            let label = axisLabel(for: tick, showsOmission: domain.omitsMidnight && index == 0)
+            let label = compactAxisLabel(for: tick, showsOmission: domain.omitsMidnight && index == 0)
             let anchor: UnitPoint = index == 0 ? .leading : (index == domain.tickDates.count - 1 ? .trailing : .center)
+            let hasActivity = isActivityHour(tick)
             
             // Draw time label below chart
             var textContext = context
+            if hasActivity {
+                textContext.addFilter(.shadow(color: AttuneTheme.accent.opacity(0.75), radius: 3))
+            }
             textContext.translateBy(x: xPos, y: chartHeight + 20)
             textContext.draw(
                 Text(label)
-                    .font(.system(size: 9))
-                    .foregroundColor(.gray),
+                    .font(.system(size: hasActivity ? 8 : 7, weight: hasActivity ? .bold : .regular))
+                    .foregroundStyle(hasActivity ? AttuneTheme.accent : Color.gray.opacity(0.82)),
                 at: .zero,
                 anchor: anchor
             )
         }
     }
+
+    private func drawDayBoundarySymbols(context: GraphicsContext, chartWidth: CGFloat, chartHeight: CGFloat, leftPadding: CGFloat) {
+        let baselineY = chartHeight + 9
+        let sunCenter = CGPoint(x: leftPadding + 2, y: baselineY)
+        let moonCenter = CGPoint(x: leftPadding + chartWidth - 2, y: baselineY)
+        let symbolColor = AttuneTheme.accent.opacity(0.35)
+
+        var sun = Path()
+        sun.addEllipse(in: CGRect(x: sunCenter.x - 2.5, y: sunCenter.y - 2.5, width: 5, height: 5))
+        for index in 0..<8 {
+            let angle = CGFloat(index) * .pi / 4
+            sun.move(to: CGPoint(x: sunCenter.x + cos(angle) * 4, y: sunCenter.y + sin(angle) * 4))
+            sun.addLine(to: CGPoint(x: sunCenter.x + cos(angle) * 6, y: sunCenter.y + sin(angle) * 6))
+        }
+        context.stroke(sun, with: .color(symbolColor), lineWidth: 0.8)
+
+        var crescent = Path()
+        crescent.addArc(center: moonCenter, radius: 5, startAngle: .degrees(55), endAngle: .degrees(305), clockwise: false)
+        crescent.addArc(center: CGPoint(x: moonCenter.x + 3, y: moonCenter.y - 0.5), radius: 4.5, startAngle: .degrees(285), endAngle: .degrees(75), clockwise: true)
+        crescent.closeSubpath()
+        context.fill(crescent, with: .color(Color(red: 0.72, green: 0.82, blue: 1).opacity(0.38)))
+    }
     
     /// Draws deliberately overlapped 3D clusters. The rightmost bar is drawn first
     /// at the back; each bar moving left is drawn later, one layer closer.
-    private func draw3DBars(context: GraphicsContext, chartWidth: CGFloat, chartHeight: CGFloat, leftPadding: CGFloat, bottomPadding: CGFloat, depthOffset: CGFloat, perspectiveAngle: CGFloat, domain: DailyMomentumTimeDomain) {
-        let baseBarWidth: CGFloat = 28 // Slightly wider while the global pass still prevents collisions.
+    private func draw3DBars(context: GraphicsContext, chartWidth: CGFloat, chartHeight: CGFloat, leftPadding: CGFloat, bottomPadding: CGFloat, depthOffset: CGFloat, perspectiveAngle: CGFloat, domain: DailyMomentumTimeDomain, completionPulse: Double) {
+        let baseBarWidth: CGFloat = 20
 
         let laidOut = DailyMomentumBarLayout.makeItems(
             points: filteredPoints,
@@ -587,7 +620,7 @@ struct LegacyMomentumChartView: View {
             dayDuration: domain.duration,
             chartWidth: chartWidth,
             baseBarWidth: baseBarWidth,
-            minimumBarWidth: 7
+            minimumBarWidth: baseBarWidth
         )
 
         // Draw the furthest-right bar first at the back, then move left. Same-time
@@ -601,7 +634,7 @@ struct LegacyMomentumChartView: View {
         for item in drawOrdered {
             let point = item.point
             let barWidth = item.barWidth
-            let barDepth = barWidth
+            let barDepth = barWidth * 0.55
 
             let xPos = leftPadding + item.centerX - (barWidth / 2)
 
@@ -612,6 +645,8 @@ struct LegacyMomentumChartView: View {
 
             // Bar color per intention (stable colorIndex mapping); legend shows these colors
             let barColor = MomentumPalette.color(forIndex: point.colorIndex)
+            let neonIntensity = DailyMomentumBarStyle.neonIntensity(for: point.percent)
+            let pulse = point.percent >= 100 ? completionPulse : 1
             
             // Artificial light from above: top face brightest, front lit, side and back in shadow so edges and depth are visible.
             let backShade = Color.black.opacity(0.5)   // Back face darkest (furthest from light)
@@ -652,12 +687,28 @@ struct LegacyMomentumChartView: View {
             // 4. Front face — main view, well lit
             var frontFace = Path()
             frontFace.addRect(CGRect(x: xPos, y: yPos, width: barWidth, height: barHeight))
-            context.fill(frontFace, with: .color(barColor))
+            context.fill(
+                frontFace,
+                with: .linearGradient(
+                    Gradient(colors: [
+                        barColor.opacity(0.9),
+                        Color.white.opacity(0.08 + neonIntensity * 0.30),
+                        barColor
+                    ]),
+                    startPoint: CGPoint(x: xPos, y: yPos),
+                    endPoint: CGPoint(x: xPos + barWidth, y: yPos + barHeight)
+                )
+            )
             context.fill(frontFace, with: .color(frontShade)) // Slight shade so edges are visible
             
             // Add glow effect to front face
             context.drawLayer { layerContext in
-                layerContext.addFilter(.shadow(color: barColor.opacity(0.6), radius: 4, x: 0, y: 2))
+                layerContext.addFilter(.shadow(
+                    color: barColor.opacity(0.22 + neonIntensity * 0.78 * pulse),
+                    radius: 2 + neonIntensity * 10 * pulse,
+                    x: 0,
+                    y: 1
+                ))
                 layerContext.fill(frontFace, with: .color(barColor))
             }
             
@@ -706,6 +757,19 @@ struct LegacyMomentumChartView: View {
         formatter.timeZone = TimeZone.current
         let time = formatter.string(from: date)
         return showsOmission ? "… \(time)" : time
+    }
+
+    private func compactAxisLabel(for date: Date, showsOmission: Bool) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "ha"
+        formatter.timeZone = TimeZone.current
+        let time = formatter.string(from: date).lowercased()
+        return showsOmission ? "…\(time)" : time
+    }
+
+    private func isActivityHour(_ date: Date) -> Bool {
+        let calendar = Calendar.current
+        return filteredPoints.contains { calendar.isDate($0.date, equalTo: date, toGranularity: .hour) }
     }
 
     /// Empty state when no momentum data for the selected day

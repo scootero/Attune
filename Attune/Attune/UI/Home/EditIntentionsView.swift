@@ -70,8 +70,17 @@ struct EditIntentionsView: View {
     @State private var baselineAddDraft: DraftIntention = DraftIntention.empty() // original add-card state (empty)
     /// Presents Pro when a Free user tries to create a second intention.
     @State private var showIntentionLimitPaywall = false
+    private let initialAddDraft: DraftIntention?
+    private let onSuggestedIntentionSaved: (() -> Void)?
     /// Shared haptic generator for slider snaps.
     private let hapticEngine = UIImpactFeedbackGenerator(style: .light) // reused to avoid reallocating per snap
+
+    init(initialAddDraft: DraftIntention? = nil, onSuggestedIntentionSaved: (() -> Void)? = nil) {
+        self.initialAddDraft = initialAddDraft
+        self.onSuggestedIntentionSaved = onSuggestedIntentionSaved
+        _addDraft = State(initialValue: initialAddDraft ?? DraftIntention.empty())
+        _isAddExpanded = State(initialValue: initialAddDraft != nil)
+    }
     
     var body: some View {
         NavigationStack {
@@ -459,10 +468,10 @@ struct EditIntentionsView: View {
                     )
                 }
                 baselineDrafts = draftIntentions // capture baseline for dirty tracking
-                addDraft = DraftIntention.empty() // reset add card to empty on load
-                baselineAddDraft = addDraft // align baseline add draft id with current add draft
+                addDraft = initialAddDraft ?? DraftIntention.empty() // optionally review a suggested intention
+                baselineAddDraft = DraftIntention.empty() // suggestion remains an explicit unsaved change
                 expandedEditId = nil // collapse edits on load
-                isAddExpanded = false // collapse add card on load
+                isAddExpanded = initialAddDraft != nil // show every suggested field before Save
                 isLoadingDraft = false
             }
         }
@@ -499,6 +508,9 @@ struct EditIntentionsView: View {
             _ = try IntentionSetStore.shared.updateCurrentIntentionSet(intentionIds: intentionIds)
             
             AppLogger.log(AppLogger.STORE, "EditIntentions saved IntentionSet with \(intentionIds.count) intentions")
+            if let initialAddDraft, valid.contains(where: { $0.id == initialAddDraft.id }) {
+                onSuggestedIntentionSaved?()
+            }
             
             baselineDrafts = draftIntentions // update baseline to latest saved existing drafts
             addDraft = DraftIntention.empty() // clear add card after save

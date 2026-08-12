@@ -96,6 +96,24 @@ Success:
 `priorContext` may be omitted or `null`. Success returns the existing
 `{"items": [...]}` extraction object used by `ExtractorService`.
 
+## Recurring-theme small-action suggestion
+
+`POST /v2/intentions/suggest-action`
+
+Deployed August 12, 2026 in Worker version
+`a897f40b-59fd-4e76-8bee-825f3da7cfde`; authenticated synthetic smoke test
+returned HTTP 200 with contract version 1.
+
+The app sends one already-qualified recurring topic, two to five distinct-session
+evidence quotes, active intention titles/aliases, and permanently declined action
+IDs. The Worker asks the model to select one allowed action ID or return null,
+then validates and hydrates the selection from its curated catalog. The model
+cannot invent the title, target, unit, timeframe, source, or safety note.
+
+Success is either `{"suggestion": null}` or a `suggestion` object containing
+`actionId`, `title`, `targetValue`, `unit`, `timeframe`, `reason`, supporting
+`evidenceItemIds`, and optional source/safety fields.
+
 ## Error contract
 
 - `400`: invalid task input

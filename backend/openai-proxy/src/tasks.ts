@@ -1,9 +1,12 @@
 /** Server-owned AI task contracts for the parallel v2 rollout. */
 
+import { SUGGESTION_ACTIONS } from "./intention-suggestion-actions";
+
 export const TASK_PATHS = {
   checkIn: "/v2/check-ins/extract",
   intentions: "/v2/intentions/parse",
   listening: "/v2/listening/extract",
+  intentionSuggestion: "/v2/intentions/suggest-action",
 } as const;
 
 export type TaskPath = (typeof TASK_PATHS)[keyof typeof TASK_PATHS];
@@ -25,8 +28,13 @@ export type ServerOwnedChatRequest = {
 
 export type BuiltTask = {
   request: ServerOwnedChatRequest;
-  taskName: "check_in" | "intentions" | "listening";
+  taskName: "check_in" | "intentions" | "listening" | "intention_suggestion";
   inputCharacters: number;
+  suggestionContext?: {
+    evidenceItemIds: string[];
+    declinedActionIds: string[];
+    allowedActionIds: string[];
+  };
 };
 
 type ValidationResult =
@@ -59,7 +67,62 @@ export function buildTask(path: TaskPath, rawBody: unknown): ValidationResult {
       return buildIntentionsTask(rawBody);
     case TASK_PATHS.listening:
       return buildListeningTask(rawBody);
+    case TASK_PATHS.intentionSuggestion:
+      return buildIntentionSuggestionTask(rawBody);
   }
+}
+
+function buildIntentionSuggestionTask(rawBody: unknown): ValidationResult {
+  if (!isRecord(rawBody)) return invalid("Request body must be an object");
+  const keyError = validateKeys(rawBody, ["topic", "evidence", "activeIntentions", "declinedActionIds"]);
+  if (keyError) return invalid(keyError);
+  if (!isRecord(rawBody.topic)) return invalid("topic must be an object");
+  const topicKeyError = validateKeys(rawBody.topic, ["key", "title", "categories"]);
+  if (topicKeyError) return invalid(topicKeyError);
+  const key = validateText(rawBody.topic.key, "topic.key", 160);
+  const title = validateText(rawBody.topic.title, "topic.title", 120);
+  if (!key.ok) return invalid(key.error);
+  if (!title.ok) return invalid(title.error);
+  if (!Array.isArray(rawBody.topic.categories) || rawBody.topic.categories.length > 10 || !rawBody.topic.categories.every((v) => typeof v === "string" && v.length <= 50)) {
+    return invalid("topic.categories must be an array of short strings");
+  }
+  if (!Array.isArray(rawBody.evidence) || rawBody.evidence.length < 2 || rawBody.evidence.length > 5) {
+    return invalid("evidence must contain between 2 and 5 items");
+  }
+  const evidence: Array<{ itemId: string; sessionDate: string; quote: string }> = [];
+  for (const value of rawBody.evidence) {
+    if (!isRecord(value)) return invalid("Each evidence item must be an object");
+    const error = validateKeys(value, ["itemId", "sessionDate", "quote"]);
+    if (error) return invalid(error);
+    const itemId = validateText(value.itemId, "evidence.itemId", 128);
+    const sessionDate = validateText(value.sessionDate, "evidence.sessionDate", 64);
+    const quote = validateText(value.quote, "evidence.quote", 240);
+    if (!itemId.ok) return invalid(itemId.error);
+    if (!sessionDate.ok || !Number.isFinite(Date.parse(sessionDate.value))) return invalid("evidence.sessionDate must be ISO8601");
+    if (!quote.ok) return invalid(quote.error);
+    evidence.push({ itemId: itemId.value, sessionDate: sessionDate.value, quote: quote.value });
+  }
+  if (!Array.isArray(rawBody.activeIntentions) || rawBody.activeIntentions.length > MAX_INTENTIONS) return invalid("activeIntentions may contain at most 10 items");
+  const activeIntentions: Array<{ title: string; aliases: string[] }> = [];
+  for (const value of rawBody.activeIntentions) {
+    if (!isRecord(value)) return invalid("Each active intention must be an object");
+    const error = validateKeys(value, ["title", "aliases"]);
+    if (error) return invalid(error);
+    const activeTitle = validateText(value.title, "activeIntention.title", 120);
+    if (!activeTitle.ok || !Array.isArray(value.aliases) || value.aliases.length > 20 || !value.aliases.every((v) => typeof v === "string" && v.length <= 80)) return invalid("Invalid active intention");
+    activeIntentions.push({ title: activeTitle.value, aliases: value.aliases as string[] });
+  }
+  if (!Array.isArray(rawBody.declinedActionIds) || rawBody.declinedActionIds.length > 100 || !rawBody.declinedActionIds.every((v) => typeof v === "string" && v.length <= 100)) return invalid("declinedActionIds must be an array of action IDs");
+
+  const catalog = SUGGESTION_ACTIONS.filter((action) => action.categories.some((category) => (rawBody.topic as Record<string, unknown>).categories instanceof Array && ((rawBody.topic as Record<string, unknown>).categories as string[]).includes(category)));
+  const systemMessage = INTENTION_SUGGESTION_SYSTEM_PROMPT;
+  const userMessage = JSON.stringify({ topic: { key: key.value, title: title.value, categories: rawBody.topic.categories }, evidence, activeIntentions, declinedActionIds: rawBody.declinedActionIds, allowedActions: catalog.map(({ actionId, title, targetValue, unit, timeframe, categories }) => ({ actionId, title, targetValue, unit, timeframe, categories })) });
+  return valid({
+    taskName: "intention_suggestion",
+    inputCharacters: systemMessage.length + userMessage.length,
+    suggestionContext: { evidenceItemIds: evidence.map((item) => item.itemId), declinedActionIds: rawBody.declinedActionIds as string[], allowedActionIds: catalog.map((action) => action.actionId) },
+    request: chatRequest(systemMessage, userMessage, INTENTION_SUGGESTION_SCHEMA, 500),
+  });
 }
 
 function buildCheckInTask(rawBody: unknown): ValidationResult {
@@ -438,6 +501,11 @@ CALENDAR CANDIDATES:
 Return ONLY valid JSON matching the schema. No markdown, no explanations.
 If nothing meets the quality bar, return: {"items": []}`;
 
+const INTENTION_SUGGESTION_SYSTEM_PROMPT = `Choose at most one small, realistic action from allowedActions that is supported by the user's repeated evidence.
+Return null when the connection is weak, an active intention already covers it, or the evidence mentions injury, pain, pregnancy, medication, eating disorders, acute symptoms, crisis, debt strategy, investing, or another situation requiring individualized professional guidance.
+Never diagnose, prescribe, infer emotion, invent personal facts, or write a new action. Use an allowed actionId exactly. Do not select a declinedActionId.
+The reason must be calm, specific to the repeated theme, under 140 characters, and must not claim guaranteed outcomes. Cite one or more supplied evidenceItemIds. Return JSON only.`;
+
 const CHECK_IN_SCHEMA: ServerOwnedChatRequest["response_format"]["json_schema"] = {
   name: "checkin_extraction",
   strict: true,
@@ -563,6 +631,21 @@ const LISTENING_SCHEMA: ServerOwnedChatRequest["response_format"]["json_schema"]
       },
     },
     required: ["items"],
+    additionalProperties: false,
+  },
+};
+
+const INTENTION_SUGGESTION_SCHEMA: ServerOwnedChatRequest["response_format"]["json_schema"] = {
+  name: "intention_suggestion",
+  strict: true,
+  schema: {
+    type: "object",
+    properties: {
+      actionId: { type: ["string", "null"] },
+      reason: { type: ["string", "null"] },
+      evidenceItemIds: { type: "array", items: { type: "string" } },
+    },
+    required: ["actionId", "reason", "evidenceItemIds"],
     additionalProperties: false,
   },
 };

@@ -152,6 +152,11 @@ struct HomeRecordView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            Text("When a theme keeps returning, Attune may suggest one small, editable next step. Nothing is added without your tap.")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(AttuneTheme.accent)
+                .fixedSize(horizontal: false, vertical: true)
+
             VStack(alignment: .leading, spacing: 6) {
                 Text("Think out loud about a decision.")
                 Text("Brain dump everything on your mind.")

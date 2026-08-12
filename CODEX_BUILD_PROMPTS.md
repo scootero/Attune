@@ -387,6 +387,15 @@ double-count in a way that surprises you.
 This is the payoff. The app observes what someone keeps talking about and offers
 an intention. The user accepts or declines — so intentions stay theirs.
 
+**Approved implementation revision:** Do not merely turn the topic title into an
+intention. Once the local deterministic engine qualifies a recurring topic, the
+server-owned AI route may select one complete, small action from a curated,
+low-risk catalog—or return no suggestion. The Worker owns the catalog, validates
+the selected action and evidence IDs, and returns the fixed title, amount, unit,
+timeframe, source, and safety note. It must return no suggestion for medical,
+acute-symptom, eating-disorder, investment, debt-strategy, or otherwise
+individualized contexts. This is one extra AI call only after a topic qualifies.
+
 ## On the onboarding cadence
 
 Your instinct is right: a pure "4+ mentions across 2+ weeks" gate means a new
@@ -452,7 +461,7 @@ Universal rules that override everything above:
     A "record more" nudge is not an intention suggestion and does not consume
     the suggestion cooldown, but show it at most once per evaluation day.
   - A declined topicKey is suppressed for at least 90 days.
-  - Never suggest a topic that duplicates an existing active intention (check
+  - Never suggest an action that duplicates an existing active intention (check
     title and aliases).
   - If the user is at their active-intention limit for their tier, do not
     suggest. Do not use this as a paywall prompt in this phase.
@@ -482,7 +491,7 @@ TASK 4B — Suggestion card UI
 Where: Home, below existing content. One card, dismissible, never a feed.
 
 Content:
-  - Plain-language suggestion built from the topic's displayTitle.
+  - One complete small action chosen from the server-owned curated catalog.
   - Evidence, always: "You've brought up {topic} in {n} sessions this month."
     Here `{n}` must use the corrected, current-month distinct-session count
     defined above, never TopicAggregate.occurrenceCount.
@@ -492,21 +501,24 @@ Content:
 Onboarding copy carries exactly one clause of hedging, for example:
   "Still early, but based on your first few sessions — maybe {topic}?"
 
-"Add this" opens the existing AddEditIntentionView PREFILLED WITH THE TITLE
-ONLY. The user sets target value, unit, and timeframe themselves. Do not guess
-the amount — guessing "run 3x/week" from "I should run more" will be wrong often
-enough to erode trust, and the amount is the part users most want to own.
+"Add this" opens the existing intention editor prefilled with the catalog's
+title, target, unit, and timeframe. All fields stay editable and visible. The
+action remains only a suggestion until the user explicitly taps the editor's
+normal Save button.
 
-"Not for me" suppresses that topicKey per the engine rules.
+"Not for me" permanently suppresses that exact action ID and pauses that
+topicKey for 90 days. Other genuinely different actions for the topic may be
+considered after the pause.
 
 Nothing is created until the user completes the existing intention editor and
 saves through the normal path.
 
 TASK 4C — Persistence
 
-New additive store for: suggestion history (topicKey, date, outcome),
-suppression list, and first-launch date if not already recorded. Must decode
-safely when absent for existing users. Do not touch existing store schemas.
+New additive store for: suggestion history (actionId, topicKey, date, outcome),
+outstanding suggestion, completed onboarding opportunities, cooldown state,
+and first-launch date. Must decode safely when absent for existing users. Do
+not touch existing store schemas.
 
 DO NOT BUILD IN THIS PHASE:
 - Any mood, stress, or emotional-tone correlation. Frequency only. Suggesting

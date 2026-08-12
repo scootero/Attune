@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 /// State of the check-in recording flow
 private enum CheckInState: Equatable {
@@ -76,6 +77,68 @@ enum ManualProgressSavePolicy {
     }
 }
 
+/// Draft slider totals are visible only while the manual editor is open.
+/// Once editing ends, persisted progress is always the source of truth.
+enum ManualProgressDisplayPolicy {
+    static func displayedTotal(stored: Double, draft: Double?, isEditing: Bool) -> Double {
+        isEditing ? (draft ?? stored) : stored
+    }
+}
+
+/// Keeps manual progress continuous while adding a gentle magnetic stop at
+/// each eighth of the track (0%, 12.5%, ... 100%).
+enum ManualProgressSliderPolicy {
+    static let segmentCount = 8
+    static let snapThreshold = 0.02
+
+    static var tickPercents: [Double] {
+        (0...segmentCount).map { Double($0) / Double(segmentCount) }
+    }
+
+    static func nearbyTickIndex(for percent: Double) -> Int? {
+        let clamped = min(1, max(0, percent))
+        let nearestIndex = Int((clamped * Double(segmentCount)).rounded())
+        let nearestPercent = Double(nearestIndex) / Double(segmentCount)
+        return abs(clamped - nearestPercent) <= snapThreshold ? nearestIndex : nil
+    }
+
+    static func adjustedPercent(_ percent: Double) -> Double {
+        let clamped = min(1, max(0, percent))
+        guard let tickIndex = nearbyTickIndex(for: clamped) else { return clamped }
+        return Double(tickIndex) / Double(segmentCount)
+    }
+}
+
+/// UIKit haptics are kept out of the persistence path so a disabled system
+/// haptics setting never changes save behavior.
+@MainActor
+private enum ManualProgressHaptics {
+    static func editorOpened() {
+        let generator = UIImpactFeedbackGenerator(style: .soft)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.35)
+    }
+
+    static func crossedTick() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+    }
+
+    static func savedChanges() {
+        Task { @MainActor in
+            let generator = UIImpactFeedbackGenerator(style: .soft)
+            generator.prepare()
+            generator.impactOccurred(intensity: 0.35)
+            try? await Task.sleep(for: .milliseconds(110))
+            generator.prepare()
+            generator.impactOccurred(intensity: 0.55)
+            try? await Task.sleep(for: .milliseconds(140))
+            generator.impactOccurred(intensity: 0.8)
+        }
+    }
+}
+
 struct HomeView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -119,6 +182,8 @@ struct HomeView: View {
     @State private var sliderValues: [String: Double] = [:] // holds the working total for each intention while editing
     /// Original totals snapshot for cancel restore.
     @State private var originalTotals: [String: Double] = [:] // keeps baseline totals so Cancel can restore without saving
+    /// Tick currently holding each manual slider, used to avoid repeated haptics while it remains in one snap zone.
+    @State private var activeProgressSnapTicks: [String: Int] = [:]
     /// Intention rows that recently received a visible progress change.
     @State private var highlightedProgressIntentionIDs: Set<String> = []
     /// Prevents an older delayed reset from clearing a newer progress highlight.
@@ -127,6 +192,11 @@ struct HomeView: View {
     @State private var showPaywall = false
     /// Optional reason text passed into the paywall sheet.
     @State private var paywallReason: String? = nil
+    @State private var intentionSuggestion: SuggestedIntentionAction?
+    @State private var suggestionNudge: String?
+    @State private var isGeneratingSuggestion = false
+    @State private var showSuggestionEditor = false
+    @State private var showSuggestionEvidence = false
     
     var body: some View {
         NavigationView {
@@ -173,6 +243,9 @@ struct HomeView: View {
                         } else {
                             freeTodayMomentumCard
                         }
+                        if IntentionSuggestionFeature.isEnabled {
+                            intentionSuggestionArea
+                        }
                     }
                     .padding(.horizontal, AttuneTheme.horizontalPadding)
                     .padding(.top, 6)
@@ -190,6 +263,7 @@ struct HomeView: View {
             refreshAll()
             // Pre-create directories so they don't need to be created on button tap (reduces lag)
             try? AppPaths.ensureDirectoriesExist()
+            Task { await evaluateIntentionSuggestion() }
         }
         .sheet(isPresented: $showEditIntentions) {
             EditIntentionsView()
@@ -198,6 +272,57 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showMoodEditor) {
             MoodEditorView(dateKey: ProgressCalculator.dateKey(for: Date()), onSaved: { refreshMoodAndStreak() })
+        }
+        .sheet(isPresented: $showSuggestionEditor) {
+            if let suggestion = intentionSuggestion {
+                EditIntentionsView(
+                    initialAddDraft: DraftIntention(
+                        id: UUID().uuidString,
+                        title: suggestion.title,
+                        targetValue: suggestion.targetValue,
+                        unit: suggestion.unit,
+                        timeframe: suggestion.timeframe
+                    ),
+                    onSuggestedIntentionSaved: { acceptSuggestion(suggestion) }
+                )
+                .environmentObject(subscriptionManager)
+            }
+        }
+        .sheet(isPresented: $showSuggestionEvidence) {
+            if let suggestion = intentionSuggestion {
+                NavigationStack {
+                    List {
+                        Section("Why this appeared") {
+                            Text(suggestion.reason)
+                            if let monthCount = suggestion.currentMonthSessionCount, monthCount > 0 {
+                                Text("You brought up \(suggestion.topicTitle) in \(monthCount) separate Talk it out sessions this month.")
+                            } else {
+                                Text("You brought up \(suggestion.topicTitle) in \(suggestion.distinctSessionCount ?? Set(suggestion.evidence.map(\.sessionId)).count) separate Talk it out sessions.")
+                            }
+                        }
+                        Section("Your words") {
+                            ForEach(suggestion.evidence) { evidence in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(evidence.quote)
+                                    Text(evidence.sessionDate, style: .date)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        if let sourceTitle = suggestion.sourceTitle,
+                           let sourceURL = suggestion.sourceURL,
+                           let url = URL(string: sourceURL) {
+                            Section("General source") {
+                                Link(sourceTitle, destination: url)
+                                if let safetyNote = suggestion.safetyNote { Text(safetyNote) }
+                            }
+                        }
+                    }
+                    .navigationTitle("Why this suggestion?")
+                    .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { showSuggestionEvidence = false } } }
+                }
+            }
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -241,6 +366,63 @@ struct HomeView: View {
     }
     
     // MARK: - A) Daily Summary Strip (Slice B: compact single-line)
+
+    @ViewBuilder
+    private var intentionSuggestionArea: some View {
+        if let suggestion = intentionSuggestion {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("A SMALL NEXT STEP")
+                    .font(.caption.weight(.bold))
+                    .tracking(1.0)
+                    .foregroundStyle(AttuneTheme.accent)
+                Text(suggestion.title)
+                    .font(.headline)
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text("\(suggestion.targetValue.formatted()) \(suggestion.unit) · \(suggestion.timeframe)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textSecondary)
+                Text(suggestion.reason)
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+                if let safetyNote = suggestion.safetyNote {
+                    Text(safetyNote)
+                        .font(.caption)
+                        .foregroundStyle(AttuneTheme.textTertiary)
+                }
+                HStack {
+                    Button("Why this?") { showSuggestionEvidence = true }
+                        .buttonStyle(.borderless)
+                    Spacer()
+                    Button("Not for me") { declineSuggestion(suggestion) }
+                        .buttonStyle(.borderless)
+                    Button("Add this") { showSuggestionEditor = true }
+                        .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(16)
+            .attuneCard()
+        } else if let suggestionNudge {
+            HStack(spacing: 10) {
+                Image(systemName: "waveform.badge.mic")
+                    .foregroundStyle(AttuneTheme.accent)
+                Text(suggestionNudge)
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .attuneCard()
+        } else if isGeneratingSuggestion {
+            HStack(spacing: 10) {
+                ProgressView()
+                Text("Looking for one useful small step…")
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+            .padding(14)
+            .attuneCard()
+        }
+    }
     
     /// One compact glass row: "5 Check-ins • Mood 8/10 • 2 In Progress • 1 Done • 1 Not Started"
     /// Uses HomeStyle glassCard for modern crisp glassy look with bloom shadows.
@@ -317,17 +499,7 @@ struct HomeView: View {
                         }
                         
                         if isUpdateProgressMode {
-                            Slider(
-                                value: Binding(
-                                    get: { percentForTotal(sliderValues[row.intention.id] ?? row.total, intention: row.intention) },
-                                    set: { newPercent in
-                                        sliderValues[row.intention.id] = totalForPercent(newPercent, intention: row.intention)
-                                    }
-                                ),
-                                in: 0...1,
-                                step: 0.01
-                            )
-                            .tint(AttuneTheme.accent)
+                            manualProgressSlider(for: row)
                         } else {
                             SwiftUI.ProgressView(value: row.percent)
                                 .tint(AttuneTheme.accent)
@@ -443,11 +615,63 @@ struct HomeView: View {
     }
 
     private func intentionProgressSummaryText(for row: IntentionProgressRow) -> String {
-        let currentValue = sliderValues[row.intention.id] ?? row.total
+        let currentValue = ManualProgressDisplayPolicy.displayedTotal(
+            stored: row.total,
+            draft: sliderValues[row.intention.id],
+            isEditing: isUpdateProgressMode
+        )
         let isWeekly = row.intention.timeframe.lowercased() == "weekly"
         let targetValue = isWeekly ? row.intention.targetValue / 7.0 : row.intention.targetValue
         let paceNote = isWeekly ? " today · weekly pace" : " today"
         return "\(formattedProgressValue(currentValue)) / \(formattedProgressValue(targetValue)) \(compactUnit(row.intention.unit))\(paceNote)"
+    }
+
+    private func manualProgressSlider(for row: IntentionProgressRow) -> some View {
+        ZStack {
+            HStack(spacing: 0) {
+                ForEach(Array(ManualProgressSliderPolicy.tickPercents.enumerated()), id: \.offset) { index, _ in
+                    Capsule()
+                        .fill(
+                            index == 0 || index == ManualProgressSliderPolicy.segmentCount
+                                ? AttuneTheme.textTertiary.opacity(0.7)
+                                : AttuneTheme.textTertiary.opacity(0.5)
+                        )
+                        .frame(width: 1.5, height: index.isMultiple(of: 2) ? 9 : 6)
+                    if index < ManualProgressSliderPolicy.segmentCount {
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .padding(.horizontal, 15)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+
+            Slider(
+                value: Binding(
+                    get: { percentForTotal(sliderValues[row.intention.id] ?? row.total, intention: row.intention) },
+                    set: { newPercent in
+                        let adjustedPercent = ManualProgressSliderPolicy.adjustedPercent(newPercent)
+                        sliderValues[row.intention.id] = totalForPercent(adjustedPercent, intention: row.intention)
+                        updateProgressSnapFeedback(rawPercent: newPercent, intentionID: row.intention.id)
+                    }
+                ),
+                in: 0...1
+            )
+            .tint(AttuneTheme.accent)
+            .accessibilityLabel("Progress for \(row.intention.title)")
+            .accessibilityValue("\(Int((currentPercent(for: row) * 100).rounded())) percent")
+        }
+        .frame(minHeight: 30)
+    }
+
+    private func updateProgressSnapFeedback(rawPercent: Double, intentionID: String) {
+        guard let tickIndex = ManualProgressSliderPolicy.nearbyTickIndex(for: rawPercent) else {
+            activeProgressSnapTicks[intentionID] = nil
+            return
+        }
+        guard activeProgressSnapTicks[intentionID] != tickIndex else { return }
+        activeProgressSnapTicks[intentionID] = tickIndex
+        ManualProgressHaptics.crossedTick()
     }
 
     private func compactUnit(_ unit: String) -> String {
@@ -641,13 +865,17 @@ struct HomeView: View {
     private func enterUpdateProgressMode() {
         originalTotals = Dictionary(uniqueKeysWithValues: todaysProgress.map { ($0.intention.id, $0.total) }) // snapshot current totals for cancel
         sliderValues = originalTotals // seed sliders with current totals
+        activeProgressSnapTicks = [:]
         isUpdateProgressMode = true // toggle mode on
+        ManualProgressHaptics.editorOpened()
     }
     
     /// Cancels update mode and restores original displayed totals without saving.
     private func cancelUpdateProgressMode() {
-        sliderValues = originalTotals // restore slider values
         isUpdateProgressMode = false // exit mode
+        sliderValues = [:]
+        originalTotals = [:]
+        activeProgressSnapTicks = [:]
         loadTodaysProgress() // refresh to ensure UI reflects persisted state
         loadIntentionsBreakdown() // recompute counts from live data
     }
@@ -675,9 +903,16 @@ struct HomeView: View {
             try? OverrideStore.shared.setOverride(override) // persist override; silent fail to avoid blocking UI
         }
         isUpdateProgressMode = false // exit mode
+        sliderValues = [:]
+        originalTotals = [:]
+        activeProgressSnapTicks = [:]
         loadTodaysProgress() // refresh data to reflect overrides
         loadIntentionsBreakdown() // recompute counts
-        highlightProgressRows(changedProgressIntentionIDs(since: previousPercents))
+        let visiblyChangedIDs = changedProgressIntentionIDs(since: previousPercents)
+        highlightProgressRows(visiblyChangedIDs)
+        if !visiblyChangedIDs.isEmpty {
+            ManualProgressHaptics.savedChanges()
+        }
     }
 
     /// Returns the currently visible progress percentage for each intention row.
@@ -715,7 +950,11 @@ struct HomeView: View {
     
     /// Computes current percent for a row using live or slider value.
     private func currentPercent(for row: IntentionProgressRow) -> Double {
-        let value = sliderValues[row.intention.id] ?? row.total // choose slider or stored total
+        let value = ManualProgressDisplayPolicy.displayedTotal(
+            stored: row.total,
+            draft: sliderValues[row.intention.id],
+            isEditing: isUpdateProgressMode
+        )
         return ProgressCalculator.percentComplete( // compute percent with existing logic
             total: value, // current value
             targetValue: row.intention.targetValue, // intention target
@@ -1250,6 +1489,84 @@ struct HomeView: View {
         loadIntentionsBreakdown()
         loadWeekMomentum()
         loadLowestProgressIntention()
+    }
+
+    private func evaluateIntentionSuggestion() async {
+        guard IntentionSuggestionFeature.isEnabled else { return }
+        do {
+            try IntentionSuggestionStore.shared.bootstrapExistingInstallIfNeeded()
+            let snapshot = IntentionSuggestionStore.shared.load()
+            let sessions = SessionStore.shared.loadAllSessions()
+            let topics = IntentionSuggestionEngine.makeTopics(
+                topics: SessionRecapTopicSnapshotReader.load(),
+                sessions: sessions,
+                items: ExtractionStore.shared.loadAllExtractions(),
+                corrections: CorrectionsStore.shared.loadCorrections()
+            )
+            let activeSet = IntentionSetStore.shared.loadCurrentIntentionSet()
+            let activeIntentions = IntentionStore.shared.loadIntentions(ids: activeSet?.intentionIds ?? [])
+            let decision = IntentionSuggestionEngine.decide(
+                snapshot: snapshot,
+                topics: topics,
+                completedSessionCount: sessions.filter { $0.status == "complete" }.count,
+                isAtIntentionLimit: !subscriptionManager.canAddIntention(currentCount: activeIntentions.count)
+            )
+            switch decision {
+            case .show(let suggestion):
+                intentionSuggestion = suggestion
+                suggestionNudge = nil
+            case .nudgeToRecord(let key):
+                suggestionNudge = "Talk it out a few times so Attune can notice a recurring theme before suggesting anything."
+                try IntentionSuggestionStore.shared.recordNudge(opportunityKey: key)
+            case .consume(let key):
+                try IntentionSuggestionStore.shared.consume(opportunityKey: key)
+            case .none:
+                break
+            case .request(let topic, let opportunityKey):
+                isGeneratingSuggestion = true
+                defer { isGeneratingSuggestion = false }
+                try IntentionSuggestionStore.shared.recordAttempt(opportunityKey: opportunityKey)
+                let declinedIds = snapshot.history.filter { $0.outcome == .declined }.map(\.actionId)
+                guard let suggestion = try await IntentionSuggestionService.generate(
+                    topic: topic,
+                    activeIntentions: activeIntentions,
+                    declinedActionIds: declinedIds
+                ) else { return }
+                let activeNames = Set(activeIntentions.flatMap { [$0.title] + $0.aliases }.map(normalizedSuggestionName))
+                guard !activeNames.contains(normalizedSuggestionName(suggestion.title)),
+                      !IntentionSuggestionEngine.isPermanentlyDeclined(actionId: suggestion.actionId, history: snapshot.history) else {
+                    return
+                }
+                try IntentionSuggestionStore.shared.setOutstanding(suggestion)
+                intentionSuggestion = suggestion
+                suggestionNudge = nil
+            }
+        } catch {
+            AppLogger.log(AppLogger.ERR, "Intention suggestion unavailable error=\"\(error.localizedDescription)\"")
+        }
+    }
+
+    private func normalizedSuggestionName(_ value: String) -> String {
+        value.lowercased().filter { $0.isLetter || $0.isNumber }
+    }
+
+    private func declineSuggestion(_ suggestion: SuggestedIntentionAction) {
+        do {
+            try IntentionSuggestionStore.shared.decide(.declined, suggestion: suggestion)
+            intentionSuggestion = nil
+        } catch {
+            AppLogger.log(AppLogger.ERR, "Suggestion decline failed error=\"\(error.localizedDescription)\"")
+        }
+    }
+
+    private func acceptSuggestion(_ suggestion: SuggestedIntentionAction) {
+        do {
+            try IntentionSuggestionStore.shared.decide(.accepted, suggestion: suggestion)
+            intentionSuggestion = nil
+            refreshAll()
+        } catch {
+            AppLogger.log(AppLogger.ERR, "Suggestion acceptance state failed error=\"\(error.localizedDescription)\"")
+        }
     }
     
     private func refreshMoodAndStreak() {

@@ -22,6 +22,16 @@ const checkInBody = {
   todaysTotals: { "read-id": 5 },
 };
 
+const suggestionBody = {
+  topic: { key: "money_finance|spending", title: "Spending", categories: ["money_finance"] },
+  evidence: [
+    { itemId: "item-1", sessionDate: "2026-08-01T12:00:00Z", quote: "I keep losing track of small purchases." },
+    { itemId: "item-2", sessionDate: "2026-08-08T12:00:00Z", quote: "I want a clearer picture of what I spend." },
+  ],
+  activeIntentions: [],
+  declinedActionIds: [],
+};
+
 const taskCases = [
   {
     path: TASK_PATHS.checkIn,
@@ -113,6 +123,51 @@ describe("server-owned v2 task routes", () => {
       }
     });
   }
+
+  it("hydrates an allowed intention suggestion from the server catalog", async () => {
+    const response = await handleRequest(
+      taskRequest(TASK_PATHS.intentionSuggestion, suggestionBody),
+      env,
+      async () => chatCompletion({ actionId: "finance.review_spending_5_daily", reason: "You have raised spending awareness more than once.", evidenceItemIds: ["item-1", "item-2"] }),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as { suggestion: Record<string, unknown> };
+    expect(body.suggestion.title).toBe("Review today’s spending");
+    expect(body.suggestion.targetValue).toBe(5);
+    expect(body.suggestion.sourceURL).toContain("consumerfinance.gov");
+  });
+
+  it("returns no suggestion when the conservative model declines", async () => {
+    const response = await handleRequest(
+      taskRequest(TASK_PATHS.intentionSuggestion, suggestionBody),
+      env,
+      async () => chatCompletion({ actionId: null, reason: null, evidenceItemIds: [] }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ suggestion: null });
+  });
+
+  it("rejects unknown, declined, or orphaned suggestion evidence", async () => {
+    for (const output of [
+      { actionId: "unknown", reason: "No", evidenceItemIds: ["item-1"] },
+      { actionId: "finance.review_spending_5_daily", reason: "No", evidenceItemIds: ["orphan"] },
+    ]) {
+      const response = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, suggestionBody), env, async () => chatCompletion(output));
+      expect(response.status).toBe(502);
+    }
+    const declinedBody = { ...suggestionBody, declinedActionIds: ["finance.review_spending_5_daily"] };
+    const response = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, declinedBody), env, async () => chatCompletion({ actionId: "finance.review_spending_5_daily", reason: "No", evidenceItemIds: ["item-1"] }));
+    expect(response.status).toBe(502);
+  });
+
+  it("rejects a catalog action outside the qualified topic categories", async () => {
+    const fitnessBody = { ...suggestionBody, topic: { key: "fitness_health|walking", title: "Walking", categories: ["fitness_health"] } };
+    const response = await handleRequest(
+      taskRequest(TASK_PATHS.intentionSuggestion, fitnessBody), env,
+      async () => chatCompletion({ actionId: "finance.review_spending_5_daily", reason: "Wrong category", evidenceItemIds: ["item-1"] }),
+    );
+    expect(response.status).toBe(502);
+  });
 
   it("does not accept client-owned model, prompt, or schema policy", async () => {
     const response = await handleRequest(

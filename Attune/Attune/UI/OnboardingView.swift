@@ -24,7 +24,7 @@ struct OnboardingView: View {
             icon: "sparkles",
             eyebrow: "TALK IT OUT",
             title: "Notice what keeps coming up.",
-            detail: "Talk through what’s on your mind. Attune organizes clear intentions, commitments, events, and states—then groups repeated ideas into themes in Insights."
+            detail: "Talk through what’s on your mind. As themes repeat, Attune may turn one into a small, editable next step chosen to be realistic—not merely repeat what you said. Nothing is added unless you choose it."
         ),
         OnboardingPage(
             icon: "chart.line.uptrend.xyaxis",
@@ -89,6 +89,11 @@ struct OnboardingView: View {
             .accessibilityHint(selectedPage == pages.count - 1 ? "Continues to voice and privacy information" : "Shows the next introduction page")
         }
         .preferredColorScheme(.dark)
+        .onAppear {
+            if IntentionSuggestionFeature.isEnabled {
+                try? IntentionSuggestionStore.shared.bootstrapNewInstall()
+            }
+        }
     }
 
     private func onboardingPage(_ page: OnboardingPage) -> some View {

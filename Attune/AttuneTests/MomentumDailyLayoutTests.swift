@@ -36,7 +36,25 @@ final class MomentumDailyLayoutTests: XCTestCase {
         XCTAssertEqual(calendar.component(.hour, from: domain.end), 0)
     }
 
-    func testSameMinuteBarsSplitOneSlotAndOrderLowToHighFromLeftToRight() {
+    func testDailyDomainProvidesAnHourlyTickForEveryCoveredHour() {
+        let calendar = utcCalendar()
+        let day = date(year: 2026, month: 8, day: 10, hour: 12, calendar: calendar)
+        let first = point(
+            id: "first",
+            date: date(year: 2026, month: 8, day: 10, hour: 8, calendar: calendar),
+            intentionId: "first",
+            percent: 20
+        )
+
+        let domain = DailyMomentumTimeDomain.make(points: [first], selectedDate: day, calendar: calendar)
+
+        XCTAssertEqual(domain.tickDates.count, 17)
+        XCTAssertTrue(zip(domain.tickDates, domain.tickDates.dropFirst()).allSatisfy {
+            $1.timeIntervalSince($0) == 60 * 60
+        })
+    }
+
+    func testSameMinuteBarsKeepEqualWidthAndOrderLowToHighFromLeftToRight() {
         let start = Date(timeIntervalSince1970: 1_800_000_000)
         let timestamp = start.addingTimeInterval(10 * 60 * 60)
         let low = point(id: "low", date: timestamp, intentionId: "low", percent: 20)
@@ -54,12 +72,13 @@ final class MomentumDailyLayoutTests: XCTestCase {
         XCTAssertEqual(items.count, 2)
         XCTAssertEqual(items[0].point.id, "low")
         XCTAssertEqual(items[1].point.id, "high")
-        XCTAssertEqual(items[0].barWidth, 14, accuracy: 0.001)
-        XCTAssertEqual(items[1].barWidth, 14, accuracy: 0.001)
+        XCTAssertEqual(items[0].barWidth, 28, accuracy: 0.001)
+        XCTAssertEqual(items[1].barWidth, 28, accuracy: 0.001)
+        XCTAssertEqual(items[1].centerX - items[0].centerX, 32, accuracy: 0.001)
         XCTAssertEqual((items[0].centerX + items[1].centerX) / 2, 100, accuracy: 0.001)
     }
 
-    func testNearbyTimeClustersShrinkToAvoidRenderedFootprintCollision() {
+    func testNearbyTimeClustersShiftWithoutChangingBarWidth() {
         let start = Date(timeIntervalSince1970: 1_800_000_000)
         let first = point(
             id: "first",
@@ -83,12 +102,47 @@ final class MomentumDailyLayoutTests: XCTestCase {
         let secondItems = items.filter { $0.point.id.hasPrefix("second") }
 
         XCTAssertLessThanOrEqual(firstItem.footprintRight + 2, secondItems.map(\.footprintLeft).min()!)
+        XCTAssertTrue(items.allSatisfy { abs($0.barWidth - 28) < 0.001 })
     }
 
     func testManualSavePolicyIgnoresUnchangedTotalsButKeepsCorrections() {
         XCTAssertFalse(ManualProgressSavePolicy.hasChanged(current: 10, original: 10))
         XCTAssertTrue(ManualProgressSavePolicy.hasChanged(current: 19.2, original: 10))
         XCTAssertTrue(ManualProgressSavePolicy.hasChanged(current: 7, original: 10))
+    }
+
+    func testPersistedProgressReplacesStaleSliderDraftAfterEditingEnds() {
+        XCTAssertEqual(
+            ManualProgressDisplayPolicy.displayedTotal(stored: 10, draft: 2, isEditing: false),
+            10
+        )
+        XCTAssertEqual(
+            ManualProgressDisplayPolicy.displayedTotal(stored: 10, draft: 2, isEditing: true),
+            2
+        )
+    }
+
+    func testManualProgressSliderUsesNineTicksAcrossEightEvenSegments() {
+        XCTAssertEqual(ManualProgressSliderPolicy.tickPercents.count, 9)
+        XCTAssertEqual(ManualProgressSliderPolicy.tickPercents.first, 0)
+        XCTAssertEqual(ManualProgressSliderPolicy.tickPercents[4], 0.5)
+        XCTAssertEqual(ManualProgressSliderPolicy.tickPercents.last, 1)
+    }
+
+    func testManualProgressSliderSnapsOnlyWhenCloseToAnEighth() {
+        XCTAssertEqual(ManualProgressSliderPolicy.adjustedPercent(0.13), 0.125, accuracy: 0.000_001)
+        XCTAssertEqual(ManualProgressSliderPolicy.adjustedPercent(0.49), 0.5, accuracy: 0.000_001)
+        XCTAssertEqual(ManualProgressSliderPolicy.adjustedPercent(0.40), 0.40, accuracy: 0.000_001)
+        XCTAssertNil(ManualProgressSliderPolicy.nearbyTickIndex(for: 0.40))
+    }
+
+    func testNeonIntensityBuildsFromTwentyPercentToFullCompletion() {
+        XCTAssertEqual(DailyMomentumBarStyle.neonIntensity(for: 20), 0, accuracy: 0.001)
+        XCTAssertEqual(DailyMomentumBarStyle.neonIntensity(for: 40), 0.25, accuracy: 0.001)
+        XCTAssertEqual(DailyMomentumBarStyle.neonIntensity(for: 60), 0.5, accuracy: 0.001)
+        XCTAssertEqual(DailyMomentumBarStyle.neonIntensity(for: 80), 0.75, accuracy: 0.001)
+        XCTAssertEqual(DailyMomentumBarStyle.neonIntensity(for: 100), 1, accuracy: 0.001)
+        XCTAssertEqual(DailyMomentumBarStyle.neonIntensity(for: 150), 1, accuracy: 0.001)
     }
 
     private func point(

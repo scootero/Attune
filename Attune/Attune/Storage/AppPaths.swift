@@ -42,6 +42,11 @@ struct AppPaths {
     static var correctionsFileURL: URL {
         baseDir.appendingPathComponent("Corrections.json")
     }
+
+    /// Additive Phase 4 state: cadence, outstanding suggestion, and user decisions.
+    static var intentionSuggestionsFileURL: URL {
+        baseDir.appendingPathComponent("IntentionSuggestions.json")
+    }
     
     /// Audio directory for a specific session: Documents/Attune/Audio/<sessionId>/
     /// Each session has its own audio subdirectory

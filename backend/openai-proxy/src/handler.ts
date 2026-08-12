@@ -7,6 +7,7 @@
  */
 
 import { buildTask, isTaskPath, type BuiltTask } from "./tasks";
+import { suggestionAction } from "./intention-suggestion-actions";
 
 interface Env {
   APP_PROXY_TOKEN?: string;
@@ -224,7 +225,7 @@ async function performServerOwnedTask(
       });
     }
 
-    const taskOutput = parseStructuredTaskOutput(responseBody, task.taskName);
+    const taskOutput = parseStructuredTaskOutput(responseBody, task);
     if (!taskOutput.ok) {
       console.error({
         event: "gateway_task_invalid_provider_response",
@@ -261,7 +262,7 @@ async function performServerOwnedTask(
 
 function parseStructuredTaskOutput(
   responseBody: ArrayBuffer,
-  taskName: BuiltTask["taskName"],
+  task: BuiltTask,
 ): { ok: true; value: Record<string, unknown> } | { ok: false } {
   try {
     const response = JSON.parse(new TextDecoder().decode(responseBody));
@@ -269,9 +270,15 @@ function parseStructuredTaskOutput(
     const content = response?.choices?.[0]?.message?.content;
     if (typeof content !== "string") return { ok: false };
     const value = JSON.parse(content);
-    return isRecord(value) && hasExpectedTaskOutputShape(taskName, value)
-      ? { ok: true, value }
-      : { ok: false };
+    if (!isRecord(value) || !hasExpectedTaskOutputShape(task.taskName, value)) return { ok: false };
+    if (task.taskName !== "intention_suggestion") return { ok: true, value };
+    if (value.actionId === null) return { ok: true, value: { suggestion: null } };
+    if (typeof value.actionId !== "string" || typeof value.reason !== "string" || value.reason.length < 1 || value.reason.length > 140 || !Array.isArray(value.evidenceItemIds)) return { ok: false };
+    const action = suggestionAction(value.actionId);
+    const context = task.suggestionContext;
+    const evidenceIds = value.evidenceItemIds;
+    if (!action || !context || !context.allowedActionIds.includes(action.actionId) || context.declinedActionIds.includes(action.actionId) || evidenceIds.length < 1 || evidenceIds.some((id) => typeof id !== "string" || !context.evidenceItemIds.includes(id))) return { ok: false };
+    return { ok: true, value: { suggestion: { ...action, reason: value.reason, evidenceItemIds: evidenceIds } } };
   } catch {
     return { ok: false };
   }
@@ -293,6 +300,11 @@ function hasExpectedTaskOutputShape(
       return hasExactKeys(value, ["intentions"]) && Array.isArray(value.intentions);
     case "listening":
       return hasExactKeys(value, ["items"]) && Array.isArray(value.items);
+    case "intention_suggestion":
+      return hasExactKeys(value, ["actionId", "reason", "evidenceItemIds"]) &&
+        (value.actionId === null || typeof value.actionId === "string") &&
+        (value.reason === null || typeof value.reason === "string") &&
+        Array.isArray(value.evidenceItemIds);
   }
 }
 
