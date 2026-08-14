@@ -58,7 +58,15 @@ final class IntentionSuggestionStore {
 
     func decide(_ outcome: IntentionSuggestionOutcome, suggestion: SuggestedIntentionAction, now: Date = Date()) throws {
         var snapshot = load()
-        snapshot.history.append(.init(actionId: suggestion.actionId, topicKey: suggestion.topicKey, outcome: outcome, decidedAt: now))
+        snapshot.history.append(.init(
+            actionId: suggestion.actionId,
+            topicKey: suggestion.topicKey,
+            outcome: outcome,
+            decidedAt: now,
+            title: suggestion.title,
+            actionFingerprint: suggestion.actionFingerprint,
+            actionFamily: suggestion.actionFamily
+        ))
         snapshot.outstanding = nil
         try save(snapshot)
     }

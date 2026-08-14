@@ -30,6 +30,10 @@ struct HomeRecordView: View {
     @State private var activeSessionId: String?
     @State private var startErrorMessage: String?
     @State private var processingCheckTimer: Timer?
+    /// Brief, in-context coaching shown after the user chooses to record.
+    @State private var showsTalkingPrompt = false
+    /// Prevents an older delayed dismissal from affecting a newer session.
+    @State private var talkingPromptToken = UUID()
 
     @State private var todaySessionsCount = 0
     @State private var todayInsightsCount = 0
@@ -100,6 +104,19 @@ struct HomeRecordView: View {
                     await autoDismissTalkSuggestion(suggestion)
                 }
             }
+
+            if showsTalkingPrompt && recorder.isRecording {
+                talkingPromptCard
+                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.bottom, 88)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.97, anchor: .bottom))
+                    )
+                    .zIndex(2)
+            }
         }
         .onAppear {
             loadTodayCounts()
@@ -109,6 +126,8 @@ struct HomeRecordView: View {
         .onDisappear {
             processingCheckTimer?.invalidate()
             processingCheckTimer = nil
+            talkingPromptToken = UUID()
+            showsTalkingPrompt = false
         }
         .onChange(of: recorder.isRecording) { wasRecording, isRecording in
             recorderStateChanged(wasRecording: wasRecording, isRecording: isRecording)
@@ -185,7 +204,16 @@ struct HomeRecordView: View {
             }
         }
         .padding(18)
+        .background {
+            if recorder.isRecording {
+                RecordingSessionAtmosphere(level: recorder.audioLevel)
+                    .clipShape(RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous))
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
+        }
         .attuneCard()
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: recorder.isRecording)
     }
 
     private var idleContent: some View {
@@ -194,26 +222,16 @@ struct HomeRecordView: View {
                 Text("Say what’s on your mind")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(AttuneTheme.textPrimary)
-                Text("Attune records only after you start. It organizes clear intentions, commitments, events, and states, then groups repeated ideas into themes in Insights. You can leave the app or lock your phone while you’re talking.")
+                Text("Talk naturally. Attune will organize the useful parts and notice what keeps coming up.")
                     .font(.subheadline)
                     .foregroundStyle(AttuneTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text("When a theme keeps returning, Attune may suggest one small, editable next step. Nothing is added without your tap.")
+            Text("Recording starts only when you tap. Nothing is added without your tap.")
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(AttuneTheme.accent)
                 .fixedSize(horizontal: false, vertical: true)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Think out loud about a decision.")
-                Text("Brain dump everything on your mind.")
-                Text("Talk through your day.")
-            }
-            .font(.footnote)
-            .foregroundStyle(AttuneTheme.textSecondary)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Ideas for using Talk it out: Think out loud about a decision. Brain dump everything on your mind. Talk through your day.")
 
             if let startErrorMessage {
                 Label(startErrorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -234,6 +252,41 @@ struct HomeRecordView: View {
             .disabled(isCheckingAIUsage)
             .accessibilityHint("Starts recording so Attune can organize captured ideas and themes")
         }
+    }
+
+    private var talkingPromptCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "quote.bubble.fill")
+                .font(.title3)
+                .foregroundStyle(AttuneTheme.accent)
+                .frame(width: 30, height: 30)
+                .background(AttuneTheme.accent.opacity(0.14), in: Circle())
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("A few ways in")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text("Think through a decision · Empty your mind · Talk through your day")
+                    .font(.footnote)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous)
+                .stroke(AttuneTheme.accent.opacity(0.30), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.20), radius: 14, y: 7)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("A few ways in. Think through a decision. Empty your mind. Talk through your day.")
     }
 
     private var recordingContent: some View {
@@ -261,6 +314,10 @@ struct HomeRecordView: View {
                 .foregroundStyle(AttuneTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            LiveVoiceWaveform(level: recorder.audioLevel)
+                .frame(height: 48)
+                .accessibilityHidden(true)
+
             Button(action: stopListeningSession) {
                 Label("Finish", systemImage: "stop.fill")
                     .font(.headline)
@@ -273,8 +330,18 @@ struct HomeRecordView: View {
             .accessibilityHint("Stops recording and begins processing the captured audio")
         }
         .padding(14)
-        .background(AttuneTheme.recording.opacity(0.10), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous).stroke(AttuneTheme.recording.opacity(0.35)))
+        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [AttuneTheme.accent.opacity(0.58), AttuneTheme.recording.opacity(0.46)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 
     private var processingContent: some View {
@@ -499,10 +566,12 @@ struct HomeRecordView: View {
         showsRecentSessionCompletion = false
         recentInsightsAddedCount = 0
         loadTodayCounts()
+        showTalkingPrompt()
     }
 
     private func stopListeningSession() {
         guard recorder.isRecording else { return }
+        dismissTalkingPrompt()
         processingSessionId = recorder.currentSessionId
         isProcessing = true
         startErrorMessage = nil
@@ -518,11 +587,33 @@ struct HomeRecordView: View {
         }
 
         guard wasRecording, let sessionId = activeSessionId ?? processingSessionId else { return }
+        dismissTalkingPrompt()
         processingSessionId = sessionId
         isProcessing = true
 
         activeSessionId = nil
         loadTodayCounts()
+    }
+
+    private func showTalkingPrompt() {
+        let token = UUID()
+        talkingPromptToken = token
+        withAnimation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.86)) {
+            showsTalkingPrompt = true
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            guard talkingPromptToken == token else { return }
+            dismissTalkingPrompt()
+        }
+    }
+
+    private func dismissTalkingPrompt() {
+        talkingPromptToken = UUID()
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.42)) {
+            showsTalkingPrompt = false
+        }
     }
 
     private func restoreProcessingStateIfNeeded() {
@@ -702,6 +793,111 @@ struct HomeRecordView: View {
                 insertion: .move(edge: edge).combined(with: .opacity),
                 removal: .move(edge: edge).combined(with: .opacity)
             )
+    }
+}
+
+/// The active Talk card uses cooler cyan/blue light with a warm recording edge,
+/// making it a visual cousin—not a duplicate—of Today's intentions card.
+private struct RecordingSessionAtmosphere: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let level: Double
+
+    private let deepBlue = Color(red: 0.02, green: 0.09, blue: 0.18)
+    private let electricBlue = Color(red: 0.14, green: 0.50, blue: 1.00)
+    private let cyan = Color(red: 0.08, green: 0.92, blue: 0.88)
+    private let coral = Color(red: 1.00, green: 0.30, blue: 0.38)
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: reduceMotion)) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            let drift = reduceMotion ? 0.0 : sin(time * 0.34)
+            let inverseDrift = reduceMotion ? 0.0 : cos(time * 0.27)
+            let energy = min(1, max(0, level))
+
+            ZStack {
+                deepBlue.opacity(0.96)
+
+                LinearGradient(
+                    colors: [
+                        cyan.opacity(0.22 + energy * 0.10),
+                        electricBlue.opacity(0.18),
+                        coral.opacity(0.10 + energy * 0.08),
+                        Color.clear
+                    ],
+                    startPoint: UnitPoint(x: 0.05 + drift * 0.08, y: 0.08),
+                    endPoint: UnitPoint(x: 0.94, y: 0.92 + inverseDrift * 0.07)
+                )
+
+                Circle()
+                    .fill(cyan.opacity(0.16 + energy * 0.18))
+                    .frame(width: 210 + energy * 75, height: 210 + energy * 75)
+                    .blur(radius: 34)
+                    .offset(x: -118 + drift * 28, y: 78 + inverseDrift * 12)
+
+                Circle()
+                    .fill(coral.opacity(0.10 + energy * 0.15))
+                    .frame(width: 180 + energy * 55, height: 180 + energy * 55)
+                    .blur(radius: 38)
+                    .offset(x: 132 + inverseDrift * 22, y: -72 + drift * 14)
+
+                LinearGradient(
+                    colors: [Color.white.opacity(0.07), .clear, Color.black.opacity(0.30)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
+    }
+}
+
+/// A live, non-literal waveform. Each bar is driven by microphone intensity;
+/// staggered phases keep it organic instead of moving as one solid block.
+private struct LiveVoiceWaveform: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let level: Double
+
+    private let barCount = 28
+    private let spacing: CGFloat = 3
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
+            GeometryReader { geometry in
+                let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+                let availableWidth = geometry.size.width - spacing * CGFloat(barCount - 1)
+                let barWidth = max(2, availableWidth / CGFloat(barCount))
+
+                HStack(alignment: .center, spacing: spacing) {
+                    ForEach(0..<barCount, id: \.self) { index in
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        AttuneTheme.accent.opacity(0.72),
+                                        Color.white.opacity(0.92),
+                                        AttuneTheme.recording.opacity(0.78)
+                                    ],
+                                    startPoint: .bottom,
+                                    endPoint: .top
+                                )
+                            )
+                            .frame(width: barWidth, height: barHeight(index: index, time: time))
+                            .shadow(color: AttuneTheme.accent.opacity(0.38), radius: 3)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+        }
+    }
+
+    private func barHeight(index: Int, time: TimeInterval) -> CGFloat {
+        let voiceEnergy = min(1, max(0, level))
+        let visibleEnergy = reduceMotion ? voiceEnergy : max(0.055, voiceEnergy)
+        let firstWave = abs(sin(Double(index) * 0.79 + time * 4.2))
+        let secondWave = abs(cos(Double(index) * 0.37 - time * 2.7))
+        let shape = 0.22 + firstWave * 0.54 + secondWave * 0.24
+        return 4 + CGFloat(visibleEnergy) * 42 * CGFloat(shape)
     }
 }
 

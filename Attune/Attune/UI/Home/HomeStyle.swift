@@ -279,7 +279,7 @@ extension View {
         self.modifier(GlassCardModifier())
     }
 
-    /// A quieter retro-glass treatment reserved for Today's intentions.
+    /// A neon-retro glass treatment reserved for Today's intentions.
     func todayIntentionsCard() -> some View {
         modifier(TodayIntentionsCardModifier())
     }
@@ -287,86 +287,193 @@ extension View {
 
 private struct TodayIntentionsCardModifier: ViewModifier {
     private let shape = RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+    private let neonPink = Color(red: 1.00, green: 0.22, blue: 0.62)
+    private let neonPurple = Color(red: 0.58, green: 0.34, blue: 1.00)
+    private let neonCyan = Color(red: 0.10, green: 0.90, blue: 0.94)
+    private let sunsetOrange = Color(red: 1.00, green: 0.48, blue: 0.18)
 
     func body(content: Content) -> some View {
         content
-            .background(.ultraThinMaterial, in: shape)
-            .background(
+            .background {
                 ZStack {
+                    shape
+                        .fill(.ultraThinMaterial)
+
+                    shape
+                        .fill(Color(red: 0.018, green: 0.018, blue: 0.060).opacity(0.89))
+
                     LinearGradient(
                         colors: [
-                            AttuneTheme.accent.opacity(0.13),
-                            AttuneTheme.backgroundRaised.opacity(0.72),
-                            AttuneTheme.accentSecondary.opacity(0.11)
+                            neonPurple.opacity(0.20),
+                            neonPink.opacity(0.12),
+                            sunsetOrange.opacity(0.07),
+                            neonCyan.opacity(0.14)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
 
                     RadialGradient(
-                        colors: [AttuneTheme.accent.opacity(0.12), .clear],
+                        colors: [neonPink.opacity(0.18), neonPurple.opacity(0.07), .clear],
                         center: .topTrailing,
                         startRadius: 4,
-                        endRadius: 230
+                        endRadius: 250
                     )
 
+                    RadialGradient(
+                        colors: [neonCyan.opacity(0.14), .clear],
+                        center: .bottomLeading,
+                        startRadius: 8,
+                        endRadius: 220
+                    )
+
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    sunsetOrange.opacity(0.20),
+                                    neonPink.opacity(0.12),
+                                    .clear
+                                ],
+                                center: .center,
+                                startRadius: 2,
+                                endRadius: 90
+                            )
+                        )
+                        .frame(width: 190, height: 190)
+                        .offset(x: 102, y: -54)
+                        .blur(radius: 3)
+
                     RetroDistanceTexture()
-                        .opacity(0.22)
+                        .opacity(0.68)
+
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.07), .clear, Color.black.opacity(0.28)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 }
                 .clipShape(shape)
                 .allowsHitTesting(false)
-            )
+            }
             .overlay {
                 shape
                     .strokeBorder(
                         LinearGradient(
                             colors: [
-                                AttuneTheme.accent.opacity(0.48),
-                                Color.white.opacity(0.10),
-                                AttuneTheme.accentSecondary.opacity(0.34)
+                                neonCyan.opacity(0.52),
+                                Color.white.opacity(0.15),
+                                neonPink.opacity(0.42),
+                                neonPurple.opacity(0.38)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 0.7
+                        lineWidth: 0.9
                     )
                     .allowsHitTesting(false)
             }
-            .shadow(color: AttuneTheme.accent.opacity(0.08), radius: 13, x: 0, y: 6)
+            .shadow(color: neonPurple.opacity(0.16), radius: 16, x: 0, y: 7)
+            .shadow(color: neonCyan.opacity(0.08), radius: 9, x: -3, y: 2)
             .shadow(color: Color.black.opacity(0.23), radius: 12, x: 0, y: 7)
     }
 }
 
 private struct RetroDistanceTexture: View {
+    private let neonPink = Color(red: 1.00, green: 0.22, blue: 0.62)
+    private let neonPurple = Color(red: 0.58, green: 0.34, blue: 1.00)
+    private let neonCyan = Color(red: 0.10, green: 0.90, blue: 0.94)
+
     var body: some View {
         Canvas { context, size in
-            let horizon = size.height * 0.42
+            let vanishingPoint = CGPoint(x: size.width * 0.52, y: size.height * 0.28)
 
-            for y in stride(from: horizon, through: size.height, by: 8) {
-                let progress = (y - horizon) / max(size.height - horizon, 1)
-                var line = Path()
-                line.move(to: CGPoint(x: 0, y: y))
-                line.addLine(to: CGPoint(x: size.width, y: y))
-                context.stroke(
-                    line,
-                    with: .color(AttuneTheme.accent.opacity(0.05 + progress * 0.08)),
-                    lineWidth: 0.45
-                )
-            }
-
-            let centerX = size.width * 0.5
-            for x in stride(from: -size.width, through: size.width * 2, by: 28) {
+            // A long radial tunnel extends to both vertical edges. There are no
+            // horizontal cross-lines, so the field cannot be confused with the
+            // intention progress tracks.
+            for (rayIndex, x) in stride(from: -size.width, through: size.width * 2, by: 25).enumerated() {
+                let bottom = CGPoint(x: x, y: size.height * 1.08)
                 var ray = Path()
-                ray.move(to: CGPoint(x: centerX, y: horizon))
-                ray.addLine(to: CGPoint(x: x, y: size.height))
+                ray.move(to: vanishingPoint)
+                ray.addLine(to: bottom)
                 context.stroke(
                     ray,
-                    with: .color(AttuneTheme.accentSecondary.opacity(0.07)),
-                    lineWidth: 0.45
+                    with: .color(neonPurple.opacity(0.24)),
+                    lineWidth: 0.65
+                )
+
+                drawDepthParticles(
+                    context: &context,
+                    from: vanishingPoint,
+                    to: bottom,
+                    rayIndex: rayIndex
                 )
             }
+
+            for (rayIndex, x) in stride(from: -size.width * 0.4, through: size.width * 1.4, by: 38).enumerated() {
+                let top = CGPoint(x: x, y: -size.height * 0.08)
+                var ray = Path()
+                ray.move(to: vanishingPoint)
+                ray.addLine(to: top)
+                context.stroke(
+                    ray,
+                    with: .color(neonCyan.opacity(0.10)),
+                    lineWidth: 0.5
+                )
+
+                drawDepthParticles(
+                    context: &context,
+                    from: vanishingPoint,
+                    to: top,
+                    rayIndex: rayIndex + 40
+                )
+            }
+
+            // Sparse deterministic grain makes the gradient feel printed rather
+            // than digitally flat.
+            for x in stride(from: CGFloat(2), through: size.width, by: 7) {
+                for y in stride(from: CGFloat(2), through: size.height, by: 7) {
+                    let signal = sin(x * 0.19) + cos(y * 0.23) + sin((x + y) * 0.11)
+                    let opacity = 0.025 + abs(signal) * 0.018
+                    let speck = CGRect(x: x, y: y, width: 1.15, height: 1.15)
+                    context.fill(Path(ellipseIn: speck), with: .color(Color.white.opacity(opacity)))
+                }
+            }
         }
-        .blur(radius: 0.45)
+        .blur(radius: 0.55)
+    }
+
+    private func drawDepthParticles(
+        context: inout GraphicsContext,
+        from start: CGPoint,
+        to end: CGPoint,
+        rayIndex: Int
+    ) {
+        for step in 1...5 {
+            let base = CGFloat(step) / 5
+            let distance = pow(base, 2.15)
+            let jitter = CGFloat((rayIndex + step).isMultiple(of: 3) ? 0.018 : -0.012)
+            let progress = min(1, max(0, distance + jitter))
+            let x = start.x + (end.x - start.x) * progress
+            let y = start.y + (end.y - start.y) * progress
+            let diameter = 0.7 + progress * 2.2
+            let color: Color
+            switch (rayIndex + step) % 3 {
+            case 0: color = neonPink
+            case 1: color = neonPurple
+            default: color = neonCyan
+            }
+            let particle = CGRect(
+                x: x - diameter / 2,
+                y: y - diameter / 2,
+                width: diameter,
+                height: diameter
+            )
+            context.fill(
+                Path(ellipseIn: particle),
+                with: .color(color.opacity(0.09 + progress * 0.22))
+            )
+        }
     }
 }
 

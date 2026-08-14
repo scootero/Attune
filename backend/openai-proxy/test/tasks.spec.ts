@@ -32,6 +32,18 @@ const suggestionBody = {
   declinedActionIds: [],
 };
 
+const customSuggestion = (overrides: Record<string, unknown> = {}) => ({
+  title: "Log one purchase at night",
+  targetValue: 1,
+  unit: "times",
+  timeframe: "daily",
+  reason: "A tiny nightly log turns fuzzy spending into something you can actually see.",
+  actionFingerprint: "log_one_purchase",
+  actionFamily: "finance_organization",
+  evidenceItemIds: ["item-1", "item-2"],
+  ...overrides,
+});
+
 const taskCases = [
   {
     path: TASK_PATHS.checkIn,
@@ -124,46 +136,62 @@ describe("server-owned v2 task routes", () => {
     });
   }
 
-  it("hydrates an allowed intention suggestion from the server catalog", async () => {
+  it("returns a fully custom intention instead of choosing from a catalog", async () => {
+    let forwardedInit: RequestInit | undefined;
+    const contextualBody = {
+      ...suggestionBody,
+      activeIntentions: [{ id: "read-id", title: "Read", aliases: ["reading"], targetValue: 10, unit: "pages", timeframe: "daily", recentProgressDays: 4 }],
+      suggestionHistory: [{ actionId: "custom.teach_idea.1.times.daily", title: "Teach one idea", actionFingerprint: "teach_idea", actionFamily: "learning", outcome: "accepted", decidedAt: "2026-06-01T12:00:00Z" }],
+    };
     const response = await handleRequest(
-      taskRequest(TASK_PATHS.intentionSuggestion, suggestionBody),
+      taskRequest(TASK_PATHS.intentionSuggestion, contextualBody),
       env,
-      async () => chatCompletion({ actionId: "finance.review_spending_5_daily", reason: "You have raised spending awareness more than once.", evidenceItemIds: ["item-1", "item-2"] }),
+      async (_input, init) => {
+        forwardedInit = init;
+        return chatCompletion(customSuggestion());
+      },
     );
     expect(response.status).toBe(200);
     const body = await response.json() as { suggestion: Record<string, unknown> };
-    expect(body.suggestion.title).toBe("Review today’s spending");
-    expect(body.suggestion.targetValue).toBe(5);
-    expect(body.suggestion.sourceURL).toContain("consumerfinance.gov");
+    expect(body.suggestion.title).toBe("Log one purchase at night");
+    expect(body.suggestion.actionId).toBe("custom.log_one_purchase.1.times.daily");
+    expect(body.suggestion.actionFingerprint).toBe("log_one_purchase");
+    expect(body.suggestion.sourceURL).toBeNull();
+    expect(body.suggestion.safetyNote).toContain("not individualized financial advice");
+    const forwarded = JSON.parse(String(forwardedInit?.body));
+    expect(forwarded.messages[0].content).toContain("There is no action catalog");
+    expect(forwarded.messages[1].content).not.toContain("allowedActions");
+    expect(forwarded.messages[1].content).toContain('"recentProgressDays":4');
+    expect(forwarded.messages[1].content).toContain('"actionFingerprint":"teach_idea"');
   });
 
-  it("hydrates a learning action that is more useful than repeating the topic", async () => {
+  it("allows a creative learning action generated for the supplied evidence", async () => {
     const learningBody = { ...suggestionBody, topic: { key: "personal_growth|learning", title: "Learning", categories: ["personal_growth"] } };
     const response = await handleRequest(
       taskRequest(TASK_PATHS.intentionSuggestion, learningBody), env,
-      async () => chatCompletion({ actionId: "learning.teach_one_daily", reason: "Your learning theme keeps returning; teaching one idea turns review into retrieval.", evidenceItemIds: ["item-1", "item-2"] }),
+      async () => chatCompletion(customSuggestion({
+        title: "Teach one idea from memory",
+        reason: "Explaining one idea makes the learning theme concrete without adding another study block.",
+        actionFingerprint: "teach_idea_from_memory",
+        actionFamily: "learning",
+      })),
     );
     expect(response.status).toBe(200);
     const body = await response.json() as { suggestion: Record<string, unknown> };
     expect(body.suggestion.title).toBe("Teach one idea from memory");
-    expect(body.suggestion.sourceURL).toContain("doi.org");
+    expect(body.suggestion.actionId).toBe("custom.teach_idea_from_memory.1.times.daily");
   });
 
-  it("rejects a generic action for an obvious learning theme", async () => {
-    const learningBody = { ...suggestionBody, topic: { key: "personal_growth|learning", title: "Learning", categories: ["personal_growth"] }, evidence: [
-      { itemId: "item-1", sessionDate: "2026-08-01T12:00:00Z", quote: "I want to remember what I study." },
-      { itemId: "item-2", sessionDate: "2026-08-08T12:00:00Z", quote: "I want to explain what I learn." },
-    ] };
-    const response = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, learningBody), env, async () => chatCompletion({ actionId: "routine.next_step_10_daily", reason: "Too generic", evidenceItemIds: ["item-1"] }));
-    expect(response.status).toBe(502);
-  });
-
-  it("allows no catalog action for sensitive individualized evidence", async () => {
+  it("rejects any generated action for sensitive individualized evidence", async () => {
     const sensitiveBody = { ...suggestionBody, topic: { key: "fitness_health|pain", title: "Pain", categories: ["fitness_health"] }, evidence: [
       { itemId: "item-1", sessionDate: "2026-08-01T12:00:00Z", quote: "I have severe pain after my medication." },
       { itemId: "item-2", sessionDate: "2026-08-08T12:00:00Z", quote: "The injury keeps getting worse." },
     ] };
-    const response = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, sensitiveBody), env, async () => chatCompletion({ actionId: "movement.walk_5_daily", reason: "Unsafe", evidenceItemIds: ["item-1"] }));
+    const response = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, sensitiveBody), env, async () => chatCompletion(customSuggestion({
+      title: "Take a short walk",
+      actionFingerprint: "take_short_walk",
+      actionFamily: "movement",
+    })));
     expect(response.status).toBe(502);
   });
 
@@ -171,45 +199,57 @@ describe("server-owned v2 task routes", () => {
     const response = await handleRequest(
       taskRequest(TASK_PATHS.intentionSuggestion, suggestionBody),
       env,
-      async () => chatCompletion({ actionId: null, reason: null, evidenceItemIds: [] }),
+      async () => chatCompletion({ title: null, targetValue: null, unit: null, timeframe: null, reason: null, actionFingerprint: null, actionFamily: null, evidenceItemIds: [] }),
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ suggestion: null });
   });
 
-  it("rejects unknown, declined, or orphaned suggestion evidence", async () => {
+  it("rejects invalid custom fields and orphaned suggestion evidence", async () => {
     for (const output of [
-      { actionId: "unknown", reason: "No", evidenceItemIds: ["item-1"] },
-      { actionId: "finance.review_spending_5_daily", reason: "No", evidenceItemIds: ["orphan"] },
+      customSuggestion({ actionFingerprint: "Not normalized" }),
+      customSuggestion({ targetValue: 0 }),
+      customSuggestion({ evidenceItemIds: ["orphan"] }),
+      customSuggestion({ title: "Skip one meal daily", reason: "Cut calories to guarantee weight loss.", actionFingerprint: "skip_one_meal", actionFamily: "other" }),
     ]) {
       const response = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, suggestionBody), env, async () => chatCompletion(output));
       expect(response.status).toBe(502);
     }
-    const declinedBody = { ...suggestionBody, declinedActionIds: ["finance.review_spending_5_daily"] };
-    const response = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, declinedBody), env, async () => chatCompletion({ actionId: "finance.review_spending_5_daily", reason: "No", evidenceItemIds: ["item-1"] }));
-    expect(response.status).toBe(502);
   });
 
-  it("rejects a catalog action outside the qualified topic categories", async () => {
-    const fitnessBody = { ...suggestionBody, topic: { key: "fitness_health|walking", title: "Walking", categories: ["fitness_health"] } };
-    const response = await handleRequest(
-      taskRequest(TASK_PATHS.intentionSuggestion, fitnessBody), env,
-      async () => chatCompletion({ actionId: "finance.review_spending_5_daily", reason: "Wrong category", evidenceItemIds: ["item-1"] }),
-    );
-    expect(response.status).toBe(502);
-  });
-
-  it("removes actions already covered by an active intention", async () => {
+  it("rejects active-intention duplicates and permanently declined close variants", async () => {
     const fitnessBody = {
       ...suggestionBody,
       topic: { key: "fitness_health|walking", title: "Walking", categories: ["fitness_health"] },
       activeIntentions: [{ title: "Walk", aliases: [] }],
     };
-    const response = await handleRequest(
-      taskRequest(TASK_PATHS.intentionSuggestion, fitnessBody), env,
-      async () => chatCompletion({ actionId: "movement.walk_5_daily", reason: "Duplicate", evidenceItemIds: ["item-1"] }),
-    );
-    expect(response.status).toBe(502);
+    const activeDuplicate = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, fitnessBody), env, async () => chatCompletion(customSuggestion({ title: "Take a short walk", actionFingerprint: "take_short_walk", actionFamily: "movement" })));
+    expect(activeDuplicate.status).toBe(502);
+
+    const declinedBody = {
+      ...suggestionBody,
+      suggestionHistory: [{
+        actionId: "custom.log_one_purchase.1.times.daily",
+        title: "Log one purchase at night",
+        actionFingerprint: "log_one_purchase",
+        actionFamily: "finance_organization",
+        outcome: "declined",
+        decidedAt: "2026-08-10T12:00:00Z",
+      }],
+    };
+    const exact = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, declinedBody), env, async () => chatCompletion(customSuggestion()));
+    expect(exact.status).toBe(502);
+    const closeVariant = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, declinedBody), env, async () => chatCompletion(customSuggestion({ title: "Record one nightly purchase", actionFingerprint: "record_nightly_purchase" })));
+    expect(closeVariant.status).toBe(502);
+    const distinct = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, declinedBody), env, async () => chatCompletion(customSuggestion({ title: "Set a weekly money date", targetValue: 1, unit: "sessions", timeframe: "weekly", actionFingerprint: "weekly_money_date" })));
+    expect(distinct.status).toBe(200);
+
+    const recentlyAcceptedBody = {
+      ...suggestionBody,
+      suggestionHistory: [{ actionId: "custom.log_one_purchase.1.times.daily", title: "Log one purchase at night", actionFingerprint: "log_one_purchase", actionFamily: "finance_organization", outcome: "accepted", decidedAt: "2026-08-13T12:00:00Z" }],
+    };
+    const recentRepeat = await handleRequest(taskRequest(TASK_PATHS.intentionSuggestion, recentlyAcceptedBody), env, async () => chatCompletion(customSuggestion()));
+    expect(recentRepeat.status).toBe(502);
   });
 
   it("does not accept client-owned model, prompt, or schema policy", async () => {

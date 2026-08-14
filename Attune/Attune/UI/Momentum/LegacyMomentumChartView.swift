@@ -251,11 +251,8 @@ struct LegacyMomentumChartView: View {
 
     var body: some View {
         let _ = logChartReceive() // Debug: emit chart input summary when body evaluates
-        VStack(alignment: .center, spacing: 16) { // Center alignment for the entire card content
-            HStack {
-                Spacer()
-                chartStyleSwitcher
-            }
+        VStack(alignment: .center, spacing: 8) { // Center alignment for the entire card content
+            chartStyleSwitcher
 
             // Chart area
             if points.isEmpty {
@@ -272,27 +269,8 @@ struct LegacyMomentumChartView: View {
             if !legendItems.isEmpty {
                 intentionSelector
             }
-
-            if !legendItems.isEmpty { // Show intention colors so users can map bars to intentions
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(legendItems, id: \.id) { item in
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(MomentumPalette.color(forIndex: item.colorIndex))
-                                    .frame(width: 10, height: 10)
-                                Text(item.title)
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
         }
-        .padding(16)
+        .padding(12)
         .glassCard()
         .onChange(of: points.map(\.intentionId)) { _, intentionIds in
             if let selectedIntentionId, !intentionIds.contains(selectedIntentionId) {
@@ -441,10 +419,10 @@ struct LegacyMomentumChartView: View {
                 // Draw 3D bars with depth
                 draw3DBars(context: context, chartWidth: chartWidth, chartHeight: chartHeight, leftPadding: leftPadding, bottomPadding: bottomPadding, depthOffset: depthOffset, perspectiveAngle: perspectiveAngle, domain: domain, completionPulse: completionPulse, entranceClock: entranceClock)
                 }
-                .frame(height: 220)
+                .frame(height: 180)
             }
         }
-        .frame(height: 220)
+        .frame(height: 180)
     }
 
     /// Line alternative using the exact same points, manual updates, colors,
@@ -508,7 +486,7 @@ struct LegacyMomentumChartView: View {
                 .foregroundStyle(AttuneTheme.textSecondary)
             }
         }
-        .frame(height: 220)
+        .frame(height: 180)
         .accessibilityLabel("Daily momentum line chart")
     }
     

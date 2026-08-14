@@ -87,7 +87,7 @@ struct MomentumView: View {
             AttuneScreenBackground()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: viewMode == .day ? 8 : 16) {
                     header
                     modeSelector
                     periodNavigation
@@ -97,18 +97,6 @@ struct MomentumView: View {
                 .padding(.bottom, 112)
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink {
-                    MomentumHistoryView()
-                } label: {
-                    Image(systemName: "clock.arrow.circlepath")
-                }
-                .accessibilityLabel("Progress history")
-                .accessibilityHint("Shows daily totals and progress by intention")
-            }
-        }
-        .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear(perform: loadAllData)
         .onChange(of: selectedDate) { _, _ in loadAllData() }
         .onChange(of: viewMode) { _, _ in loadAllData() }
@@ -121,16 +109,34 @@ struct MomentumView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Momentum")
-                .font(.largeTitle.bold())
-                .foregroundStyle(AttuneTheme.textPrimary)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Momentum")
+                    .font(.title.bold())
+                    .foregroundStyle(AttuneTheme.textPrimary)
 
-            Text("Progress recorded through your check-ins.")
-                .font(.subheadline)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                Text("Progress recorded through your check-ins.")
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+
+            Spacer(minLength: 4)
+
+            NavigationLink {
+                MomentumHistoryView()
+            } label: {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AttuneTheme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(AttuneTheme.surface, in: Circle())
+                    .overlay(Circle().stroke(AttuneTheme.border, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Progress history")
+            .accessibilityHint("Shows daily totals and progress by intention")
         }
-        .padding(.top, 8)
+        .padding(.top, viewMode == .day ? 2 : 8)
     }
 
     private var modeSelector: some View {
@@ -144,7 +150,7 @@ struct MomentumView: View {
     }
 
     private var periodNavigation: some View {
-        VStack(spacing: viewMode == .day ? 8 : 0) {
+        VStack(spacing: viewMode == .day ? 2 : 0) {
             HStack {
                 periodButton(systemImage: "chevron.left", label: "Previous period") {
                     shiftPeriod(backward: true)
@@ -169,7 +175,7 @@ struct MomentumView: View {
                 WeekdayPicker(days: weekDays, selectedDate: $selectedDate)
             }
         }
-        .padding(12)
+        .padding(viewMode == .day ? 6 : 12)
         .background(AttuneTheme.surface, in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous)
@@ -190,7 +196,7 @@ struct MomentumView: View {
     }
 
     private var dayContent: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 8) {
             summaryCard(items: [
                 SummaryItem(value: percentText(dayOverallRatio), label: "overall"),
                 SummaryItem(value: "\(dayIntentionCount)", label: dayIntentionCount == 1 ? "intention" : "intentions"),
@@ -283,7 +289,7 @@ struct MomentumView: View {
                 }
             }
         }
-        .padding(.vertical, 14)
+        .padding(.vertical, viewMode == .day ? 8 : 14)
         .attuneCard()
     }
 

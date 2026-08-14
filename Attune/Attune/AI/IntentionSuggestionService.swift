@@ -16,6 +16,8 @@ enum IntentionSuggestionService {
         let unit: String
         let timeframe: String
         let reason: String
+        let actionFingerprint: String
+        let actionFamily: String
         let evidenceItemIds: [String]
         let sourceTitle: String?
         let sourceURL: String?
@@ -25,7 +27,8 @@ enum IntentionSuggestionService {
     static func generate(
         topic: IntentionSuggestionTopic,
         activeIntentions: [Intention],
-        declinedActionIds: [String],
+        history: [IntentionSuggestionHistoryEntry],
+        recentProgressDaysByIntentionId: [String: Int],
         now: Date = Date()
     ) async throws -> SuggestedIntentionAction? {
         let formatter = ISO8601DateFormatter()
@@ -39,9 +42,28 @@ enum IntentionSuggestionService {
                 ["itemId": $0.itemId, "sessionDate": formatter.string(from: $0.sessionDate), "quote": $0.quote]
             },
             "activeIntentions": activeIntentions.map {
-                ["title": $0.title, "aliases": $0.aliases]
+                [
+                    "id": $0.id,
+                    "title": $0.title,
+                    "aliases": $0.aliases,
+                    "targetValue": $0.targetValue,
+                    "unit": $0.unit,
+                    "timeframe": $0.timeframe,
+                    "recentProgressDays": recentProgressDaysByIntentionId[$0.id] ?? 0
+                ] as [String: Any]
             },
-            "declinedActionIds": Array(declinedActionIds.prefix(100))
+            "declinedActionIds": Array(history.filter { $0.outcome == .declined }.map(\.actionId).prefix(100)),
+            "suggestionHistory": Array(history.suffix(100)).map {
+                var value: [String: Any] = [
+                    "actionId": $0.actionId,
+                    "outcome": $0.outcome.rawValue,
+                    "decidedAt": formatter.string(from: $0.decidedAt)
+                ]
+                if let title = $0.title { value["title"] = title }
+                if let fingerprint = $0.actionFingerprint { value["actionFingerprint"] = fingerprint }
+                if let family = $0.actionFamily { value["actionFamily"] = family }
+                return value
+            }
         ]
         let json = try await OpenAIClient.serverOwnedTask(.intentionSuggestion, body: body)
         let decoder = JSONDecoder()
@@ -51,8 +73,15 @@ enum IntentionSuggestionService {
         guard let payload = response.suggestion else { return nil }
         guard payload.targetValue > 0,
               ["daily", "weekly"].contains(payload.timeframe),
+              ["pages", "minutes", "sessions", "steps", "reps", "cups", "glasses", "times"].contains(payload.unit),
               !payload.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !declinedActionIds.contains(payload.actionId) else {
+              !IntentionSuggestionEngine.isSuppressed(
+                  actionId: payload.actionId,
+                  actionFingerprint: payload.actionFingerprint,
+                  title: payload.title,
+                  history: history,
+                  now: now
+              ) else {
             throw IntentionSuggestionServiceError.invalidResponse
         }
         let evidenceById = Dictionary(uniqueKeysWithValues: topic.evidence.map { ($0.itemId, $0) })
@@ -75,6 +104,8 @@ enum IntentionSuggestionService {
             safetyNote: payload.safetyNote,
             generatedAt: now
         )
+        suggestion.actionFingerprint = payload.actionFingerprint
+        suggestion.actionFamily = payload.actionFamily
         suggestion.distinctSessionCount = topic.distinctSessionCount
         suggestion.currentMonthSessionCount = topic.currentMonthSessionCount
         return suggestion

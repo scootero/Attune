@@ -30,6 +30,10 @@ class RecorderService: NSObject, ObservableObject {
     
     /// Total elapsed seconds since recording started
     @Published var elapsedSec = 0
+
+    /// Smoothed live microphone intensity (0...1) for recording UI only.
+    /// This is derived from AVAudioRecorder metering and is never persisted.
+    @Published private(set) var audioLevel: Double = 0
     
     /// Current segment index (1-based for display)
     @Published var currentSegmentIndex = 0
@@ -56,6 +60,9 @@ class RecorderService: NSObject, ObservableObject {
     
     /// Timer that fires every 1 second to update elapsed time
     private var elapsedTimer: Timer?
+
+    /// Lightweight meter used to drive the live recording visualization.
+    private var meteringTimer: Timer?
     
     /// Timer that fires at segment rotation interval to rotate segments
     private var rotationTimer: Timer?
@@ -358,6 +365,7 @@ class RecorderService: NSObject, ObservableObject {
         do {
             let newRecorder = try AVAudioRecorder(url: url, settings: settings)
             newRecorder.delegate = self
+            newRecorder.isMeteringEnabled = true
             newRecorder.record()
             recorder = newRecorder
         } catch {
@@ -380,6 +388,12 @@ class RecorderService: NSObject, ObservableObject {
         let elapsed = Timer(timeInterval: 1.0, target: self, selector: #selector(incrementElapsedTimer), userInfo: nil, repeats: true)
         RunLoop.current.add(elapsed, forMode: .common)
         elapsedTimer = elapsed
+
+        // Frequent enough to feel responsive without touching the audio data or
+        // changing the recording pipeline.
+        let meter = Timer(timeInterval: 0.08, target: self, selector: #selector(updateAudioLevel), userInfo: nil, repeats: true)
+        RunLoop.current.add(meter, forMode: .common)
+        meteringTimer = meter
         
         // Rotation timer: fires at segment duration interval (180 seconds = 3 minutes)
         // Use .common run loop mode to continue firing when app is backgrounded
@@ -392,6 +406,10 @@ class RecorderService: NSObject, ObservableObject {
     private func stopTimers() {
         elapsedTimer?.invalidate()
         elapsedTimer = nil
+
+        meteringTimer?.invalidate()
+        meteringTimer = nil
+        audioLevel = 0
         
         rotationTimer?.invalidate()
         rotationTimer = nil
@@ -399,6 +417,22 @@ class RecorderService: NSObject, ObservableObject {
 
     @objc private func incrementElapsedTimer() {
         elapsedSec += 1
+    }
+
+    @objc private func updateAudioLevel() {
+        guard isRecording, let recorder else {
+            audioLevel = 0
+            return
+        }
+
+        recorder.updateMeters()
+        let decibels = Double(recorder.averagePower(forChannel: 0))
+        // Typical speech lives around -35...-8 dB. This curve keeps room noise
+        // calm while leaving enough headroom for emphatic speech.
+        let normalized = min(1, max(0, (decibels + 45) / 45))
+        let target = pow(normalized, 1.35)
+        let response = target > audioLevel ? 0.48 : 0.16
+        audioLevel += (target - audioLevel) * response
     }
     
     // MARK: - Interruption Handling

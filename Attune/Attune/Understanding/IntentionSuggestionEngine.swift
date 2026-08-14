@@ -21,7 +21,7 @@ enum IntentionSuggestionEngine {
         let itemsById = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
         let month = calendar.dateInterval(of: .month, for: now)
 
-        return topics.compactMap { topic in
+        let candidates = topics.compactMap { topic -> IntentionSuggestionTopic? in
             let key = topic.topicKey ?? topic.canonicalKey
             guard !key.isEmpty, !topic.itemIds.isEmpty else { return nil }
             guard !topic.itemIds.contains(where: {
@@ -61,6 +61,7 @@ enum IntentionSuggestionEngine {
                 lastSessionAt: last.sessionDate
             )
         }
+        return consolidateRelatedTopics(candidates, calendar: calendar, now: now)
     }
 
     static func decide(
@@ -78,13 +79,9 @@ enum IntentionSuggestionEngine {
         if let attempt = snapshot.lastGenerationAttemptAt,
            now.timeIntervalSince(attempt) < 24 * 60 * 60 { return .none }
 
-        let declined = snapshot.history.filter { $0.outcome == .declined }
-        let available = topics.filter { topic in
-            // "Not for me" is durable for both the exact action and the theme
-            // that produced it. Do not quietly bring the same kind of suggestion
-            // back after an arbitrary cooling-off period.
-            !declined.contains { $0.topicKey == topic.topicKey }
-        }
+        // A declined action is permanently suppressed, but its broad topic is
+        // still allowed to produce a genuinely different idea later.
+        let available = topics
         // The feature gets its own introduction clock for every user. It starts
         // responsive, then deliberately quiets down as Attune learns more.
         let programStart = snapshot.firstLaunchAt ?? now
@@ -96,19 +93,14 @@ enum IntentionSuggestionEngine {
         let minimumSessions: Int
         let minimumSpan: TimeInterval
         let cooldown: TimeInterval
-        switch days {
-        case 0...20:
+        if days <= 20 {
             minimumSessions = 2
             minimumSpan = 0
-            cooldown = 4 * 24 * 60 * 60
-        case 21...50:
+            cooldown = 3 * 24 * 60 * 60
+        } else {
             minimumSessions = 3
-            minimumSpan = 0
-            cooldown = 7 * 24 * 60 * 60
-        default:
-            minimumSessions = 4
-            minimumSpan = 14 * 24 * 60 * 60
-            cooldown = 14 * 24 * 60 * 60
+            minimumSpan = 3 * 24 * 60 * 60
+            cooldown = 4 * 24 * 60 * 60
         }
 
         guard completedSessionCount >= minimumSessions else {
@@ -128,6 +120,25 @@ enum IntentionSuggestionEngine {
         history.contains { $0.actionId == actionId && $0.outcome == .declined }
     }
 
+    static func isSuppressed(
+        actionId: String,
+        actionFingerprint: String?,
+        title: String,
+        history: [IntentionSuggestionHistoryEntry],
+        now: Date = Date()
+    ) -> Bool {
+        history.contains { entry in
+            let exactAction = entry.actionId == actionId
+            let exactFingerprint = actionFingerprint.map { $0 == entry.actionFingerprint } ?? false
+            let closeDeclinedTitle = entry.outcome == .declined
+                && entry.title.map { titlesAreSemanticMatches(title, $0) } == true
+            if entry.outcome == .declined {
+                return exactAction || exactFingerprint || closeDeclinedTitle
+            }
+            return (exactAction || exactFingerprint) && now.timeIntervalSince(entry.decidedAt) < 60 * 24 * 60 * 60
+        }
+    }
+
     static func isCoveredByActiveIntention(
         suggestionTitle: String,
         activeIntentions: [Intention]
@@ -136,14 +147,27 @@ enum IntentionSuggestionEngine {
         guard !suggestionTerms.isEmpty else { return false }
         return activeIntentions.contains { intention in
             let activeTerms = coverageTerms(in: ([intention.title] + intention.aliases).joined(separator: " "))
-            return !suggestionTerms.isDisjoint(with: activeTerms)
+            return termsAreSemanticMatches(suggestionTerms, activeTerms)
         }
+    }
+
+    private static func titlesAreSemanticMatches(_ lhs: String, _ rhs: String) -> Bool {
+        termsAreSemanticMatches(coverageTerms(in: lhs), coverageTerms(in: rhs))
+    }
+
+    private static func termsAreSemanticMatches(_ lhs: Set<String>, _ rhs: Set<String>) -> Bool {
+        guard !lhs.isEmpty, !rhs.isEmpty else { return false }
+        let overlap = lhs.intersection(rhs).count
+        if min(lhs.count, rhs.count) == 1 { return overlap == 1 }
+        return overlap >= 2 || Double(overlap) / Double(min(lhs.count, rhs.count)) >= 0.6
     }
 
     private static func coverageTerms(in value: String) -> Set<String> {
         let ignored: Set<String> = [
             "a", "an", "and", "at", "daily", "do", "for", "from", "in", "minute", "minutes",
-            "my", "of", "one", "short", "take", "the", "this", "times", "to", "today", "two", "weekly"
+            "better", "daily", "feel", "keep", "more", "my", "need", "of", "one", "really", "say",
+            "short", "take", "talk", "the", "thing", "things", "think", "this", "times", "to", "today",
+            "two", "want", "weekly"
         ]
         let words = value.lowercased().split { !$0.isLetter && !$0.isNumber }
         return Set(words.compactMap { word -> String? in
@@ -151,6 +175,8 @@ enum IntentionSuggestionEngine {
             if term.count > 5, term.hasSuffix("ing") { term.removeLast(3) }
             else if term.count > 4, term.hasSuffix("ed") { term.removeLast(2) }
             else if term.count > 4, term.hasSuffix("s") { term.removeLast() }
+            if term == "record" { term = "log" }
+            if term == "nightly" { term = "night" }
             return term.count >= 3 && !ignored.contains(term) ? term : nil
         })
     }
@@ -161,5 +187,48 @@ enum IntentionSuggestionEngine {
             if $0.lastSessionAt != $1.lastSessionAt { return $0.lastSessionAt > $1.lastSessionAt }
             return $0.topicKey < $1.topicKey
         }.first
+    }
+
+    private static func consolidateRelatedTopics(
+        _ topics: [IntentionSuggestionTopic],
+        calendar: Calendar,
+        now: Date
+    ) -> [IntentionSuggestionTopic] {
+        var groups: [[IntentionSuggestionTopic]] = []
+        for topic in topics.sorted(by: { $0.topicKey < $1.topicKey }) {
+            let terms = identityTerms(for: topic)
+            if let index = groups.firstIndex(where: { group in
+                guard let representative = group.first else { return false }
+                return !Set(representative.categories).isDisjoint(with: topic.categories)
+                    && group.contains { !identityTerms(for: $0).isDisjoint(with: terms) }
+            }) {
+                groups[index].append(topic)
+            } else {
+                groups.append([topic])
+            }
+        }
+        let month = calendar.dateInterval(of: .month, for: now)
+        return groups.compactMap { group in
+            guard let representative = bestTopic(group) else { return nil }
+            let newestPerSession = Dictionary(grouping: group.flatMap(\.evidence), by: \.sessionId)
+                .compactMap { _, values in values.max(by: { $0.sessionDate < $1.sessionDate }) }
+                .sorted { $0.sessionDate > $1.sessionDate }
+            guard let newest = newestPerSession.first, let oldest = newestPerSession.last else { return nil }
+            return IntentionSuggestionTopic(
+                topicKey: group.map(\.topicKey).sorted().joined(separator: "+"),
+                title: representative.title,
+                categories: Array(Set(group.flatMap(\.categories))).sorted(),
+                evidence: Array(newestPerSession.prefix(5)),
+                distinctSessionCount: newestPerSession.count,
+                currentMonthSessionCount: newestPerSession.filter { month?.contains($0.sessionDate) == true }.count,
+                firstSessionAt: oldest.sessionDate,
+                lastSessionAt: newest.sessionDate
+            )
+        }
+    }
+
+    private static func identityTerms(for topic: IntentionSuggestionTopic) -> Set<String> {
+        let evidence = topic.evidence.map(\.quote).joined(separator: " ")
+        return coverageTerms(in: "\(topic.title) \(evidence)")
     }
 }

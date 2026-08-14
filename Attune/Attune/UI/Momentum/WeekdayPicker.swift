@@ -46,7 +46,7 @@ struct WeekdayPicker: View {
                 selectedDate = day.date
             }
         }) {
-            VStack(spacing: 3) {
+            VStack(spacing: 1) {
                 Text(day.weekdayLetter)
                     .font(.caption2.weight(.semibold))
                 Text(day.date.formatted(.dateTime.day()))
@@ -55,7 +55,7 @@ struct WeekdayPicker: View {
             }
                 .foregroundColor(foregroundColor(day: day, isSelected: isSelected))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .frame(minHeight: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .fill(backgroundColor(day: day, isSelected: isSelected))

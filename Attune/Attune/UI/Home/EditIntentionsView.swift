@@ -43,6 +43,15 @@ struct DraftIntention: Identifiable {
             createdAt: Date()
         )
     }
+
+    /// Compares only fields the user can edit. A freshly created blank Add card
+    /// has a new UUID, but that implementation detail must not make it dirty.
+    func hasEditableChanges(comparedTo other: DraftIntention) -> Bool {
+        title != other.title
+        || targetValue != other.targetValue
+        || unit != other.unit
+        || timeframe.lowercased() != other.timeframe.lowercased()
+    }
 }
 
 struct EditIntentionsView: View {
@@ -346,7 +355,7 @@ struct EditIntentionsView: View {
             return true
         }
 
-        let addHasChanges = isDraftDifferent(addDraft, baselineAddDraft)
+        let addHasChanges = addDraft.hasEditableChanges(comparedTo: baselineAddDraft)
         return addHasChanges && !isValidDraft(addDraft)
     }
 
@@ -385,7 +394,7 @@ struct EditIntentionsView: View {
     /// Detects whether any changes exist compared to baseline snapshots.
     private var hasChanges: Bool {
         // Check add draft change
-        if isDraftDifferent(addDraft, baselineAddDraft) { // compare add card to baseline
+        if addDraft.hasEditableChanges(comparedTo: baselineAddDraft) { // ignore the blank card's generated id
             return true // changed
         }
         // Check deletions or insertions
@@ -406,10 +415,7 @@ struct EditIntentionsView: View {
     /// Field-wise comparison for dirty tracking.
     private func isDraftDifferent(_ lhs: DraftIntention, _ rhs: DraftIntention) -> Bool {
         lhs.id != rhs.id // id difference counts as change
-        || lhs.title != rhs.title // title change
-        || lhs.targetValue != rhs.targetValue // target change
-        || lhs.unit != rhs.unit // unit change
-        || lhs.timeframe.lowercased() != rhs.timeframe.lowercased() // timeframe change with normalization
+        || lhs.hasEditableChanges(comparedTo: rhs) // user-editable field change
     } // end isDraftDifferent
     
     private func deleteDraft(at offsets: IndexSet) {

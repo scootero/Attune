@@ -54,29 +54,60 @@ final class IntentionSuggestionEngineTests: XCTestCase {
         XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidate], completedSessionCount: 2, isAtIntentionLimit: true, calendar: calendar, now: now), .request(topic: candidate, opportunityKey: nil))
     }
 
-    func testIntroFourDayCooldownThenRampAndSteadyCadence() {
-        let start = date("2026-01-01T00:00:00Z")
+    func testThreeDayIntroCooldownThenFourDaySteadyCadence() {
+        let start = date("2026-08-01T00:00:00Z")
         let candidate = candidateTopic(count: 4)
         var snapshot = IntentionSuggestionSnapshot.empty
         snapshot.firstLaunchAt = start
-        snapshot.history = [.init(actionId: "old", topicKey: "other", outcome: .accepted, decidedAt: date("2026-01-05T00:00:00Z"))]
-        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidate], completedSessionCount: 4, isAtIntentionLimit: false, calendar: calendar, now: date("2026-01-08T23:59:00Z")), .none)
-        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidate], completedSessionCount: 4, isAtIntentionLimit: false, calendar: calendar, now: date("2026-01-09T00:00:00Z")), .request(topic: candidate, opportunityKey: nil))
+        snapshot.history = [.init(actionId: "old", topicKey: "other", outcome: .accepted, decidedAt: date("2026-08-02T00:00:00Z"))]
+        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidate], completedSessionCount: 4, isAtIntentionLimit: false, calendar: calendar, now: date("2026-08-04T23:59:00Z")), .none)
+        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidate], completedSessionCount: 4, isAtIntentionLimit: false, calendar: calendar, now: date("2026-08-05T00:00:00Z")), .request(topic: candidate, opportunityKey: nil))
 
+        snapshot.firstLaunchAt = date("2026-01-01T00:00:00Z")
         snapshot.history[0] = .init(actionId: "old", topicKey: "other", outcome: .accepted, decidedAt: date("2026-01-25T00:00:00Z"))
-        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidate], completedSessionCount: 4, isAtIntentionLimit: false, calendar: calendar, now: date("2026-01-31T23:59:00Z")), .none)
-        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidate], completedSessionCount: 4, isAtIntentionLimit: false, calendar: calendar, now: date("2026-02-01T00:00:00Z")), .request(topic: candidate, opportunityKey: nil))
+        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidate], completedSessionCount: 4, isAtIntentionLimit: false, calendar: calendar, now: date("2026-01-28T23:59:00Z")), .none)
+        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidate], completedSessionCount: 4, isAtIntentionLimit: false, calendar: calendar, now: date("2026-01-29T00:00:00Z")), .request(topic: candidate, opportunityKey: nil))
+
+        let shortSpan = IntentionSuggestionTopic(topicKey: "short", title: "Short", categories: ["personal_growth"], evidence: [], distinctSessionCount: 3, currentMonthSessionCount: 3, firstSessionAt: date("2026-01-26T00:00:00Z"), lastSessionAt: date("2026-01-28T23:59:59Z"))
+        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [shortSpan], completedSessionCount: 4, isAtIntentionLimit: false, calendar: calendar, now: date("2026-02-10T00:00:00Z")), .none)
     }
 
-    func testDeclinePermanentlySuppressesActionAndTopic() {
+    func testDeclinePermanentlySuppressesActionButAllowsNewIdeaForTopic() {
         let now = date("2026-08-12T00:00:00Z")
-        let entry = IntentionSuggestionHistoryEntry(actionId: "movement.walk_5_daily", topicKey: "fitness|walk", outcome: .declined, decidedAt: now)
+        let entry = IntentionSuggestionHistoryEntry(actionId: "custom.take_short_walk.5.minutes.daily", topicKey: "fitness|walk", outcome: .declined, decidedAt: now, title: "Take a short walk", actionFingerprint: "take_short_walk", actionFamily: "movement")
         XCTAssertTrue(IntentionSuggestionEngine.isPermanentlyDeclined(actionId: entry.actionId, history: [entry]))
+        XCTAssertTrue(IntentionSuggestionEngine.isSuppressed(actionId: "new-id", actionFingerprint: "take_short_walk", title: "Walk briefly", history: [entry], now: now.addingTimeInterval(365 * 86_400)))
+        let accepted = IntentionSuggestionHistoryEntry(actionId: "custom.teach_idea.1.times.daily", topicKey: "learning", outcome: .accepted, decidedAt: now, title: "Teach one idea", actionFingerprint: "teach_idea", actionFamily: "learning")
+        XCTAssertTrue(IntentionSuggestionEngine.isSuppressed(actionId: "new-id", actionFingerprint: "teach_idea", title: "Teach one idea", history: [accepted], now: now.addingTimeInterval(59 * 86_400)))
+        XCTAssertFalse(IntentionSuggestionEngine.isSuppressed(actionId: "new-id", actionFingerprint: "teach_idea", title: "Teach one idea", history: [accepted], now: now.addingTimeInterval(61 * 86_400)))
         var snapshot = IntentionSuggestionSnapshot.empty
         snapshot.isExistingInstall = true
+        snapshot.firstLaunchAt = date("2026-01-01T00:00:00Z")
         snapshot.history = [entry]
-        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidateTopic(count: 4, key: entry.topicKey)], completedSessionCount: 8, isAtIntentionLimit: false, calendar: calendar, now: now.addingTimeInterval(30 * 86_400)), .none)
-        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [candidateTopic(count: 4, key: entry.topicKey)], completedSessionCount: 8, isAtIntentionLimit: false, calendar: calendar, now: now.addingTimeInterval(365 * 86_400)), .none)
+        let topic = candidateTopic(count: 4, key: entry.topicKey)
+        XCTAssertEqual(IntentionSuggestionEngine.decide(snapshot: snapshot, topics: [topic], completedSessionCount: 8, isAtIntentionLimit: false, calendar: calendar, now: now.addingTimeInterval(5 * 86_400)), .request(topic: topic, opportunityKey: nil))
+    }
+
+    func testRelatedFragmentedTopicsMergeAcrossDistinctSessions() {
+        let sessions = [
+            session("one", "2026-08-01T00:00:00Z"),
+            session("two", "2026-08-04T00:00:00Z"),
+            session("three", "2026-08-08T00:00:00Z")
+        ]
+        let items = [
+            item("a", session: "one", title: "Special Gestures", quote: "I want to surprise my wife with something thoughtful."),
+            item("b", session: "two", title: "Relationship Focus", quote: "I want to make more time for my wife."),
+            item("c", session: "three", title: "Thoughtful Moments", quote: "I should do small thoughtful things for my wife.")
+        ]
+        let aggregates = [
+            topic(["a"], key: "relationships_social|special_gestures", title: "Special Gestures", categories: ["relationships_social"]),
+            topic(["b"], key: "relationships_social|relationship_focus", title: "Relationship Focus", categories: ["relationships_social"]),
+            topic(["c"], key: "relationships_social|thoughtful_moments", title: "Thoughtful Moments", categories: ["relationships_social"])
+        ]
+        let result = IntentionSuggestionEngine.makeTopics(topics: aggregates, sessions: sessions, items: items, corrections: [:], calendar: calendar, now: date("2026-08-12T00:00:00Z"))
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.distinctSessionCount, 3)
+        XCTAssertEqual(Set(result.first?.evidence.map(\.sessionId) ?? []).count, 3)
     }
 
     func testActiveIntentionSemanticallyCoversSuggestion() {
@@ -103,16 +134,20 @@ final class IntentionSuggestionEngineTests: XCTestCase {
         let file = directory.appendingPathComponent("suggestions.json")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        try Data("{}".utf8).write(to: file)
+        try Data(#"{"history":[{"actionId":"legacy","topicKey":"planning","outcome":"declined","decidedAt":"2026-08-01T00:00:00Z"}]}"#.utf8).write(to: file)
         let store = IntentionSuggestionStore(fileURL: file)
-        XCTAssertEqual(store.load(), .empty)
+        XCTAssertEqual(store.load().history.first?.actionId, "legacy")
+        XCTAssertNil(store.load().history.first?.actionFingerprint)
 
         let evidence = IntentionSuggestionEvidence(itemId: "item", sessionId: "session", sessionDate: date("2026-08-01T00:00:00Z"), quote: "quote")
-        let suggestion = SuggestedIntentionAction(actionId: "routine.top_task_daily", topicKey: "career|planning", topicTitle: "Planning", title: "Choose today’s top task", targetValue: 1, unit: "times", timeframe: "daily", reason: "Planning keeps returning.", evidence: [evidence], sourceTitle: nil, sourceURL: nil, safetyNote: nil, generatedAt: date("2026-08-12T00:00:00Z"))
+        var suggestion = SuggestedIntentionAction(actionId: "custom.choose_top_task.1.times.daily", topicKey: "career|planning", topicTitle: "Planning", title: "Choose today’s top task", targetValue: 1, unit: "times", timeframe: "daily", reason: "Planning keeps returning.", evidence: [evidence], sourceTitle: nil, sourceURL: nil, safetyNote: nil, generatedAt: date("2026-08-12T00:00:00Z"))
+        suggestion.actionFingerprint = "choose_top_task"
+        suggestion.actionFamily = "planning"
         try store.setOutstanding(suggestion)
         try store.decide(.declined, suggestion: suggestion, now: date("2026-08-12T01:00:00Z"))
         XCTAssertNil(store.load().outstanding)
         XCTAssertTrue(IntentionSuggestionEngine.isPermanentlyDeclined(actionId: suggestion.actionId, history: store.load().history))
+        XCTAssertEqual(store.load().history.last?.actionFingerprint, "choose_top_task")
     }
 
     private func candidateTopic(count: Int, key: String = "personal_growth|planning") -> IntentionSuggestionTopic {
@@ -120,11 +155,11 @@ final class IntentionSuggestionEngineTests: XCTestCase {
     }
 
     private func session(_ id: String, _ value: String) -> Session { Session(id: id, startedAt: date(value), status: "complete") }
-    private func item(_ id: String, session: String, extracted: String = "2026-08-01T01:00:00Z", reviewState: String = "new") -> ExtractedItem {
-        ExtractedItem(id: id, sessionId: session, segmentId: "s", segmentIndex: 0, type: "state", title: "Planning", summary: "", categories: ["personal_growth"], confidence: 1, strength: 1, sourceQuote: "I keep bringing this up", fingerprint: "planning", reviewState: reviewState, createdAt: extracted, extractedAt: extracted)
+    private func item(_ id: String, session: String, extracted: String = "2026-08-01T01:00:00Z", reviewState: String = "new", title: String = "Planning", quote: String = "I keep bringing this up", categories: [String] = ["personal_growth"]) -> ExtractedItem {
+        ExtractedItem(id: id, sessionId: session, segmentId: "s", segmentIndex: 0, type: "state", title: title, summary: "", categories: categories, confidence: 1, strength: 1, sourceQuote: quote, fingerprint: title.lowercased(), reviewState: reviewState, createdAt: extracted, extractedAt: extracted)
     }
-    private func topic(_ ids: [String]) -> TopicAggregate {
-        var value = TopicAggregate(canonicalKey: "planning__1", displayTitle: "Planning", firstSeenAtISO: "2026-07-01T00:00:00Z", categories: ["personal_growth"], itemId: ids.first ?? "", topicKey: "personal_growth|planning")
+    private func topic(_ ids: [String], key: String = "personal_growth|planning", title: String = "Planning", categories: [String] = ["personal_growth"]) -> TopicAggregate {
+        var value = TopicAggregate(canonicalKey: "\(title.lowercased())__1", displayTitle: title, firstSeenAtISO: "2026-07-01T00:00:00Z", categories: categories, itemId: ids.first ?? "", topicKey: key)
         value.itemIds = ids
         value.occurrenceCount = ids.count
         return value

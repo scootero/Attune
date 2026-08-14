@@ -249,6 +249,12 @@ The detailed, ordered manual checklist is maintained in
 
 Allow the user to explicitly promote an intention discovered during a Listening Session into a quantitative tracked intention. This must require confirmation and must never happen automatically.
 
+Speaker-aware Listening Sessions are also deferred and unassigned. The
+planning-only feasibility, ownership, filtering, data, verification, and rollout
+gates are documented in `SPEAKER_AWARE_LISTENING_BUILD_PLAN.md`. The recommended
+v1 contract performs speaker analysis locally and sends only speech confidently
+matched to the Attune user; it never identifies another speaker.
+
 ## Demo-data cleanup reminder
 
 The current Debug simulator may contain removable Momentum demo data. Remove it through:

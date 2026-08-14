@@ -7,7 +7,6 @@
  */
 
 import { buildTask, isTaskPath, type BuiltTask } from "./tasks";
-import { suggestionAction } from "./intention-suggestion-actions";
 import type { GatewayEnv } from "./env";
 import {
   actualWeightedUnits,
@@ -407,13 +406,73 @@ function parseStructuredTaskOutput(
     const value = JSON.parse(content);
     if (!isRecord(value) || !hasExpectedTaskOutputShape(task.taskName, value)) return { ok: false };
     if (task.taskName !== "intention_suggestion") return { ok: true, value };
-    if (value.actionId === null) return { ok: true, value: { suggestion: null } };
-    if (typeof value.actionId !== "string" || typeof value.reason !== "string" || value.reason.length < 1 || value.reason.length > 140 || !Array.isArray(value.evidenceItemIds)) return { ok: false };
-    const action = suggestionAction(value.actionId);
+    if (value.title === null) {
+      return value.targetValue === null
+        && value.unit === null
+        && value.timeframe === null
+        && value.reason === null
+        && value.actionFingerprint === null
+        && value.actionFamily === null
+        && Array.isArray(value.evidenceItemIds)
+        && value.evidenceItemIds.length === 0
+        ? { ok: true, value: { suggestion: null } }
+        : { ok: false };
+    }
     const context = task.suggestionContext;
+    if (!context || context.sensitiveEvidence) return { ok: false };
+    if (
+      typeof value.title !== "string"
+      || value.title.trim().length < 3
+      || value.title.length > 64
+      || value.title.trim().split(/\s+/).length > 8
+      || typeof value.targetValue !== "number"
+      || !isValidSuggestionTarget(value.targetValue, value.unit)
+      || typeof value.unit !== "string"
+      || !SUGGESTION_UNITS.has(value.unit)
+      || (value.timeframe !== "daily" && value.timeframe !== "weekly")
+      || typeof value.reason !== "string"
+      || value.reason.trim().length < 1
+      || value.reason.length > 140
+      || isUnsafeGeneratedSuggestion(`${value.title} ${value.reason}`)
+      || typeof value.actionFingerprint !== "string"
+      || !/^[a-z0-9]+(?:_[a-z0-9]+){0,7}$/.test(value.actionFingerprint)
+      || value.actionFingerprint.length > 80
+      || typeof value.actionFamily !== "string"
+      || !SUGGESTION_FAMILIES.has(value.actionFamily)
+      || !Array.isArray(value.evidenceItemIds)
+    ) return { ok: false };
+    const suggestionTitle = value.title;
     const evidenceIds = value.evidenceItemIds;
-    if (!action || !context || !context.allowedActionIds.includes(action.actionId) || context.declinedActionIds.includes(action.actionId) || evidenceIds.length < 1 || evidenceIds.some((id) => typeof id !== "string" || !context.evidenceItemIds.includes(id))) return { ok: false };
-    return { ok: true, value: { suggestion: { ...action, reason: value.reason, evidenceItemIds: evidenceIds } } };
+    const actionId = customSuggestionActionId(value.actionFingerprint, value.targetValue, value.unit, value.timeframe);
+    if (
+      context.blockedActionIds.includes(actionId)
+      || context.blockedFingerprints.includes(value.actionFingerprint)
+      || context.activeIntentionTexts.some((text) => suggestionTextsMatch(suggestionTitle, text))
+      || context.declinedTitles.some((text) => suggestionTextsMatch(suggestionTitle, text))
+      || evidenceIds.length < 1
+      || evidenceIds.length > 5
+      || new Set(evidenceIds).size !== evidenceIds.length
+      || evidenceIds.some((id) => typeof id !== "string" || !context.evidenceItemIds.includes(id))
+    ) return { ok: false };
+    return {
+      ok: true,
+      value: {
+        suggestion: {
+          actionId,
+          title: value.title.trim(),
+          targetValue: value.targetValue,
+          unit: value.unit,
+          timeframe: value.timeframe,
+          reason: value.reason.trim(),
+          actionFingerprint: value.actionFingerprint,
+          actionFamily: value.actionFamily,
+          evidenceItemIds: evidenceIds,
+          sourceTitle: null,
+          sourceURL: null,
+          safetyNote: suggestionSafetyNote(context.topicCategories),
+        },
+      },
+    };
   } catch {
     return { ok: false };
   }
@@ -436,11 +495,68 @@ function hasExpectedTaskOutputShape(
     case "listening":
       return hasExactKeys(value, ["items"]) && Array.isArray(value.items);
     case "intention_suggestion":
-      return hasExactKeys(value, ["actionId", "reason", "evidenceItemIds"]) &&
-        (value.actionId === null || typeof value.actionId === "string") &&
+      return hasExactKeys(value, ["title", "targetValue", "unit", "timeframe", "reason", "actionFingerprint", "actionFamily", "evidenceItemIds"]) &&
+        (value.title === null || typeof value.title === "string") &&
+        (value.targetValue === null || typeof value.targetValue === "number") &&
+        (value.unit === null || typeof value.unit === "string") &&
+        (value.timeframe === null || typeof value.timeframe === "string") &&
         (value.reason === null || typeof value.reason === "string") &&
+        (value.actionFingerprint === null || typeof value.actionFingerprint === "string") &&
+        (value.actionFamily === null || typeof value.actionFamily === "string") &&
         Array.isArray(value.evidenceItemIds);
   }
+}
+
+const SUGGESTION_UNITS = new Set(["pages", "minutes", "sessions", "steps", "reps", "cups", "glasses", "times"]);
+const SUGGESTION_FAMILIES = new Set(["movement", "planning", "learning", "connection", "finance_organization", "sleep_routine", "environment", "creativity", "reflection", "other"]);
+
+function isValidSuggestionTarget(target: number, unit: unknown): boolean {
+  if (!Number.isFinite(target) || target <= 0 || typeof unit !== "string") return false;
+  if (unit === "steps") return target <= 100_000;
+  if (unit === "minutes") return target <= 240;
+  return target <= 1_000;
+}
+
+function customSuggestionActionId(fingerprint: string, target: number, unit: string, timeframe: string): string {
+  const targetPart = Number.isInteger(target) ? String(target) : String(target).replace(".", "_");
+  return `custom.${fingerprint}.${targetPart}.${unit}.${timeframe}`;
+}
+
+function suggestionTextsMatch(lhs: string, rhs: string): boolean {
+  const lhsTerms = suggestionCoverageTerms(lhs);
+  const rhsTerms = suggestionCoverageTerms(rhs);
+  if (lhsTerms.size === 0 || rhsTerms.size === 0) return false;
+  const overlap = Array.from(lhsTerms).filter((term) => rhsTerms.has(term)).length;
+  const smaller = Math.min(lhsTerms.size, rhsTerms.size);
+  return smaller === 1 ? overlap === 1 : overlap >= 2 || overlap / smaller >= 0.6;
+}
+
+function suggestionCoverageTerms(value: string): Set<string> {
+  const ignored = new Set([
+    "a", "an", "and", "at", "daily", "do", "for", "from", "in", "minute", "minutes", "my",
+    "of", "one", "short", "take", "the", "this", "times", "to", "today", "two", "weekly",
+  ]);
+  return new Set(value.toLowerCase().split(/[^a-z0-9]+/).flatMap((raw) => {
+    if (ignored.has(raw)) return [];
+    let term = raw;
+    if (term.length > 5 && term.endsWith("ing")) term = term.slice(0, -3);
+    else if (term.length > 4 && term.endsWith("ed")) term = term.slice(0, -2);
+    else if (term.length > 4 && term.endsWith("s")) term = term.slice(0, -1);
+    if (term === "record") term = "log";
+    if (term === "nightly") term = "night";
+    return term.length >= 3 ? [term] : [];
+  }));
+}
+
+function suggestionSafetyNote(categories: string[]): string | null {
+  if (categories.includes("fitness_health")) return "Keep this general and adjust it to your abilities. Ask a qualified clinician when health guidance is needed.";
+  if (categories.includes("money_finance")) return "This is a general organizing idea, not individualized financial advice.";
+  if (categories.includes("relationships_social")) return "Choose an action that feels safe and appropriate for the relationship.";
+  return null;
+}
+
+function isUnsafeGeneratedSuggestion(value: string): boolean {
+  return /\b(calorie|fasting|skip meals?|medication|dosage|prescription|supplement|diagnos|treat|cure|guarantee|which stock|invest|debt settlement|bankruptcy|legal advice)\b/i.test(value);
 }
 
 function hasExactKeys(value: Record<string, unknown>, expectedKeys: string[]): boolean {

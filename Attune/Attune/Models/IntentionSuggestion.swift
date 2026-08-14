@@ -43,6 +43,8 @@ struct SuggestedIntentionAction: Codable, Equatable, Identifiable {
     let sourceURL: String?
     let safetyNote: String?
     let generatedAt: Date
+    var actionFingerprint: String? = nil
+    var actionFamily: String? = nil
     var distinctSessionCount: Int? = nil
     var currentMonthSessionCount: Int? = nil
     var id: String { actionId }
@@ -58,6 +60,9 @@ struct IntentionSuggestionHistoryEntry: Codable, Equatable {
     let topicKey: String
     let outcome: IntentionSuggestionOutcome
     let decidedAt: Date
+    var title: String? = nil
+    var actionFingerprint: String? = nil
+    var actionFamily: String? = nil
 }
 
 struct IntentionSuggestionSnapshot: Codable, Equatable {

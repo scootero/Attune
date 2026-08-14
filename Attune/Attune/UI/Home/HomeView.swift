@@ -49,6 +49,16 @@ private enum CheckInHighlightKind {
     case failure
 }
 
+/// Keep the redesigned Home chart independently reversible while it is being
+/// evaluated. Change this one value to `.classicBars` to restore the previous
+/// card without touching its implementation or the weekly data pipeline.
+private enum HomeWeeklyMomentumDesign {
+    case depthDials
+    case classicBars
+
+    static let active: Self = .depthDials
+}
+
 /// Slice 7: Context for ambiguity disambiguation sheet (Identifiable for .sheet(item:))
 private struct AmbiguitySheetData: Identifiable {
     let id = UUID()
@@ -153,7 +163,6 @@ struct HomeView: View {
     @State private var streak: Int = 0
     @State private var showEditIntentions = false
     @State private var showMoodEditor = false
-    @State private var showSettings = false
     /// Slice 7: Data for ambiguity disambiguation sheet (nil = not showing)
     @State private var ambiguitySheetData: AmbiguitySheetData?
     /// Today's check-ins for the Today Check-ins card (newest-first)
@@ -208,34 +217,6 @@ struct HomeView: View {
             
             ScrollView {
                 VStack(spacing: 0) {
-                    HStack(spacing: 12) {
-                        Color.clear
-                            .frame(width: 44, height: 44)
-                            .accessibilityHidden(true)
-                        Spacer(minLength: 0)
-                        Text("Attune")
-                            .font(.title2.bold())
-                            .foregroundStyle(AttuneTheme.textPrimary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        Spacer(minLength: 0)
-                        Button {
-                            showSettings = true
-                        } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(AttuneTheme.textPrimary)
-                                .frame(width: 44, height: 44)
-                                .background(AttuneTheme.surface, in: Circle())
-                                .overlay(Circle().stroke(AttuneTheme.border, lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Settings")
-                        .accessibilityHint("Opens Attune settings")
-                    }
-                    .padding(.horizontal, AttuneTheme.horizontalPadding)
-                    .padding(.top, 4)
-                    
                     // Keep the primary action and today's complete status visible with minimal scrolling.
                     VStack(spacing: 8) {
                         recordCheckInCTAArea
@@ -353,12 +334,16 @@ struct HomeView: View {
                                 }
                             }
                         }
-                        if let sourceTitle = suggestion.sourceTitle,
-                           let sourceURL = suggestion.sourceURL,
-                           let url = URL(string: sourceURL) {
-                            Section("General source") {
-                                Link(sourceTitle, destination: url)
-                                if let safetyNote = suggestion.safetyNote { Text(safetyNote) }
+                        if suggestion.sourceTitle != nil || suggestion.safetyNote != nil {
+                            Section("General guidance") {
+                                if let sourceTitle = suggestion.sourceTitle,
+                                   let sourceURL = suggestion.sourceURL,
+                                   let url = URL(string: sourceURL) {
+                                    Link(sourceTitle, destination: url)
+                                }
+                                if let safetyNote = suggestion.safetyNote {
+                                    Text(safetyNote)
+                                }
                             }
                         }
                     }
@@ -366,10 +351,6 @@ struct HomeView: View {
                     .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { showSuggestionEvidence = false } } }
                 }
             }
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-                .environmentObject(subscriptionManager)
         }
         .sheet(item: $ambiguitySheetData) { data in
             AmbiguityDisambiguationSheet(
@@ -536,26 +517,31 @@ struct HomeView: View {
                 }
                 .padding(.vertical, 4)
             } else {
-                ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { _, row in // render each intention row
+                ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { index, row in // render each intention row
+                    let neonTextColor = intentionNeonTextColor(at: index)
+                    let neonAccentColor = intentionNeonAccentColor(at: index)
+
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(alignment: .firstTextBaseline) {
                             Text(row.intention.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AttuneTheme.textPrimary)
+                                .font(.headline.weight(.semibold))
+                                .foregroundStyle(neonTextColor)
                                 .lineLimit(1)
                             Spacer()
                             Text("\(Int(currentPercent(for: row) * 100))%")
-                                .font(.subheadline.weight(.semibold))
+                                .font(.headline.weight(.semibold))
                                 .monospacedDigit()
-                                .foregroundStyle(AttuneTheme.textPrimary)
+                                .foregroundStyle(neonTextColor)
                         }
                         
                         if isUpdateProgressMode {
-                            manualProgressSlider(for: row)
+                            manualProgressSlider(for: row, tint: neonAccentColor)
                         } else {
                             SwiftUI.ProgressView(value: row.percent)
-                                .tint(AttuneTheme.accent)
-                                .scaleEffect(x: 1, y: 0.72, anchor: .center)
+                                .tint(neonAccentColor)
+                                .scaleEffect(x: 1, y: 1.65, anchor: .center)
+                                .frame(height: 10)
+                                .shadow(color: neonAccentColor.opacity(0.62), radius: 4)
                         }
 
                         Text(intentionProgressSummaryText(for: row))
@@ -706,7 +692,7 @@ struct HomeView: View {
         return "\(formattedProgressValue(currentValue)) / \(formattedProgressValue(targetValue)) \(compactUnit(row.intention.unit))\(paceNote)"
     }
 
-    private func manualProgressSlider(for row: IntentionProgressRow) -> some View {
+    private func manualProgressSlider(for row: IntentionProgressRow, tint: Color) -> some View {
         ZStack {
             HStack(spacing: 0) {
                 ForEach(Array(ManualProgressSliderPolicy.tickPercents.enumerated()), id: \.offset) { index, _ in
@@ -737,11 +723,34 @@ struct HomeView: View {
                 ),
                 in: 0...1
             )
-            .tint(AttuneTheme.accent)
+            .tint(tint)
             .accessibilityLabel("Progress for \(row.intention.title)")
             .accessibilityValue("\(Int((currentPercent(for: row) * 100).rounded())) percent")
         }
         .frame(minHeight: 30)
+    }
+
+    /// Adjacent intentions walk around the color wheel using a non-repeating
+    /// interval. The title stays close to white while the progress line uses a
+    /// more saturated version of the exact same hue.
+    private func intentionNeonTextColor(at index: Int) -> Color {
+        Color(
+            hue: intentionNeonHue(at: index),
+            saturation: 0.30,
+            brightness: 1.0
+        )
+    }
+
+    private func intentionNeonAccentColor(at index: Int) -> Color {
+        Color(
+            hue: intentionNeonHue(at: index),
+            saturation: 0.78,
+            brightness: 1.0
+        )
+    }
+
+    private func intentionNeonHue(at index: Int) -> Double {
+        (0.48 + Double(index) * 0.173).truncatingRemainder(dividingBy: 1)
     }
 
     private func updateProgressSnapFeedback(rawPercent: Double, intentionID: String) {
@@ -791,9 +800,123 @@ struct HomeView: View {
     
     // MARK: - B2) Weekly Momentum Card (Slice B: lighter)
     
-    /// Slice B: Bars with red→yellow→green gradient by progress; tap navigates to Library → Momentum tab.
-    /// Day labels aligned on same baseline; bars bottom-aligned; slightly larger bars and text.
+    @ViewBuilder
     private var weeklyMomentumCard: some View {
+        switch HomeWeeklyMomentumDesign.active {
+        case .depthDials:
+            weeklyMomentumDepthDialCard
+        case .classicBars:
+            classicWeeklyMomentumCard
+        }
+    }
+
+    /// A seven-point 3D path made from radial progress dials. The dial arc and
+    /// its vertical position both express progress, while labels remain on one
+    /// fixed baseline for calm, uniform scanning.
+    private var weeklyMomentumDepthDialCard: some View {
+        Button(action: {
+            appRouter.navigateToMomentum(date: Date())
+        }) {
+            ZStack {
+                WeeklyMomentumCardAtmosphere()
+
+                VStack(alignment: .leading, spacing: 16) {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: 7) {
+                            weeklyMomentumDepthTitle
+                            weeklyMomentumDepthSummary
+                        }
+                    } else {
+                        HStack(alignment: .top, spacing: 12) {
+                            weeklyMomentumDepthTitle
+                            Spacer(minLength: 8)
+                            weeklyMomentumDepthSummary
+                        }
+                    }
+
+                    if weekMomentum.days.isEmpty {
+                        HStack(spacing: 10) {
+                            Image(systemName: "circle.dotted")
+                                .foregroundStyle(AttuneTheme.accent)
+                            Text("Your week will take shape after your first check-in.")
+                                .font(.caption)
+                                .foregroundStyle(AttuneTheme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 92, alignment: .center)
+                    } else {
+                        WeeklyMomentumDepthChart(
+                            days: weekMomentum.days,
+                            colorForProgress: colorForProgressRatio
+                        )
+                        .frame(height: 112)
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 16)
+                .padding(.bottom, 14)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .attuneCard()
+        .accessibilityHint("Opens detailed Momentum history")
+    }
+
+    private var weeklyMomentumDepthTitle: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("THIS WEEK")
+                .font(.caption2.weight(.bold))
+                .tracking(1.4)
+                .foregroundStyle(AttuneTheme.accent)
+            Text("Momentum path")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textPrimary)
+        }
+    }
+
+    private var weeklyMomentumDepthSummary: some View {
+        HStack(spacing: 7) {
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(weeklyMomentumAverageText)
+                    .font(.subheadline.monospacedDigit().weight(.bold))
+                    .foregroundStyle(weeklyMomentumAverageColor)
+                Text(weeklyMomentumAverageCaption)
+                    .font(.caption2)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(AttuneTheme.accent)
+        }
+    }
+
+    private var weeklyMomentumMeasuredDays: [DayMomentum] {
+        weekMomentum.days.filter { !$0.isFutureDay && $0.hasData && $0.completionRatio != nil }
+    }
+
+    private var weeklyMomentumAverageRatio: Double? {
+        let ratios = weeklyMomentumMeasuredDays.compactMap(\.completionRatio)
+        guard !ratios.isEmpty else { return nil }
+        return ratios.reduce(0, +) / Double(ratios.count)
+    }
+
+    private var weeklyMomentumAverageText: String {
+        guard let ratio = weeklyMomentumAverageRatio else { return "READY" }
+        return "\(Int((ratio * 100).rounded()))%"
+    }
+
+    private var weeklyMomentumAverageCaption: String {
+        weeklyMomentumAverageRatio == nil ? "start your path" : "average so far"
+    }
+
+    private var weeklyMomentumAverageColor: Color {
+        guard let ratio = weeklyMomentumAverageRatio else { return AttuneTheme.accent }
+        return colorForProgressRatio(ratio)
+    }
+
+    /// Original Home weekly card, intentionally retained byte-for-byte in
+    /// behavior so the redesign can be reverted via HomeWeeklyMomentumDesign.
+    private var classicWeeklyMomentumCard: some View {
         Button(action: {
             appRouter.navigateToMomentum(date: Date())  // Jump to Library → Momentum showing today
         }) {
@@ -1628,17 +1751,25 @@ struct HomeView: View {
                 isGeneratingSuggestion = true
                 defer { isGeneratingSuggestion = false }
                 try IntentionSuggestionStore.shared.recordAttempt(opportunityKey: opportunityKey)
-                let declinedIds = snapshot.history.filter { $0.outcome == .declined }.map(\.actionId)
                 guard let suggestion = try await IntentionSuggestionService.generate(
                     topic: topic,
                     activeIntentions: activeIntentions,
-                    declinedActionIds: declinedIds
+                    history: snapshot.history,
+                    recentProgressDaysByIntentionId: recentProgressDaysByIntentionId(
+                        intentions: activeIntentions,
+                        intentionSet: activeSet
+                    )
                 ) else { return }
                 guard !IntentionSuggestionEngine.isCoveredByActiveIntention(
                           suggestionTitle: suggestion.title,
                           activeIntentions: activeIntentions
                       ),
-                      !IntentionSuggestionEngine.isPermanentlyDeclined(actionId: suggestion.actionId, history: snapshot.history) else {
+                      !IntentionSuggestionEngine.isSuppressed(
+                          actionId: suggestion.actionId,
+                          actionFingerprint: suggestion.actionFingerprint,
+                          title: suggestion.title,
+                          history: snapshot.history
+                      ) else {
                     return
                 }
                 try IntentionSuggestionStore.shared.setOutstanding(suggestion)
@@ -1805,6 +1936,24 @@ struct HomeView: View {
         return (1...days).compactMap { offset in
             calendar.date(byAdding: .day, value: -offset, to: today).map { ProgressCalculator.dateKey(for: $0) }
         }
+    }
+
+    private func recentProgressDaysByIntentionId(
+        intentions: [Intention],
+        intentionSet: IntentionSet?,
+        now: Date = Date()
+    ) -> [String: Int] {
+        guard let intentionSet else { return [:] }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let keys = Set((0..<14).compactMap { offset in
+            calendar.date(byAdding: .day, value: -offset, to: today).map { ProgressCalculator.dateKey(for: $0) }
+        })
+        let activeIDs = Set(intentions.map(\.id))
+        let grouped = Dictionary(grouping: ProgressStore.shared.loadAllProgressEntries().filter {
+            $0.intentionSetId == intentionSet.id && activeIDs.contains($0.intentionId) && keys.contains($0.dateKey)
+        }, by: \.intentionId)
+        return grouped.mapValues { Set($0.map(\.dateKey)).count }
     }
     
     private func refreshMoodAndStreak() {
@@ -2267,6 +2416,215 @@ struct HomeView: View {
             highlightKind = .failure
             scheduleClearHighlight()
         }
+    }
+}
+
+/// Low-contrast depth and light inside the new card. It stays deliberately
+/// quieter than the Today's Intentions treatment so the progress colors lead.
+private struct WeeklyMomentumCardAtmosphere: View {
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        AttuneTheme.accent.opacity(0.08),
+                        Color.clear,
+                        AttuneTheme.accentSecondary.opacity(0.07)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                Circle()
+                    .fill(AttuneTheme.accent.opacity(0.10))
+                    .frame(width: geometry.size.width * 0.7)
+                    .blur(radius: 32)
+                    .offset(x: geometry.size.width * 0.34, y: -geometry.size.height * 0.46)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A weekly radial plot: each progress dial sits higher as its completion
+/// increases, and a shallow extruded connector turns the seven readings into
+/// one continuous path rather than seven independent bars.
+private struct WeeklyMomentumDepthChart: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let days: [DayMomentum]
+    let colorForProgress: (Double) -> Color
+
+    @State private var hasAppeared = false
+
+    private let plotTop: CGFloat = 4
+    private let plotTravel: CGFloat = 42
+    private let labelY: CGFloat = 101
+
+    var body: some View {
+        GeometryReader { geometry in
+            let slotWidth = geometry.size.width / CGFloat(max(days.count, 1))
+
+            ZStack(alignment: .topLeading) {
+                Canvas { context, size in
+                    let visibleIndices = days.indices.filter { !days[$0].isFutureDay }
+                    guard let firstIndex = visibleIndices.first else { return }
+
+                    var path = Path()
+                    path.move(to: point(for: firstIndex, slotWidth: slotWidth))
+                    for index in visibleIndices.dropFirst() {
+                        path.addLine(to: point(for: index, slotWidth: slotWidth))
+                    }
+
+                    var depthPath = path
+                    depthPath = depthPath.applying(CGAffineTransform(translationX: 0, y: 5))
+                    context.stroke(
+                        depthPath,
+                        with: .color(Color.black.opacity(0.32)),
+                        style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
+                    )
+                    context.stroke(
+                        path,
+                        with: .linearGradient(
+                            Gradient(colors: [
+                                AttuneTheme.accent.opacity(0.34),
+                                Color.white.opacity(0.25),
+                                AttuneTheme.accentSecondary.opacity(0.34)
+                            ]),
+                            startPoint: CGPoint(x: 0, y: 0),
+                            endPoint: CGPoint(x: size.width, y: 0)
+                        ),
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                    )
+                }
+                .opacity(hasAppeared || reduceMotion ? 1 : 0)
+                .animation(.easeOut(duration: 0.45), value: hasAppeared)
+
+                ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
+                    let ratio = min(1, max(0, day.completionRatio ?? 0))
+                    let isToday = Calendar.current.isDateInToday(day.date)
+
+                    MomentumDepthDial(
+                        progress: ratio,
+                        color: colorForProgress(ratio),
+                        isFuture: day.isFutureDay,
+                        hasData: day.hasData,
+                        isToday: isToday,
+                        isVisible: hasAppeared || reduceMotion
+                    )
+                    .frame(width: min(38, slotWidth - 4), height: 38)
+                    .position(point(for: index, slotWidth: slotWidth))
+                    .animation(
+                        reduceMotion
+                            ? nil
+                            : .spring(response: 0.62, dampingFraction: 0.72)
+                                .delay(Double(index) * 0.055),
+                        value: hasAppeared
+                    )
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(accessibilityLabel(for: day, isToday: isToday))
+
+                    VStack(spacing: 3) {
+                        Text(day.weekdayLetter)
+                            .font(.caption.weight(isToday ? .bold : .semibold))
+                            .foregroundStyle(isToday ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
+                        Capsule()
+                            .fill(isToday ? AttuneTheme.accent : Color.clear)
+                            .frame(width: 12, height: 2)
+                    }
+                    .frame(width: slotWidth)
+                    .position(x: (CGFloat(index) + 0.5) * slotWidth, y: labelY)
+                    .accessibilityHidden(true)
+                }
+            }
+        }
+        .task(id: days.map(\.id)) {
+            hasAppeared = reduceMotion
+            if !reduceMotion {
+                await Task.yield()
+                hasAppeared = true
+            }
+        }
+    }
+
+    private func point(for index: Int, slotWidth: CGFloat) -> CGPoint {
+        let day = days[index]
+        let ratio = min(1, max(0, day.completionRatio ?? 0))
+        let y = day.isFutureDay ? plotTop + plotTravel : plotTop + (1 - ratio) * plotTravel
+        return CGPoint(x: (CGFloat(index) + 0.5) * slotWidth, y: y + 19)
+    }
+
+    private func accessibilityLabel(for day: DayMomentum, isToday: Bool) -> String {
+        let prefix = isToday ? "Today, " : ""
+        if day.isFutureDay { return "\(prefix)\(day.weekdayLetter), future day" }
+        guard day.hasData, let ratio = day.completionRatio else {
+            return "\(prefix)\(day.weekdayLetter), no momentum data"
+        }
+        return "\(prefix)\(day.weekdayLetter), \(Int((ratio * 100).rounded())) percent momentum"
+    }
+}
+
+/// A compact progress ring with a darker lower rim and offset highlight. The
+/// layered rim reads as a small physical dial without adding visual noise.
+private struct MomentumDepthDial: View {
+    let progress: Double
+    let color: Color
+    let isFuture: Bool
+    let hasData: Bool
+    let isToday: Bool
+    let isVisible: Bool
+
+    var body: some View {
+        ZStack {
+            if isToday {
+                Circle()
+                    .stroke(color.opacity(0.22), lineWidth: 7)
+                    .blur(radius: 5)
+                    .scaleEffect(1.13)
+            }
+
+            Circle()
+                .fill(Color.black.opacity(0.36))
+                .offset(y: 4)
+
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.10), AttuneTheme.surfaceStrong.opacity(0.96)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Circle()
+                .stroke(AttuneTheme.border.opacity(isFuture ? 0.48 : 0.8), lineWidth: 4.5)
+
+            if !isFuture && hasData {
+                Circle()
+                    .trim(from: 0, to: isVisible ? progress : 0)
+                    .stroke(
+                        AngularGradient(
+                            colors: [color.opacity(0.52), color, Color.white.opacity(0.84), color],
+                            center: .center
+                        ),
+                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .shadow(color: color.opacity(0.72), radius: 4, x: 0, y: 2)
+
+                Circle()
+                    .fill(color)
+                    .frame(width: 5, height: 5)
+                    .shadow(color: color.opacity(0.7), radius: 3)
+            } else if !isFuture {
+                Circle()
+                    .fill(AttuneTheme.textSecondary.opacity(0.52))
+                    .frame(width: 4, height: 4)
+            }
+        }
+        .scaleEffect(isVisible ? 1 : 0.72)
+        .opacity(isVisible ? (isFuture ? 0.42 : 1) : 0)
     }
 }
 

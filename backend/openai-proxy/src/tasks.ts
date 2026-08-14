@@ -1,7 +1,5 @@
 /** Server-owned AI task contracts for the parallel v2 rollout. */
 
-import { SUGGESTION_ACTIONS } from "./intention-suggestion-actions";
-
 export const TASK_PATHS = {
   checkIn: "/v2/check-ins/extract",
   intentions: "/v2/intentions/parse",
@@ -32,8 +30,12 @@ export type BuiltTask = {
   inputCharacters: number;
   suggestionContext?: {
     evidenceItemIds: string[];
-    declinedActionIds: string[];
-    allowedActionIds: string[];
+    blockedActionIds: string[];
+    blockedFingerprints: string[];
+    declinedTitles: string[];
+    activeIntentionTexts: string[];
+    topicCategories: string[];
+    sensitiveEvidence: boolean;
   };
 };
 
@@ -74,7 +76,7 @@ export function buildTask(path: TaskPath, rawBody: unknown): ValidationResult {
 
 function buildIntentionSuggestionTask(rawBody: unknown): ValidationResult {
   if (!isRecord(rawBody)) return invalid("Request body must be an object");
-  const keyError = validateKeys(rawBody, ["topic", "evidence", "activeIntentions", "declinedActionIds"]);
+  const keyError = validateKeys(rawBody, ["topic", "evidence", "activeIntentions", "declinedActionIds", "suggestionHistory"]);
   if (keyError) return invalid(keyError);
   if (!isRecord(rawBody.topic)) return invalid("topic must be an object");
   const topicKeyError = validateKeys(rawBody.topic, ["key", "title", "categories"]);
@@ -103,66 +105,87 @@ function buildIntentionSuggestionTask(rawBody: unknown): ValidationResult {
     evidence.push({ itemId: itemId.value, sessionDate: sessionDate.value, quote: quote.value });
   }
   if (!Array.isArray(rawBody.activeIntentions) || rawBody.activeIntentions.length > MAX_INTENTIONS) return invalid("activeIntentions may contain at most 10 items");
-  const activeIntentions: Array<{ title: string; aliases: string[] }> = [];
+  const activeIntentions: Array<{ id?: string; title: string; aliases: string[]; targetValue?: number; unit?: string; timeframe?: string; recentProgressDays?: number }> = [];
   for (const value of rawBody.activeIntentions) {
     if (!isRecord(value)) return invalid("Each active intention must be an object");
-    const error = validateKeys(value, ["title", "aliases"]);
+    const error = validateKeys(value, ["id", "title", "aliases", "targetValue", "unit", "timeframe", "recentProgressDays"]);
     if (error) return invalid(error);
     const activeTitle = validateText(value.title, "activeIntention.title", 120);
     if (!activeTitle.ok || !Array.isArray(value.aliases) || value.aliases.length > 20 || !value.aliases.every((v) => typeof v === "string" && v.length <= 80)) return invalid("Invalid active intention");
-    activeIntentions.push({ title: activeTitle.value, aliases: value.aliases as string[] });
+    if (value.id !== undefined && (typeof value.id !== "string" || value.id.length > 128)) return invalid("Invalid active intention id");
+    if (value.targetValue !== undefined && (!isNonnegativeFiniteNumber(value.targetValue) || value.targetValue === 0)) return invalid("Invalid active intention target");
+    if (value.unit !== undefined && (typeof value.unit !== "string" || value.unit.length > 40)) return invalid("Invalid active intention unit");
+    if (value.timeframe !== undefined && (value.timeframe !== "daily" && value.timeframe !== "weekly")) return invalid("Invalid active intention timeframe");
+    if (value.recentProgressDays !== undefined && (typeof value.recentProgressDays !== "number" || !Number.isInteger(value.recentProgressDays) || value.recentProgressDays < 0 || value.recentProgressDays > 14)) return invalid("Invalid active intention progress context");
+    activeIntentions.push({
+      id: value.id as string | undefined,
+      title: activeTitle.value,
+      aliases: value.aliases as string[],
+      targetValue: value.targetValue as number | undefined,
+      unit: value.unit as string | undefined,
+      timeframe: value.timeframe as string | undefined,
+      recentProgressDays: value.recentProgressDays as number | undefined,
+    });
   }
   if (!Array.isArray(rawBody.declinedActionIds) || rawBody.declinedActionIds.length > 100 || !rawBody.declinedActionIds.every((v) => typeof v === "string" && v.length <= 100)) return invalid("declinedActionIds must be an array of action IDs");
+
+  const suggestionHistory: Array<{ actionId: string; title?: string; actionFingerprint?: string; actionFamily?: string; outcome: "accepted" | "declined"; decidedAt: string }> = [];
+  if (rawBody.suggestionHistory !== undefined) {
+    if (!Array.isArray(rawBody.suggestionHistory) || rawBody.suggestionHistory.length > 100) return invalid("suggestionHistory may contain at most 100 items");
+    for (const value of rawBody.suggestionHistory) {
+      if (!isRecord(value)) return invalid("Each suggestion history item must be an object");
+      const error = validateKeys(value, ["actionId", "title", "actionFingerprint", "actionFamily", "outcome", "decidedAt"]);
+      if (error) return invalid(error);
+      const actionId = validateText(value.actionId, "suggestionHistory.actionId", 100);
+      const decidedAt = validateText(value.decidedAt, "suggestionHistory.decidedAt", 64);
+      if (!actionId.ok || !decidedAt.ok || !Number.isFinite(Date.parse(decidedAt.value))) return invalid("Invalid suggestion history item");
+      if (value.outcome !== "accepted" && value.outcome !== "declined") return invalid("Invalid suggestion history outcome");
+      for (const optionalKey of ["title", "actionFingerprint", "actionFamily"] as const) {
+        if (value[optionalKey] !== undefined && (typeof value[optionalKey] !== "string" || value[optionalKey].length > 120)) return invalid(`Invalid suggestion history ${optionalKey}`);
+      }
+      suggestionHistory.push({
+        actionId: actionId.value,
+        title: value.title as string | undefined,
+        actionFingerprint: value.actionFingerprint as string | undefined,
+        actionFamily: value.actionFamily as string | undefined,
+        outcome: value.outcome,
+        decidedAt: decidedAt.value,
+      });
+    }
+  }
 
   const topicCategories = rawBody.topic.categories as string[];
   const evidenceText = `${title.value} ${evidence.map((item) => item.quote).join(" ")}`.toLowerCase();
   const declinedActionIds = rawBody.declinedActionIds as string[];
-  const catalog = isSensitiveSuggestionEvidence(evidenceText)
-    ? []
-    : SUGGESTION_ACTIONS.filter((action) =>
-        action.categories.some((category) => topicCategories.includes(category))
-        && matchesSpecializedActionFamily(action.actionId, topicCategories, evidenceText)
-        && !declinedActionIds.includes(action.actionId)
-        && !isActionCoveredByActiveIntentions(action.title, activeIntentions)
-      );
+  const declinedHistory = suggestionHistory.filter((item) => item.outcome === "declined");
+  const recentAccepted = suggestionHistory.filter((item) => item.outcome === "accepted" && Date.now() - Date.parse(item.decidedAt) < 60 * 24 * 60 * 60 * 1_000);
+  const blockedActionIds = [...new Set([...declinedActionIds, ...declinedHistory.map((item) => item.actionId), ...recentAccepted.map((item) => item.actionId)])];
+  const blockedFingerprints = [...new Set([...declinedHistory, ...recentAccepted].flatMap((item) => item.actionFingerprint ? [item.actionFingerprint] : []))];
+  const declinedTitles = declinedHistory.flatMap((item) => item.title ? [item.title] : []);
+  const sensitiveEvidence = isSensitiveSuggestionEvidence(evidenceText);
   const systemMessage = INTENTION_SUGGESTION_SYSTEM_PROMPT;
-  const userMessage = JSON.stringify({ topic: { key: key.value, title: title.value, categories: rawBody.topic.categories }, evidence, activeIntentions, declinedActionIds: rawBody.declinedActionIds, allowedActions: catalog.map(({ actionId, title, targetValue, unit, timeframe, categories }) => ({ actionId, title, targetValue, unit, timeframe, categories })) });
+  const userMessage = JSON.stringify({
+    topic: { key: key.value, title: title.value, categories: topicCategories },
+    evidence,
+    activeIntentions,
+    suggestionHistory,
+    avoidExactFingerprints: blockedFingerprints,
+    avoidCloseVariantsOf: declinedTitles,
+  });
   return valid({
     taskName: "intention_suggestion",
     inputCharacters: systemMessage.length + userMessage.length,
-    suggestionContext: { evidenceItemIds: evidence.map((item) => item.itemId), declinedActionIds, allowedActionIds: catalog.map((action) => action.actionId) },
-    request: chatRequest(systemMessage, userMessage, INTENTION_SUGGESTION_SCHEMA, 500),
+    suggestionContext: {
+      evidenceItemIds: evidence.map((item) => item.itemId),
+      blockedActionIds,
+      blockedFingerprints,
+      declinedTitles,
+      activeIntentionTexts: activeIntentions.map((item) => [item.title, ...item.aliases].join(" ")),
+      topicCategories,
+      sensitiveEvidence,
+    },
+    request: chatRequest(systemMessage, userMessage, INTENTION_SUGGESTION_SCHEMA, 800),
   });
-}
-
-function matchesSpecializedActionFamily(
-  actionId: string,
-  categories: string[],
-  evidenceText: string,
-): boolean {
-  const learningTheme = categories.includes("personal_growth")
-    && /\b(learn|learning|study|studying|remember|retention|read|reading|course|class|notes?|understand|explain)\b/.test(evidenceText);
-  if (learningTheme) return actionId.startsWith("learning.");
-  return !actionId.startsWith("learning.");
-}
-
-function isActionCoveredByActiveIntentions(
-  actionTitle: string,
-  activeIntentions: Array<{ title: string; aliases: string[] }>,
-): boolean {
-  const actionTerms = coverageTerms(actionTitle);
-  return activeIntentions.some((intention) => {
-    const activeTerms = coverageTerms([intention.title, ...intention.aliases].join(" "));
-    return actionTerms.some((term) => activeTerms.has(term));
-  });
-}
-
-function coverageTerms(value: string): Set<string> {
-  const ignored = new Set([
-    "a", "an", "and", "at", "daily", "do", "for", "from", "in", "minute", "minutes",
-    "my", "of", "one", "short", "take", "the", "this", "times", "to", "today", "two", "weekly",
-  ]);
-  return new Set(value.toLowerCase().split(/[^a-z0-9]+/).filter((term) => term.length >= 3 && !ignored.has(term)));
 }
 
 function isSensitiveSuggestionEvidence(value: string): boolean {
@@ -545,10 +568,20 @@ CALENDAR CANDIDATES:
 Return ONLY valid JSON matching the schema. No markdown, no explanations.
 If nothing meets the quality bar, return: {"items": []}`;
 
-const INTENTION_SUGGESTION_SYSTEM_PROMPT = `Choose at most one small, realistic, genuinely useful action from allowedActions that is supported by the user's repeated evidence. Prefer a creative but practical action that helps the user learn, notice, practice, or make a concrete next move—not one that merely repeats the topic title or an active intention.
-Return null when the connection is weak, an active intention already covers it, or the evidence mentions injury, pain, pregnancy, medication, eating disorders, acute symptoms, crisis, debt strategy, investing, or another situation requiring individualized professional guidance.
-Never diagnose, prescribe, infer emotion, invent personal facts, or write a new action. Use an allowed actionId exactly. Do not select a declinedActionId.
-The reason must be specific to the repeated theme, under 140 characters, lightly clever when natural, professional, never mocking, and must not claim guaranteed outcomes. Cite one or more supplied evidenceItemIds. Return JSON only.`;
+const INTENTION_SUGGESTION_SYSTEM_PROMPT = `Create at most one fully custom, measurable micro-intention from the user's repeated evidence and current context. There is no action catalog. Transform the underlying need into a useful next behavior instead of parroting the topic or the user's stated goal.
+
+QUALITY BAR:
+- Make it specific, low-friction, and realistic enough to begin now.
+- Prefer established behavior-design ideas: reduce activation energy, shape the environment, attach a small action to an existing cue, use retrieval practice, or create a concrete observation loop.
+- Personalize only from supplied facts. Never infer diagnoses, personality, emotion, finances, relationships, abilities, or constraints that were not stated.
+- Do not duplicate an active intention, an avoidExactFingerprint, or a close variation of avoidCloseVariantsOf. A different action in the same broad family is allowed only when it is meaningfully different.
+- Use one supported unit: pages, minutes, sessions, steps, reps, cups, glasses, or times. Use daily or weekly.
+- actionFingerprint is a stable lowercase snake_case description of the actual behavior, not the broad topic. actionFamily is one of movement, planning, learning, connection, finance_organization, sleep_routine, environment, creativity, reflection, or other.
+
+SAFETY:
+Return the all-null form when the connection is weak, an existing intention already covers it, or the evidence involves injury, pain, pregnancy, medication, eating disorders, acute symptoms, crisis, debt strategy, investing, or individualized medical, legal, or financial guidance. Never diagnose, prescribe, recommend calorie restriction, promise outcomes, or tell the user to replace professional care.
+
+The reason must be specific to the repeated evidence, under 140 characters, lightly clever when natural, professional, and never mocking. Cite one or more supplied evidenceItemIds. Return JSON only.`;
 
 const CHECK_IN_SCHEMA: ServerOwnedChatRequest["response_format"]["json_schema"] = {
   name: "checkin_extraction",
@@ -685,11 +718,19 @@ const INTENTION_SUGGESTION_SCHEMA: ServerOwnedChatRequest["response_format"]["js
   schema: {
     type: "object",
     properties: {
-      actionId: { type: ["string", "null"] },
+      title: { type: ["string", "null"] },
+      targetValue: { type: ["number", "null"] },
+      unit: { type: ["string", "null"], enum: ["pages", "minutes", "sessions", "steps", "reps", "cups", "glasses", "times", null] },
+      timeframe: { type: ["string", "null"], enum: ["daily", "weekly", null] },
       reason: { type: ["string", "null"] },
+      actionFingerprint: { type: ["string", "null"] },
+      actionFamily: {
+        type: ["string", "null"],
+        enum: ["movement", "planning", "learning", "connection", "finance_organization", "sleep_routine", "environment", "creativity", "reflection", "other", null],
+      },
       evidenceItemIds: { type: "array", items: { type: "string" } },
     },
-    required: ["actionId", "reason", "evidenceItemIds"],
+    required: ["title", "targetValue", "unit", "timeframe", "reason", "actionFingerprint", "actionFamily", "evidenceItemIds"],
     additionalProperties: false,
   },
 };

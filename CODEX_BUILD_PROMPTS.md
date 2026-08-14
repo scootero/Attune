@@ -388,20 +388,21 @@ This is the payoff. The app observes what someone keeps talking about and offers
 an intention. The user accepts or declines — so intentions stay theirs.
 
 **Approved implementation revision:** Do not merely turn the topic title into an
-intention. Once the local deterministic engine qualifies a recurring topic, the
-server-owned AI route may select one complete, small action from a curated,
-low-risk catalog—or return no suggestion. The Worker owns the catalog, validates
-the selected action and evidence IDs, and returns the fixed title, amount, unit,
-timeframe, source, and safety note. It must return no suggestion for medical,
-acute-symptom, eating-disorder, investment, debt-strategy, or otherwise
-individualized contexts. This is one extra AI call only after a topic qualifies.
+intention and do not choose from predefined actions. Once the local engine
+qualifies a recurring topic, the server-owned AI route may compose one fully
+custom, measurable micro-intention—or return no suggestion. It receives the
+corrected evidence, active intention configuration, recent progress-day counts,
+and prior suggestion outcomes. The Worker validates the generated behavior,
+evidence IDs, supported units, safety, active-intention duplication, and
+declined/recent repetition before returning it. Model-invented citations are not
+accepted. This is one extra AI call only after a topic qualifies.
 
 **Approved cadence revision:** Reevaluate immediately whenever a Talk it out
 session finishes processing. Every user gets an introduction period for this
-new feature: days 0-20 use a two-distinct-session floor and four-day cooldown;
-days 21-50 use three sessions and a seven-day cooldown; steady state uses four
-sessions spanning 14 days and a 14-day cooldown. Completion observation must
-not modify `ExtractionQueue`.
+new feature: days 0-20 use a two-distinct-session floor and three-day cooldown.
+After day 20, require three distinct sessions spanning at least three days and
+use a four-day cooldown. Completion observation must not modify
+`ExtractionQueue`.
 
 **Approved focus-mode revision:** After the previous two full local-calendar
 days contain no progress entry or manual override, Home may enter a reversible
@@ -452,34 +453,29 @@ Do not use raw occurrenceCount as a distinct-session signal.
 
 Cadence:
 
-  ONBOARDING (first two evaluation opportunities, at most):
-    - Day 3 after first launch:
-        * If fewer than 3 sessions recorded -> return a "record more" nudge,
-          not an intention suggestion.
-        * If 3 or more sessions -> suggest the single most-mentioned qualifying
-          topic, minimum 2 DISTINCT SESSIONS.
-    - Day 10: same evaluation, second and final onboarding opportunity. Day 10
-      replaces Day 6 so the 7-day global cooldown can be satisfied after a
-      Day 3 suggestion.
+  INTRODUCTION (days 0-20 after this feature's first-launch date):
+    - Minimum 2 distinct qualifying sessions.
+    - At most one suggestion every 3 days.
 
-  RAMP (after onboarding, next 2 weeks):
-    - At most one suggestion per 7 days, minimum 3 distinct sessions.
-
-  STEADY STATE (thereafter):
-    - At most one suggestion per 14 days, minimum 4 distinct sessions spanning
-      14+ days.
+  ESTABLISHED (day 21 onward):
+    - Minimum 3 distinct qualifying sessions spanning at least 3 days.
+    - At most one suggestion every 4 days.
 
 Universal rules that override everything above:
   - Never more than ONE outstanding, unanswered suggestion at a time.
-  - Global cooldown of at least 7 days between any two suggestions, regardless
-    of which cadence rule fired. The schedules must not be able to stack.
+  - The applicable 3-day or 4-day cooldown is global across topics. The
+    schedules must not be able to stack.
     A "record more" nudge is not an intention suggestion and does not consume
     the suggestion cooldown, but show it at most once per evaluation day.
-  - A declined topicKey is suppressed for at least 90 days.
+  - A declined behavior fingerprint and close title rewrites are suppressed
+    permanently. Do not ban its entire broad topic; a meaningfully different
+    action may be considered after the normal cooldown.
+  - Hold an accepted fingerprint out for 60 days to preserve variety. An
+    inactive accepted intention may be considered again after that period.
   - Never suggest an action that duplicates an existing active intention (check
     title and aliases).
-  - If the user is at their active-intention limit for their tier, do not
-    suggest. Do not use this as a paywall prompt in this phase.
+  - A user at their active-intention limit may still receive one suggestion;
+    stage an explicit editor-reviewed swap and persist only on Save.
   - If no topic qualifies, return no suggestion. Silence is the default.
 
 Counting rule:
@@ -506,7 +502,8 @@ TASK 4B — Suggestion card UI
 Where: Home, below existing content. One card, dismissible, never a feed.
 
 Content:
-  - One complete small action chosen from the server-owned curated catalog.
+  - One complete small action composed for the user's qualified evidence and
+    validated by the Worker. No fixed action catalog.
   - Evidence, always: "You've brought up {topic} in {n} sessions this month."
     Here `{n}` must use the corrected, current-month distinct-session count
     defined above, never TopicAggregate.occurrenceCount.
@@ -516,21 +513,22 @@ Content:
 Onboarding copy carries exactly one clause of hedging, for example:
   "Still early, but based on your first few sessions — maybe {topic}?"
 
-"Add this" opens the existing intention editor prefilled with the catalog's
+"Add this" opens the existing intention editor prefilled with the validated
 title, target, unit, and timeframe. All fields stay editable and visible. The
 action remains only a suggestion until the user explicitly taps the editor's
 normal Save button.
 
-"Not for me" permanently suppresses that exact action ID and pauses that
-topicKey for 90 days. Other genuinely different actions for the topic may be
-considered after the pause.
+"Not for me" permanently suppresses that behavior fingerprint and close
+rewrites. Other genuinely different actions for the topic may be considered
+after the normal cooldown.
 
 Nothing is created until the user completes the existing intention editor and
 saves through the normal path.
 
 TASK 4C — Persistence
 
-New additive store for: suggestion history (actionId, topicKey, date, outcome),
+New additive store for: suggestion history (actionId, topicKey, optional title,
+behavior fingerprint and family, date, outcome),
 outstanding suggestion, completed onboarding opportunities, cooldown state,
 and first-launch date. Must decode safely when absent for existing users. Do
 not touch existing store schemas.
@@ -551,11 +549,13 @@ sessions are derived, how existing installs bypass new-user onboarding cadence,
 and any case where two rules could fire on the same day.
 ```
 
-**Verify:** unit tests for every cadence branch, then on a physical device
-simulate day 3 with fewer than 3 sessions, day 3 with 3+, Day 10 after a Day 3
-suggestion, an existing install with no new first-launch record, a decline
-followed by confirming that topic stays suppressed, and a user already at their
-intention limit.
+**Verify:** unit tests for every cadence branch, custom response validation,
+fragmented-topic consolidation, legacy JSON decoding, active duplicates,
+permanent declined behavior suppression, 60-day accepted novelty, sensitive
+evidence, and orphan evidence. Then verify on a physical device with two related
+sessions during days 0-20, three related sessions spanning three days after day
+20, a decline followed by a meaningfully different idea on the same topic, and
+a user already at their intention limit.
 
 ---
 
