@@ -526,6 +526,15 @@ struct EditIntentionsView: View {
             }
             return
         }
+
+        let baselineByID = Dictionary(uniqueKeysWithValues: baselineDrafts.map { ($0.id, $0) })
+        let proposedByID = Dictionary(uniqueKeysWithValues: valid.map { ($0.id, $0) })
+        let createdCount = proposedByID.keys.filter { baselineByID[$0] == nil }.count
+        let archivedCount = baselineByID.keys.filter { proposedByID[$0] == nil }.count
+        let editedCount = proposedByID.values.filter { draft in
+            guard let baseline = baselineByID[draft.id] else { return false }
+            return draft.hasEditableChanges(comparedTo: baseline)
+        }.count
         
         do {
             // 1. Save each intention (create or update) and collect IDs
@@ -540,6 +549,9 @@ struct EditIntentionsView: View {
             _ = try IntentionSetStore.shared.updateCurrentIntentionSet(intentionIds: intentionIds)
             
             AppLogger.log(AppLogger.STORE, "EditIntentions saved IntentionSet with \(intentionIds.count) intentions")
+            EngagementMetricsStore.shared.record(.intentionCreated, quantity: createdCount)
+            EngagementMetricsStore.shared.record(.intentionEdited, quantity: editedCount)
+            EngagementMetricsStore.shared.record(.intentionArchived, quantity: archivedCount)
             if let initialAddDraft, valid.contains(where: { $0.id == initialAddDraft.id }) {
                 onSuggestedIntentionSaved?()
             }

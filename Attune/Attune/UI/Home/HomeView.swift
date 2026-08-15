@@ -8,6 +8,7 @@
 
 import SwiftUI
 import UIKit
+import StoreKit
 
 /// State of the check-in recording flow
 private enum CheckInState: Equatable {
@@ -153,6 +154,8 @@ struct HomeView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.requestReview) private var requestReview
     @EnvironmentObject var appRouter: AppRouter
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @StateObject private var checkInRecorder = CheckInRecorderService.shared
@@ -318,7 +321,9 @@ struct HomeView: View {
                     List {
                         Section("Why this appeared") {
                             Text(suggestion.reason)
-                            if let monthCount = suggestion.currentMonthSessionCount, monthCount > 0 {
+                            if let mentionCount = suggestion.rapidTestMentionCount {
+                                Text("Rapid test mode counted \(mentionCount) related mentions at least three minutes apart.")
+                            } else if let monthCount = suggestion.currentMonthSessionCount, monthCount > 0 {
                                 Text("You brought up \(suggestion.topicTitle) in \(monthCount) separate Talk it out sessions this month.")
                             } else {
                                 Text("You brought up \(suggestion.topicTitle) in \(suggestion.distinctSessionCount ?? Set(suggestion.evidence.map(\.sessionId)).count) separate Talk it out sessions.")
@@ -362,12 +367,12 @@ struct HomeView: View {
                     ambiguitySheetData = nil
                     refreshAll()
                     highlightProgressRows(changedProgressIntentionIDs(since: previousPercents))
-                    state = .saved(checkInId: data.checkInId)
+                    completeCheckIn(data.checkInId)
                 },
                 onCancel: {
                     ambiguitySheetData = nil
                     refreshAll()
-                    state = .saved(checkInId: data.checkInId)
+                    completeCheckIn(data.checkInId)
                 }
             )
         }
@@ -1092,6 +1097,7 @@ struct HomeView: View {
         let previousPercents = displayedProgressPercentages()
         let dateKey = ProgressCalculator.dateKey(for: Date()) // today’s date key
         let savedAt = Date() // one timestamp keeps multiple real changes in the same manual chart cluster
+        var savedChangeCount = 0
         for row in todaysProgress { // iterate intentions shown
             let value = sliderValues[row.intention.id] ?? row.total // use slider or existing total
             let originalValue = originalTotals[row.intention.id] ?? row.total
@@ -1103,8 +1109,14 @@ struct HomeView: View {
                 unit: row.intention.unit, // preserve unit for display
                 updatedAt: savedAt
             )
-            try? OverrideStore.shared.setOverride(override) // persist override; silent fail to avoid blocking UI
+            do {
+                try OverrideStore.shared.setOverride(override)
+                savedChangeCount += 1
+            } catch {
+                AppLogger.log(AppLogger.ERR, "Manual progress metrics save skipped after override failure id=\(AppLogger.shortId(row.intention.id))")
+            }
         }
+        EngagementMetricsStore.shared.record(.manualProgressUpdated, quantity: savedChangeCount, at: savedAt)
         isUpdateProgressMode = false // exit mode
         sliderValues = [:]
         originalTotals = [:]
@@ -1658,6 +1670,44 @@ struct HomeView: View {
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
                 state = .idle
             }
+            if case .saved = newState {
+                scheduleReviewRequestAfterSavedReceipt()
+            }
+        }
+    }
+
+    private func completeCheckIn(_ checkInId: String) {
+        EngagementMetricsStore.shared.record(
+            .checkInCompleted,
+            eventID: "check-in-completed:\(checkInId)",
+            at: Date()
+        )
+        state = .saved(checkInId: checkInId)
+    }
+
+    private func scheduleReviewRequestAfterSavedReceipt() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard scenePhase == .active,
+                  appRouter.selectedRootTab == .home,
+                  state == .idle,
+                  !showEditIntentions,
+                  !showMoodEditor,
+                  !showSuggestionEditor,
+                  !showSuggestionEvidence,
+                  !showAllCheckInsSheet,
+                  !showPaywall,
+                  ambiguitySheetData == nil,
+                  suggestionToastCenter.homeSuggestion == nil,
+                  !isGeneratingSuggestion else {
+                return
+            }
+
+            let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+            guard EngagementMetricsStore.shared.claimReviewRequestIfEligible(currentVersion: version) else {
+                return
+            }
+            requestReview()
         }
     }
     
@@ -1706,7 +1756,8 @@ struct HomeView: View {
                 topics: SessionRecapTopicSnapshotReader.load(),
                 sessions: sessions,
                 items: ExtractionStore.shared.loadAllExtractions(),
-                corrections: CorrectionsStore.shared.loadCorrections()
+                corrections: CorrectionsStore.shared.loadCorrections(),
+                rapidTestingEnabled: RapidIntentionSuggestionTestingFeature.isEnabled
             )
             let activeSet = IntentionSetStore.shared.loadCurrentIntentionSet()
             let activeIntentions = IntentionStore.shared.loadIntentions(ids: activeSet?.intentionIds ?? [])
@@ -1718,7 +1769,8 @@ struct HomeView: View {
                 snapshot: snapshot,
                 topics: topics,
                 completedSessionCount: sessions.filter { $0.status == "complete" }.count,
-                isAtIntentionLimit: !subscriptionManager.canAddIntention(currentCount: activeIntentions.count)
+                isAtIntentionLimit: !subscriptionManager.canAddIntention(currentCount: activeIntentions.count),
+                rapidTestingEnabled: RapidIntentionSuggestionTestingFeature.isEnabled
             )
             switch decision {
             case .show(let suggestion):
@@ -1751,15 +1803,22 @@ struct HomeView: View {
                 isGeneratingSuggestion = true
                 defer { isGeneratingSuggestion = false }
                 try IntentionSuggestionStore.shared.recordAttempt(opportunityKey: opportunityKey)
-                guard let suggestion = try await IntentionSuggestionService.generate(
+                let generatedSuggestion = try await IntentionSuggestionService.generate(
                     topic: topic,
                     activeIntentions: activeIntentions,
                     history: snapshot.history,
                     recentProgressDaysByIntentionId: recentProgressDaysByIntentionId(
                         intentions: activeIntentions,
                         intentionSet: activeSet
-                    )
-                ) else { return }
+                    ),
+                    rapidTestMode: RapidIntentionSuggestionTestingFeature.isEnabled
+                )
+                guard let suggestion = generatedSuggestion else {
+                    if RapidIntentionSuggestionTestingFeature.isEnabled {
+                        suggestionNudge = "Rapid test qualified three mentions, but no safe new suggestion was returned."
+                    }
+                    return
+                }
                 guard !IntentionSuggestionEngine.isCoveredByActiveIntention(
                           suggestionTitle: suggestion.title,
                           activeIntentions: activeIntentions
@@ -1783,6 +1842,9 @@ struct HomeView: View {
             }
         } catch {
             AppLogger.log(AppLogger.ERR, "Intention suggestion unavailable error=\"\(error.localizedDescription)\"")
+            if RapidIntentionSuggestionTestingFeature.isEnabled {
+                suggestionNudge = "Rapid suggestion test failed. Check the app log and Worker deployment."
+            }
         }
     }
 
@@ -2222,7 +2284,11 @@ struct HomeView: View {
             }
             
             // Start recording (this is the main operation that changes hardware state)
-            _ = try checkInRecorder.startRecording()
+            let checkInId = try checkInRecorder.startRecording()
+            EngagementMetricsStore.shared.record(
+                .checkInStarted,
+                eventID: "check-in-started:\(checkInId)"
+            )
             
             // Update state to recording (this triggers UI update immediately)
             state = .recording
@@ -2401,11 +2467,15 @@ struct HomeView: View {
                     checkInId: checkInId
                 )
             } else {
-                state = .saved(checkInId: checkInId)
+                completeCheckIn(checkInId)
             }
             
         } catch {
             AppLogger.log(AppLogger.ERR, "Check-in transcription failed id=\(AppLogger.shortId(checkInId)) error=\"\(error.localizedDescription)\"")
+            EngagementMetricsStore.shared.record(
+                .checkInFailed,
+                eventID: "check-in-failed:\(checkInId)"
+            )
             state = .error(message: error.localizedDescription)
             
             // Replace placeholder with failed row; red flash

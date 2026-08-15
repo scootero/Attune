@@ -29,6 +29,7 @@ enum IntentionSuggestionService {
         activeIntentions: [Intention],
         history: [IntentionSuggestionHistoryEntry],
         recentProgressDaysByIntentionId: [String: Int],
+        rapidTestMode: Bool = false,
         now: Date = Date()
     ) async throws -> SuggestedIntentionAction? {
         let formatter = ISO8601DateFormatter()
@@ -53,6 +54,7 @@ enum IntentionSuggestionService {
                 ] as [String: Any]
             },
             "declinedActionIds": Array(history.filter { $0.outcome == .declined }.map(\.actionId).prefix(100)),
+            "rapidTestMode": rapidTestMode,
             "suggestionHistory": Array(history.suffix(100)).map {
                 var value: [String: Any] = [
                     "actionId": $0.actionId,
@@ -108,6 +110,7 @@ enum IntentionSuggestionService {
         suggestion.actionFamily = payload.actionFamily
         suggestion.distinctSessionCount = topic.distinctSessionCount
         suggestion.currentMonthSessionCount = topic.currentMonthSessionCount
+        suggestion.rapidTestMentionCount = topic.rapidTestMentionCount
         return suggestion
     }
 }

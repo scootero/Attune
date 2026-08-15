@@ -30,6 +30,7 @@ const suggestionBody = {
   ],
   activeIntentions: [],
   declinedActionIds: [],
+  rapidTestMode: false,
 };
 
 const customSuggestion = (overrides: Record<string, unknown> = {}) => ({
@@ -163,6 +164,35 @@ describe("server-owned v2 task routes", () => {
     expect(forwarded.messages[1].content).not.toContain("allowedActions");
     expect(forwarded.messages[1].content).toContain('"recentProgressDays":4');
     expect(forwarded.messages[1].content).toContain('"actionFingerprint":"teach_idea"');
+  });
+
+  it("forwards rapid test mode without weakening the server-owned safety prompt", async () => {
+    let forwardedInit: RequestInit | undefined;
+    const response = await handleRequest(
+      taskRequest(TASK_PATHS.intentionSuggestion, { ...suggestionBody, rapidTestMode: true }),
+      env,
+      async (_input, init) => {
+        forwardedInit = init;
+        return chatCompletion(customSuggestion());
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const forwarded = JSON.parse(String(forwardedInit?.body));
+    expect(forwarded.messages[1].content).toContain('"rapidTestMode":true');
+    expect(forwarded.messages[0].content).toContain("developer evaluation harness");
+    expect(forwarded.messages[0].content).toContain("Do not relax");
+  });
+
+  it("rejects a non-boolean rapid test mode", async () => {
+    const response = await handleRequest(
+      taskRequest(TASK_PATHS.intentionSuggestion, { ...suggestionBody, rapidTestMode: "yes" }),
+      env,
+      vi.fn(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "rapidTestMode must be a boolean" });
   });
 
   it("allows a creative learning action generated for the supplied evidence", async () => {

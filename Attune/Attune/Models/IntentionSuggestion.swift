@@ -10,6 +10,19 @@ enum IntentionSuggestionFeature {
     }
 }
 
+enum RapidIntentionSuggestionTestingFeature {
+    static var isEnabled: Bool {
+        #if DEBUG
+        true
+        #else
+        false
+        #endif
+    }
+
+    static let minimumMentionCount = 3
+    static let minimumMentionSpacing: TimeInterval = 3 * 60
+}
+
 struct IntentionSuggestionEvidence: Codable, Equatable, Identifiable {
     let itemId: String
     let sessionId: String
@@ -27,6 +40,7 @@ struct IntentionSuggestionTopic: Equatable {
     let currentMonthSessionCount: Int
     let firstSessionAt: Date
     let lastSessionAt: Date
+    var rapidTestMentionCount: Int? = nil
 }
 
 struct SuggestedIntentionAction: Codable, Equatable, Identifiable {
@@ -47,6 +61,7 @@ struct SuggestedIntentionAction: Codable, Equatable, Identifiable {
     var actionFamily: String? = nil
     var distinctSessionCount: Int? = nil
     var currentMonthSessionCount: Int? = nil
+    var rapidTestMentionCount: Int? = nil
     var id: String { actionId }
 }
 

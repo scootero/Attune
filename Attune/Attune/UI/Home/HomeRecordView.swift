@@ -560,6 +560,11 @@ struct HomeRecordView: View {
             return
         }
 
+        EngagementMetricsStore.shared.record(
+            .talkSessionStarted,
+            eventID: "talk-session-started:\(sessionId)"
+        )
+
         activeSessionId = sessionId
         processingSessionId = nil
         isProcessing = false
@@ -686,6 +691,27 @@ struct HomeRecordView: View {
     /// Displays completion feedback only after this session's transcription and captures are saved.
     private func showCompletionFeedback(for sessionId: String) {
         recentInsightsAddedCount = ExtractionStore.shared.loadExtractions(sessionId: sessionId).count
+        if let session = SessionStore.shared.loadSession(id: sessionId) {
+            if session.status == "complete" {
+                EngagementMetricsStore.shared.record(
+                    .talkSessionCompleted,
+                    eventID: "talk-session-completed:\(sessionId)",
+                    at: session.endedAt ?? session.startedAt
+                )
+                EngagementMetricsStore.shared.record(
+                    .insightCreated,
+                    quantity: recentInsightsAddedCount,
+                    eventID: "talk-session-insights:\(sessionId)",
+                    at: session.endedAt ?? session.startedAt
+                )
+            } else if session.status == "error" {
+                EngagementMetricsStore.shared.record(
+                    .talkSessionFailed,
+                    eventID: "talk-session-failed:\(sessionId)",
+                    at: session.endedAt ?? session.startedAt
+                )
+            }
+        }
         NotificationCenter.default.post(
             name: .attuneListeningSessionDidFinishProcessing,
             object: nil,

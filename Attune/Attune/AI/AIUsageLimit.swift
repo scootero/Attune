@@ -18,7 +18,12 @@ struct AIUsageStatus: Codable, Equatable {
     let period: String
 
     var resetDate: Date? {
-        ISO8601DateFormatter().date(from: resetsAt)
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractionalFormatter.date(from: resetsAt) {
+            return date
+        }
+        return ISO8601DateFormatter().date(from: resetsAt)
     }
 }
 

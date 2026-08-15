@@ -68,6 +68,34 @@ pipelines are unchanged.
 
 ## Physical verification
 
+### Rapid Debug test mode
+
+`RapidIntentionSuggestionTestingFeature.isEnabled` is on only in Debug and off
+in Release. It is an evaluation shortcut, not production cadence:
+
+- Three eligible related mentions qualify when their trustworthy evidence
+  timestamps are at least three minutes apart. They may come from three
+  sessions or from separately timestamped segments in one session.
+- Multiple extracted items from one segment do not create extra timed mentions.
+  A normal Talk it out segment lasts five minutes, so a one-session test must
+  run long enough to create three segments and finish processing them.
+- It bypasses the first-20-days/session thresholds, date-span requirement,
+  generation-attempt throttle, and suggestion cooldown. It does not bypass an
+  already-outstanding suggestion, incorrect-item filtering, active-intention
+  duplicate checks, permanent decline suppression, evidence validation, or
+  medical/financial/crisis safety rules.
+- Qualification forces an AI evaluation, not an unsafe or duplicate result. If
+  the Worker returns no safe new action, Home shows a Debug diagnostic instead
+  of inventing one. This distinction keeps the test representative of the real
+  product.
+- The app sends `rapidTestMode: true` to the server-owned Worker contract so the
+  model prefers a safe supported suggestion when one exists. The matching
+  Worker revision must be deployed before on-device testing.
+
+To disable the shortcut, make
+`RapidIntentionSuggestionTestingFeature.isEnabled` return `false` in Debug. No
+stored data or migration needs to be reversed.
+
 1. Deploy the matching Worker revision, then run an authenticated synthetic
    smoke test. The new app request is not compatible with the older deployed
    catalog validator.

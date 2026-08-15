@@ -215,6 +215,10 @@ struct SettingsView: View {
                 settingsLabel("Logs", icon: "doc.text.magnifyingglass", color: .green)
             }
 
+            NavigationLink(destination: EngagementDiagnosticsView()) {
+                settingsLabel("Engagement Diagnostics", icon: "chart.bar.doc.horizontal", color: AttuneTheme.accent)
+            }
+
             #if targetEnvironment(simulator)
             // MOMENTUM DEMO CLEANUP HANDOFF:
             // These controls reuse real intentions but create only ATTUNE_DEMO_*

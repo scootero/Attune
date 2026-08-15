@@ -76,8 +76,11 @@ export function buildTask(path: TaskPath, rawBody: unknown): ValidationResult {
 
 function buildIntentionSuggestionTask(rawBody: unknown): ValidationResult {
   if (!isRecord(rawBody)) return invalid("Request body must be an object");
-  const keyError = validateKeys(rawBody, ["topic", "evidence", "activeIntentions", "declinedActionIds", "suggestionHistory"]);
+  const keyError = validateKeys(rawBody, ["topic", "evidence", "activeIntentions", "declinedActionIds", "suggestionHistory", "rapidTestMode"]);
   if (keyError) return invalid(keyError);
+  if (rawBody.rapidTestMode !== undefined && typeof rawBody.rapidTestMode !== "boolean") {
+    return invalid("rapidTestMode must be a boolean");
+  }
   if (!isRecord(rawBody.topic)) return invalid("topic must be an object");
   const topicKeyError = validateKeys(rawBody.topic, ["key", "title", "categories"]);
   if (topicKeyError) return invalid(topicKeyError);
@@ -169,6 +172,7 @@ function buildIntentionSuggestionTask(rawBody: unknown): ValidationResult {
     evidence,
     activeIntentions,
     suggestionHistory,
+    rapidTestMode: rawBody.rapidTestMode === true,
     avoidExactFingerprints: blockedFingerprints,
     avoidCloseVariantsOf: declinedTitles,
   });
@@ -577,6 +581,9 @@ QUALITY BAR:
 - Do not duplicate an active intention, an avoidExactFingerprint, or a close variation of avoidCloseVariantsOf. A different action in the same broad family is allowed only when it is meaningfully different.
 - Use one supported unit: pages, minutes, sessions, steps, reps, cups, glasses, or times. Use daily or weekly.
 - actionFingerprint is a stable lowercase snake_case description of the actual behavior, not the broad topic. actionFamily is one of movement, planning, learning, connection, finance_organization, sleep_routine, environment, creativity, reflection, or other.
+
+RAPID TEST MODE:
+When rapidTestMode is true, this is a developer evaluation harness. Prefer returning a useful suggestion whenever the supplied evidence supports any safe, genuinely new micro-action. Do not relax the evidence, active-intention duplicate, declined-action, or safety rules.
 
 SAFETY:
 Return the all-null form when the connection is weak, an existing intention already covers it, or the evidence involves injury, pain, pregnancy, medication, eating disorders, acute symptoms, crisis, debt strategy, investing, or individualized medical, legal, or financial guidance. Never diagnose, prescribe, recommend calorie restriction, promise outcomes, or tell the user to replace professional care.

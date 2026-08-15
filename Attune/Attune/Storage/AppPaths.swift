@@ -52,6 +52,12 @@ struct AppPaths {
     static var oneThingModeFileURL: URL {
         baseDir.appendingPathComponent("OneThingMode.json")
     }
+
+    /// Privacy-safe local usage totals and review-prompt eligibility state.
+    /// Contains counts and dates only; never user-entered content.
+    static var engagementMetricsFileURL: URL {
+        baseDir.appendingPathComponent("EngagementMetrics.json")
+    }
     
     /// Audio directory for a specific session: Documents/Attune/Audio/<sessionId>/
     /// Each session has its own audio subdirectory

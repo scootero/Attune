@@ -14,6 +14,7 @@ enum IntentionSuggestionEngine {
         sessions: [Session],
         items: [ExtractedItem],
         corrections: [String: ItemCorrection],
+        rapidTestingEnabled: Bool = false,
         calendar: Calendar = .current,
         now: Date = Date()
     ) -> [IntentionSuggestionTopic] {
@@ -36,32 +37,47 @@ enum IntentionSuggestionEngine {
                 guard let session = sessionsById[item.sessionId], session.status == "complete" else { return nil }
                 let quote = SessionRecapBuilder.normalizeWhitespace(item.sourceQuote)
                 guard !quote.isEmpty else { return nil }
+                let evidenceDate: Date
+                if rapidTestingEnabled,
+                   let segment = session.segments.first(where: { $0.id == item.segmentId }) {
+                    evidenceDate = segment.startedAt
+                } else {
+                    evidenceDate = session.startedAt
+                }
                 return IntentionSuggestionEvidence(
                     itemId: item.id,
                     sessionId: session.id,
-                    sessionDate: session.startedAt,
+                    sessionDate: evidenceDate,
                     quote: SessionRecapBuilder.truncateQuote(quote, maximumCharacterCount: 180)
                 )
             }
             guard !resolvedEvidence.isEmpty else { return nil }
 
-            let newestPerSession = Dictionary(grouping: resolvedEvidence, by: \.sessionId)
-                .compactMap { _, evidence in evidence.max(by: { $0.sessionDate < $1.sessionDate }) }
-                .sorted { $0.sessionDate > $1.sessionDate }
-            guard let first = newestPerSession.last, let last = newestPerSession.first else { return nil }
-            let monthCount = newestPerSession.filter { month?.contains($0.sessionDate) == true }.count
-            return IntentionSuggestionTopic(
+            let selectedEvidence: [IntentionSuggestionEvidence]
+            if rapidTestingEnabled {
+                selectedEvidence = spacedEvidence(resolvedEvidence)
+            } else {
+                selectedEvidence = Dictionary(grouping: resolvedEvidence, by: \.sessionId)
+                    .compactMap { _, evidence in evidence.max(by: { $0.sessionDate < $1.sessionDate }) }
+                    .sorted { $0.sessionDate > $1.sessionDate }
+            }
+            guard let first = selectedEvidence.last, let last = selectedEvidence.first else { return nil }
+            let distinctSessions = Set(selectedEvidence.map(\.sessionId))
+            let monthSessions = Set(selectedEvidence.filter { month?.contains($0.sessionDate) == true }.map(\.sessionId))
+            var candidate = IntentionSuggestionTopic(
                 topicKey: key,
                 title: topic.displayTitle,
                 categories: topic.categories,
-                evidence: Array(newestPerSession.prefix(5)),
-                distinctSessionCount: newestPerSession.count,
-                currentMonthSessionCount: monthCount,
+                evidence: Array(selectedEvidence.prefix(5)),
+                distinctSessionCount: distinctSessions.count,
+                currentMonthSessionCount: monthSessions.count,
                 firstSessionAt: first.sessionDate,
                 lastSessionAt: last.sessionDate
             )
+            if rapidTestingEnabled { candidate.rapidTestMentionCount = selectedEvidence.count }
+            return candidate
         }
-        return consolidateRelatedTopics(candidates, calendar: calendar, now: now)
+        return consolidateRelatedTopics(candidates, rapidTestingEnabled: rapidTestingEnabled, calendar: calendar, now: now)
     }
 
     static func decide(
@@ -69,6 +85,7 @@ enum IntentionSuggestionEngine {
         topics: [IntentionSuggestionTopic],
         completedSessionCount: Int,
         isAtIntentionLimit: Bool,
+        rapidTestingEnabled: Bool = false,
         calendar: Calendar = .current,
         now: Date = Date()
     ) -> IntentionSuggestionDecision {
@@ -76,6 +93,11 @@ enum IntentionSuggestionEngine {
         // offers an explicit, reviewable swap instead of silently adding one.
         _ = isAtIntentionLimit
         if let outstanding = snapshot.outstanding { return .show(outstanding) }
+        if rapidTestingEnabled {
+            return bestTopic(topics.filter {
+                ($0.rapidTestMentionCount ?? 0) >= RapidIntentionSuggestionTestingFeature.minimumMentionCount
+            }).map { .request(topic: $0, opportunityKey: nil) } ?? .none
+        }
         if let attempt = snapshot.lastGenerationAttemptAt,
            now.timeIntervalSince(attempt) < 24 * 60 * 60 { return .none }
 
@@ -191,6 +213,7 @@ enum IntentionSuggestionEngine {
 
     private static func consolidateRelatedTopics(
         _ topics: [IntentionSuggestionTopic],
+        rapidTestingEnabled: Bool,
         calendar: Calendar,
         now: Date
     ) -> [IntentionSuggestionTopic] {
@@ -210,21 +233,47 @@ enum IntentionSuggestionEngine {
         let month = calendar.dateInterval(of: .month, for: now)
         return groups.compactMap { group in
             guard let representative = bestTopic(group) else { return nil }
-            let newestPerSession = Dictionary(grouping: group.flatMap(\.evidence), by: \.sessionId)
-                .compactMap { _, values in values.max(by: { $0.sessionDate < $1.sessionDate }) }
-                .sorted { $0.sessionDate > $1.sessionDate }
-            guard let newest = newestPerSession.first, let oldest = newestPerSession.last else { return nil }
-            return IntentionSuggestionTopic(
+            let selectedEvidence: [IntentionSuggestionEvidence]
+            if rapidTestingEnabled {
+                selectedEvidence = spacedEvidence(group.flatMap(\.evidence))
+            } else {
+                selectedEvidence = Dictionary(grouping: group.flatMap(\.evidence), by: \.sessionId)
+                    .compactMap { _, values in values.max(by: { $0.sessionDate < $1.sessionDate }) }
+                    .sorted { $0.sessionDate > $1.sessionDate }
+            }
+            guard let newest = selectedEvidence.first, let oldest = selectedEvidence.last else { return nil }
+            let distinctSessions = Set(selectedEvidence.map(\.sessionId))
+            var topic = IntentionSuggestionTopic(
                 topicKey: group.map(\.topicKey).sorted().joined(separator: "+"),
                 title: representative.title,
                 categories: Array(Set(group.flatMap(\.categories))).sorted(),
-                evidence: Array(newestPerSession.prefix(5)),
-                distinctSessionCount: newestPerSession.count,
-                currentMonthSessionCount: newestPerSession.filter { month?.contains($0.sessionDate) == true }.count,
+                evidence: Array(selectedEvidence.prefix(5)),
+                distinctSessionCount: distinctSessions.count,
+                currentMonthSessionCount: Set(selectedEvidence.filter { month?.contains($0.sessionDate) == true }.map(\.sessionId)).count,
                 firstSessionAt: oldest.sessionDate,
                 lastSessionAt: newest.sessionDate
             )
+            if rapidTestingEnabled { topic.rapidTestMentionCount = selectedEvidence.count }
+            return topic
         }
+    }
+
+    private static func spacedEvidence(_ evidence: [IntentionSuggestionEvidence]) -> [IntentionSuggestionEvidence] {
+        let chronological = evidence.sorted {
+            if $0.sessionDate != $1.sessionDate { return $0.sessionDate < $1.sessionDate }
+            return $0.itemId < $1.itemId
+        }
+        var accepted: [IntentionSuggestionEvidence] = []
+        for value in chronological {
+            guard let previous = accepted.last else {
+                accepted.append(value)
+                continue
+            }
+            if value.sessionDate.timeIntervalSince(previous.sessionDate) >= RapidIntentionSuggestionTestingFeature.minimumMentionSpacing {
+                accepted.append(value)
+            }
+        }
+        return accepted.sorted { $0.sessionDate > $1.sessionDate }
     }
 
     private static func identityTerms(for topic: IntentionSuggestionTopic) -> Set<String> {

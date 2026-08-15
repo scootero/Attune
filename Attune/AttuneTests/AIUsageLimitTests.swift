@@ -3,7 +3,8 @@ import XCTest
 
 final class AIUsageLimitTests: XCTestCase {
     func testUsageStatusDecodesResetAndLimit() throws {
-        let data = Data(#"{
+        let data = Data(#"""
+        {
           "usedUnits": 8000000,
           "limitUnits": 10000000,
           "warningAtUnits": 8000000,
@@ -11,7 +12,8 @@ final class AIUsageLimitTests: XCTestCase {
           "limited": false,
           "resetsAt": "2026-09-01T00:00:00.000Z",
           "period": "2026-08"
-        }"#.utf8)
+        }
+        """#.utf8)
 
         let status = try JSONDecoder().decode(AIUsageStatus.self, from: data)
         XCTAssertEqual(status.period, "2026-08")

@@ -167,7 +167,7 @@ For each closed segment:
 
 1. Produce time-aligned transcription.
 2. Detect speaker turns.
-3. compare each usable turn with the local enrolled-user profile.
+3. Compare each usable turn with the local enrolled-user profile.
 4. Assign **You**, **Someone else**, or **Not sure** conservatively.
 5. Persist local speaker turns.
 6. Build a server payload containing only approved **You** text and neutral
@@ -186,6 +186,9 @@ Integration rules:
 - Server and app schemas must reject `other` or `unknown` text in v1 payloads.
 - Extraction prompts must state that only `[YOU]` statements can be treated as
   the user's evidence.
+- A user turn such as “yes, do that” is not actionable when its meaning depends
+  on omitted speech. Require the user to restate the actual intention,
+  commitment, event, state, or progress before extraction can save a capture.
 - Source quotes and recurring topics must retain speaker provenance.
 - Speaker corrections may re-run local filtering/extraction only after an
   explicit user action; they must not silently alter saved intentions or

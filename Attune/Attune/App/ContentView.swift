@@ -31,6 +31,9 @@ struct ContentView: View {
                     .zIndex(1)
             }
         }
+        .onAppear {
+            EngagementMetricsStore.shared.recordAppLaunchOnce()
+        }
             .fullScreenCover(isPresented: $showOnboarding, onDismiss: presentPrivacyDisclosureIfNeeded) {
                 OnboardingView {
                     AttuneOnboardingState.hasCompleted = true

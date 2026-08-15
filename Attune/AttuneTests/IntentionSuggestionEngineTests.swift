@@ -110,6 +110,91 @@ final class IntentionSuggestionEngineTests: XCTestCase {
         XCTAssertEqual(Set(result.first?.evidence.map(\.sessionId) ?? []).count, 3)
     }
 
+    func testRapidModeCountsSpacedSegmentsWithinOneSessionAndBypassesCadence() throws {
+        let start = date("2026-08-15T12:00:00Z")
+        let segments = [
+            segment("segment-1", session: "one", index: 0, startedAt: start),
+            segment("segment-2", session: "one", index: 1, startedAt: start.addingTimeInterval(3 * 60)),
+            segment("segment-3", session: "one", index: 2, startedAt: start.addingTimeInterval(6 * 60))
+        ]
+        let oneSession = Session(id: "one", startedAt: start, status: "complete", segments: segments)
+        let items = segments.map {
+            item("item-\($0.index)", session: oneSession.id, segmentId: $0.id)
+        }
+        let topics = IntentionSuggestionEngine.makeTopics(
+            topics: [topic(items.map(\.id))],
+            sessions: [oneSession],
+            items: items,
+            corrections: [:],
+            rapidTestingEnabled: true,
+            calendar: calendar,
+            now: start.addingTimeInterval(10 * 60)
+        )
+
+        let candidate = try XCTUnwrap(topics.first)
+        XCTAssertEqual(candidate.distinctSessionCount, 1)
+        XCTAssertEqual(candidate.rapidTestMentionCount, 3)
+        XCTAssertEqual(candidate.evidence.count, 3)
+
+        var snapshot = IntentionSuggestionSnapshot.empty
+        snapshot.firstLaunchAt = start
+        snapshot.lastGenerationAttemptAt = start.addingTimeInterval(9 * 60)
+        snapshot.history = [.init(
+            actionId: "recent",
+            topicKey: "other",
+            outcome: .accepted,
+            decidedAt: start.addingTimeInterval(9 * 60)
+        )]
+        XCTAssertEqual(
+            IntentionSuggestionEngine.decide(
+                snapshot: snapshot,
+                topics: topics,
+                completedSessionCount: 1,
+                isAtIntentionLimit: false,
+                rapidTestingEnabled: true,
+                calendar: calendar,
+                now: start.addingTimeInterval(10 * 60)
+            ),
+            .request(topic: candidate, opportunityKey: nil)
+        )
+    }
+
+    func testRapidModeDoesNotCountMentionsLessThanThreeMinutesApart() {
+        let start = date("2026-08-15T12:00:00Z")
+        let segments = [
+            segment("segment-1", session: "one", index: 0, startedAt: start),
+            segment("segment-2", session: "one", index: 1, startedAt: start.addingTimeInterval(2 * 60)),
+            segment("segment-3", session: "one", index: 2, startedAt: start.addingTimeInterval(4 * 60))
+        ]
+        let oneSession = Session(id: "one", startedAt: start, status: "complete", segments: segments)
+        let items = segments.map {
+            item("item-\($0.index)", session: oneSession.id, segmentId: $0.id)
+        }
+        let topics = IntentionSuggestionEngine.makeTopics(
+            topics: [topic(items.map(\.id))],
+            sessions: [oneSession],
+            items: items,
+            corrections: [:],
+            rapidTestingEnabled: true,
+            calendar: calendar,
+            now: start.addingTimeInterval(10 * 60)
+        )
+
+        XCTAssertEqual(topics.first?.rapidTestMentionCount, 2)
+        XCTAssertEqual(
+            IntentionSuggestionEngine.decide(
+                snapshot: .empty,
+                topics: topics,
+                completedSessionCount: 1,
+                isAtIntentionLimit: false,
+                rapidTestingEnabled: true,
+                calendar: calendar,
+                now: start.addingTimeInterval(10 * 60)
+            ),
+            .none
+        )
+    }
+
     func testActiveIntentionSemanticallyCoversSuggestion() {
         let walk = Intention(title: "Walk", targetValue: 20, unit: "minutes", timeframe: "daily")
         let reading = Intention(title: "Read", targetValue: 10, unit: "pages", timeframe: "daily", aliases: ["reading"])
@@ -155,8 +240,11 @@ final class IntentionSuggestionEngineTests: XCTestCase {
     }
 
     private func session(_ id: String, _ value: String) -> Session { Session(id: id, startedAt: date(value), status: "complete") }
-    private func item(_ id: String, session: String, extracted: String = "2026-08-01T01:00:00Z", reviewState: String = "new", title: String = "Planning", quote: String = "I keep bringing this up", categories: [String] = ["personal_growth"]) -> ExtractedItem {
-        ExtractedItem(id: id, sessionId: session, segmentId: "s", segmentIndex: 0, type: "state", title: title, summary: "", categories: categories, confidence: 1, strength: 1, sourceQuote: quote, fingerprint: title.lowercased(), reviewState: reviewState, createdAt: extracted, extractedAt: extracted)
+    private func item(_ id: String, session: String, segmentId: String = "s", extracted: String = "2026-08-01T01:00:00Z", reviewState: String = "new", title: String = "Planning", quote: String = "I keep bringing this up", categories: [String] = ["personal_growth"]) -> ExtractedItem {
+        ExtractedItem(id: id, sessionId: session, segmentId: segmentId, segmentIndex: 0, type: "state", title: title, summary: "", categories: categories, confidence: 1, strength: 1, sourceQuote: quote, fingerprint: title.lowercased(), reviewState: reviewState, createdAt: extracted, extractedAt: extracted)
+    }
+    private func segment(_ id: String, session: String, index: Int, startedAt: Date) -> Segment {
+        Segment(id: id, sessionId: session, index: index, startedAt: startedAt, audioFileName: "segment_\(index).m4a", status: "done")
     }
     private func topic(_ ids: [String], key: String = "personal_growth|planning", title: String = "Planning", categories: [String] = ["personal_growth"]) -> TopicAggregate {
         var value = TopicAggregate(canonicalKey: "\(title.lowercased())__1", displayTitle: title, firstSeenAtISO: "2026-07-01T00:00:00Z", categories: categories, itemId: ids.first ?? "", topicKey: key)
