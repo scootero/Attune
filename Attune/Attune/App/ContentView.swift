@@ -12,13 +12,35 @@ struct ContentView: View {
     @StateObject private var appRouter = AppRouter()
     /// Shared StoreKit subscription state for paywall + feature gates.
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    @ObservedObject private var aiUsageNoticeCenter = AIUsageNoticeCenter.shared
+    /// The static iOS launch screen hands off to this short branded animation.
+    @State private var showLaunchIntro = true
+    /// Benefit-led introduction appears once, before the separate processing disclosure.
+    @State private var showOnboarding = false
     /// Drives the first-launch AI disclosure; starts false if consent already saved.
-    @State private var showAIPrivacySheet = !AIPrivacyConsent.hasAccepted
+    @State private var showAIPrivacySheet = false
 
     var body: some View {
-        RootTabView()
-            .environmentObject(appRouter)
-            .environmentObject(subscriptionManager)
+        ZStack {
+            RootTabView()
+                .environmentObject(appRouter)
+                .environmentObject(subscriptionManager)
+
+            if showLaunchIntro {
+                LaunchIntroView(onFinished: finishLaunchIntro)
+                    .zIndex(1)
+            }
+        }
+        .onAppear {
+            EngagementMetricsStore.shared.recordAppLaunchOnce()
+        }
+            .fullScreenCover(isPresented: $showOnboarding, onDismiss: presentPrivacyDisclosureIfNeeded) {
+                OnboardingView {
+                    AttuneOnboardingState.hasCompleted = true
+                    showOnboarding = false
+                }
+                .interactiveDismissDisabled(true)
+            }
             .sheet(isPresented: $showAIPrivacySheet) {
                 AIPrivacyDisclosureSheet {
                     // Persist acceptance so OpenAIClient may send transcripts.
@@ -27,6 +49,28 @@ struct ContentView: View {
                 }
                 .interactiveDismissDisabled(true) // Require an explicit Accept tap.
             }
+            .alert(item: $aiUsageNoticeCenter.notice) { notice in
+                Alert(
+                    title: Text(notice.title),
+                    message: Text(notice.message),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
+            .preferredColorScheme(.dark)
+    }
+
+    private func finishLaunchIntro() {
+        showLaunchIntro = false
+
+        if !AttuneOnboardingState.hasCompleted {
+            showOnboarding = true
+        } else if !AIPrivacyConsent.hasAccepted {
+            showAIPrivacySheet = true
+        }
+    }
+
+    private func presentPrivacyDisclosureIfNeeded() {
+        showAIPrivacySheet = !AIPrivacyConsent.hasAccepted
     }
 }
 

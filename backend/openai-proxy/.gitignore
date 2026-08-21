@@ -1,3 +1,6 @@
 .dev.vars
 .node_modules/
+node_modules/
+.wrangler/
+src/worker-configuration.d.ts
 .wrangler/

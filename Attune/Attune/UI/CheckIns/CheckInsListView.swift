@@ -34,7 +34,7 @@ struct CheckInsListView: View {
                 .foregroundColor(.secondary)
             Text("No check-ins yet")
                 .font(.headline)
-            Text("Record a check-in from the Home tab")
+            Text("Record a voice check-in from Today")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -77,7 +77,7 @@ struct CheckInsListView: View {
     /// Returns first ~120 chars of transcript + ellipsis if longer
     private func transcriptSnippet(for checkIn: CheckIn) -> String {
         let text = checkIn.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return "No transcript" }
+        guard !text.isEmpty else { return "Check-in saved" }
         let prefix = String(text.prefix(120)).trimmingCharacters(in: .whitespaces)
         return prefix + (text.count > 120 ? "…" : "")
     }

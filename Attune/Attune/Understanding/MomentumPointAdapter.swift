@@ -4,7 +4,7 @@
 //
 //  Builds [MomentumPoint] for a selected day by processing check-ins
 //  chronologically and computing cumulative % per intention at each check-in.
-//  Does NOT apply overrides (raw progression from entries only).
+//  Includes manual overrides as timestamped absolute-total points when supplied.
 //
 
 import Foundation
@@ -25,7 +25,8 @@ struct MomentumPointAdapter {
         intentionSet: IntentionSet,
         intentions: [Intention],
         checkIns: [CheckIn],
-        entries: [ProgressEntry]
+        entries: [ProgressEntry],
+        overrides: [ManualProgressOverride] = []
     ) -> [MomentumPoint] {
         let checkInIds = Set(checkIns.map { $0.id }) // Debug: collect check-in ids to measure linkage
         let linkedEntriesCount = entries.filter { checkInIds.contains($0.sourceCheckInId) }.count // Debug: how many entries are linked to a known check-in
@@ -37,25 +38,88 @@ struct MomentumPointAdapter {
             checkIns: checkIns,
             entries: entries
         )
+        let entryPoints: [MomentumPoint]
         if !fromCheckIns.isEmpty { // Debug: path succeeded using check-ins
             print("[Momentum] adapterPath=checkIns checkIns=\(checkIns.count) entries=\(entries.count) linkedEntries=\(linkedEntriesCount)") // Debug: log primary path usage
-            return deduplicateByMinuteBucket(from: fromCheckIns) // Combine same-intention same-minute duplicates, keep max %
+            entryPoints = fromCheckIns
+        } else {
+            // Fallback: entries only (use entry.createdAt as timestamp)
+            entryPoints = buildPointsFromEntriesOnly(
+                dateKey: dateKey,
+                intentionSet: intentionSet,
+                intentions: intentions,
+                entries: entries
+            )
+            print("[Momentum] adapterPath=entriesOnly checkIns=\(checkIns.count) entries=\(entries.count) linkedEntries=\(linkedEntriesCount)") // Debug: log fallback path usage
         }
 
-        // Fallback: entries only (use entry.createdAt as timestamp)
-        let fromEntriesOnly = buildPointsFromEntriesOnly(
+        let manualPoints = buildPointsFromOverrides(
             dateKey: dateKey,
-            intentionSet: intentionSet,
             intentions: intentions,
-            entries: entries
+            overrides: overrides
         )
-        print("[Momentum] adapterPath=entriesOnly checkIns=\(checkIns.count) entries=\(entries.count) linkedEntries=\(linkedEntriesCount)") // Debug: log fallback path usage
-        return deduplicateByMinuteBucket(from: fromEntriesOnly) // Combine same-intention same-minute duplicates, keep max %
+        return deduplicateByMinuteBucket(from: entryPoints + manualPoints)
     }
 
-    /// Buckets points by (intentionId, minute) and keeps one bar per bucket with max percent.
+    /// Represents an authoritative manual total as a real chart event without
+    /// fabricating a transcript-derived ProgressEntry.
+    private static func buildPointsFromOverrides(
+        dateKey: String,
+        intentions: [Intention],
+        overrides: [ManualProgressOverride]
+    ) -> [MomentumPoint] {
+        let intentionIndexById = Dictionary(
+            uniqueKeysWithValues: intentions.enumerated().map { ($1.id, $0) }
+        )
+
+        return overrides.compactMap { override in
+            guard override.dateKey == dateKey,
+                  let intention = intentions.first(where: { $0.id == override.intentionId }),
+                  intention.targetValue > 0 else { return nil }
+
+            let effectiveTarget = intention.timeframe.lowercased() == "weekly"
+                ? intention.targetValue / 7
+                : intention.targetValue
+            guard effectiveTarget > 0 else { return nil }
+
+            let chartDate = projectedDate(override.updatedAt, onto: dateKey)
+            let clusterSecond = Int(chartDate.timeIntervalSince1970)
+            return MomentumPoint(
+                id: "manual-\(override.intentionId)-\(clusterSecond)",
+                date: chartDate,
+                intentionId: intention.id,
+                intentionTitle: intention.title,
+                colorIndex: intentionIndexById[intention.id] ?? 0,
+                recordingId: "manual-\(dateKey)-\(clusterSecond)",
+                percent: max(0, override.amount / effectiveTarget * 100),
+                timeOffsetSeconds: 0
+            )
+        }
+    }
+
+    /// Historical-day adjustments are made today, so project the action's local
+    /// clock time onto the adjusted day to keep it inside that day's chart domain.
+    private static func projectedDate(_ timestamp: Date, onto dateKey: String) -> Date {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar.current
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let targetDay = formatter.date(from: dateKey) else { return timestamp }
+
+        let calendar = Calendar.current
+        let clock = calendar.dateComponents([.hour, .minute, .second], from: timestamp)
+        return calendar.date(
+            bySettingHour: clock.hour ?? 12,
+            minute: clock.minute ?? 0,
+            second: clock.second ?? 0,
+            of: targetDay
+        ) ?? targetDay
+    }
+
+    /// Buckets points by (intentionId, minute) and keeps the latest value per bucket.
     /// Fixes stacked bars when multiple check-ins for same intention occur within the same minute.
-    /// Uses max percent within bucket (robust when users repeat themselves).
+    /// The latest value matters when a manual total intentionally lowers progress.
     private static func deduplicateByMinuteBucket(from points: [MomentumPoint]) -> [MomentumPoint] {
         let cal = Calendar.current
         // Group by (intentionId, minute-bucket). Bucket = year, month, day, hour, minute (truncate seconds).
@@ -63,14 +127,16 @@ struct MomentumPointAdapter {
         for point in points {
             let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: point.date)
             guard let bucketDate = cal.date(from: comps) else { continue }
-            let recordingPart = point.recordingId ?? "noRec" // Use recording id when present so buckets remain stable per source
-            let key = "\(point.intentionId)-\(recordingPart)-\(bucketDate.timeIntervalSince1970)"
+            let key = "\(point.intentionId)-\(bucketDate.timeIntervalSince1970)"
             bucketToPoints[key, default: []].append(point)
         }
-        // For each bucket: keep single point with max percent; use bucket timestamp as date for consistent x-position.
+        // For each bucket: keep the latest point and normalize it to the bucket timestamp.
         var result: [MomentumPoint] = []
         for (_, group) in bucketToPoints {
-            guard let best = group.max(by: { $0.percent < $1.percent }) else { continue }
+            guard let best = group.max(by: { lhs, rhs in
+                if lhs.date != rhs.date { return lhs.date < rhs.date }
+                return lhs.percent < rhs.percent
+            }) else { continue }
             let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: best.date)
             let bucketDate = cal.date(from: comps) ?? best.date
             let recordingPart = best.recordingId ?? "noRec"

@@ -9,13 +9,12 @@
 import Combine
 import SwiftUI
 
-/// Root tabs (Home, All Day, Library, Settings, Progress)
+/// Consumer-facing root tabs. Settings is presented from Today.
 enum RootTab: Int, CaseIterable {
-    case home = 0  // Root tab for Home
-    case allDay = 1  // Root tab for All Day
-    case library = 2  // Root tab for Library
-    case settings = 3  // Root tab for Settings
-    case progress = 4  // Root tab for Progress
+    case home = 0
+    case allDay = 1
+    case library = 2
+    case progress = 3
 }
 
 /// App-level routing: tab selection so Home can navigate to the Momentum tab.
@@ -25,14 +24,27 @@ final class AppRouter: ObservableObject {
     @Published var selectedRootTab: RootTab = .home
 
     /// Library sub-tab (used when we navigate to Library)
-    @Published var selectedLibraryTab: LibraryTab = .sessions
+    @Published var selectedLibraryTab: LibraryTab = .insights
 
     /// Optional selected date for Momentum so Home can pass the day we should show
     @Published var momentumSelectedDate: Date? = nil
+
+    /// Intention selected from an actionable reminder. Home consumes this by
+    /// opening the existing manual progress sliders.
+    @Published var progressUpdateIntentionID: String? = nil
 
     /// Call from Home momentum card: switch to root Momentum tab and seed its date.
     func navigateToMomentum(date: Date) {
         momentumSelectedDate = date  // Remember which day to show in Momentum
         selectedRootTab = .progress  // Switch root tab to the Momentum screen (formerly Progress slot)
+    }
+
+    func navigateToProgressUpdate(intentionID: String?) {
+        progressUpdateIntentionID = intentionID
+        selectedRootTab = .home
+    }
+
+    func consumeProgressUpdateRoute() {
+        progressUpdateIntentionID = nil
     }
 }

@@ -17,7 +17,7 @@ struct DraftIntention: Identifiable {
     var unit: String
     var timeframe: String  // "daily" or "weekly"
     
-    static let maxCount = 10  // maximum intentions user can add; single source of truth for cap
+    static let maxCount = SubscriptionConfig.maximumActiveIntentions // shared product-wide safety cap
     
     static let unitOptions = ["pages", "minutes", "sessions", "steps", "reps", "cups", "glasses", "times"] // added "times" to align with parser defaults
     
@@ -43,10 +43,21 @@ struct DraftIntention: Identifiable {
             createdAt: Date()
         )
     }
+
+    /// Compares only fields the user can edit. A freshly created blank Add card
+    /// has a new UUID, but that implementation detail must not make it dirty.
+    func hasEditableChanges(comparedTo other: DraftIntention) -> Bool {
+        title != other.title
+        || targetValue != other.targetValue
+        || unit != other.unit
+        || timeframe.lowercased() != other.timeframe.lowercased()
+    }
 }
 
 struct EditIntentionsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     
     /// Draft intentions (max 10, from DraftIntention.maxCount)
     @State private var draftIntentions: [DraftIntention] = [] // holds current working list for existing intentions
@@ -66,8 +77,28 @@ struct EditIntentionsView: View {
     @State private var baselineDrafts: [DraftIntention] = [] // original loaded drafts for change comparison
     /// Baseline snapshot of add draft for dirty-state detection.
     @State private var baselineAddDraft: DraftIntention = DraftIntention.empty() // original add-card state (empty)
+    /// Presents Pro when a Free user tries to create a second intention.
+    @State private var showIntentionLimitPaywall = false
+    private let initialAddDraft: DraftIntention?
+    private let onSuggestedIntentionSaved: (() -> Void)?
+    private let replacementIntentionId: String?
+    private let replacementIntentionTitle: String?
     /// Shared haptic generator for slider snaps.
     private let hapticEngine = UIImpactFeedbackGenerator(style: .light) // reused to avoid reallocating per snap
+
+    init(
+        initialAddDraft: DraftIntention? = nil,
+        onSuggestedIntentionSaved: (() -> Void)? = nil,
+        replacementIntentionId: String? = nil,
+        replacementIntentionTitle: String? = nil
+    ) {
+        self.initialAddDraft = initialAddDraft
+        self.onSuggestedIntentionSaved = onSuggestedIntentionSaved
+        self.replacementIntentionId = replacementIntentionId
+        self.replacementIntentionTitle = replacementIntentionTitle
+        _addDraft = State(initialValue: initialAddDraft ?? DraftIntention.empty())
+        _isAddExpanded = State(initialValue: initialAddDraft != nil)
+    }
     
     var body: some View {
         NavigationStack {
@@ -87,10 +118,43 @@ struct EditIntentionsView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         List {
+                            intentionGuideCard
+                                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 6, trailing: 12))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+
+                            if let replacementIntentionTitle, initialAddDraft != nil {
+                                Label(
+                                    "Ready to replace “\(replacementIntentionTitle)” with this suggestion. Nothing changes until you tap Save.",
+                                    systemImage: "arrow.triangle.swap"
+                                )
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(AttuneTheme.warning)
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(AttuneTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                            }
+
+                            if hasValidationIssue {
+                                Label("Each intention needs a name and a target greater than zero.", systemImage: "exclamationmark.circle.fill")
+                                    .font(.footnote)
+                                    .foregroundStyle(AttuneTheme.warning)
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(AttuneTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                            }
+
                             AddIntentionCard( // inline Add card per spec
                                 draft: $addDraft, // bind to add draft state
                                 isExpanded: $isAddExpanded, // controls expansion
-                                disableAdd: draftIntentions.count >= DraftIntention.maxCount, // enforce max cap
+                                disableAdd: !subscriptionManager.canAddIntention(currentCount: draftIntentions.count), // enforce plan + app caps
+                                onDisabledTap: handleDisabledAddTap,
                                 onExpand: { collapseAllForAdd() }, // ensure only one expanded at a time
                                 onParsed: { parsed in applyParsedToAddDraft(parsed) }, // route record parse into add draft
                                 hapticEngine: hapticEngine, // share haptic generator
@@ -139,6 +203,18 @@ struct EditIntentionsView: View {
                                         )
                                         .shadow(color: NeonPalette.darkShadow.opacity(0.2), radius: 4, x: 0, y: 2) // very soft shadow to avoid expensive/heavy depth effects
                                         .transition(.opacity.combined(with: .move(edge: .top))) // smooth show/hide
+
+                                        Button(role: .destructive) {
+                                            pendingDeleteDraftId = draft.id
+                                            let trimmedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            pendingDeleteDraftTitle = trimmedTitle.isEmpty ? "this intention" : "\"\(trimmedTitle)\""
+                                        } label: {
+                                            Label("Delete Intention", systemImage: "trash")
+                                                .font(.subheadline.weight(.semibold))
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .tint(AttuneTheme.recording)
                                     }
                                 }
                                 .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // spacing for glass cards
@@ -156,7 +232,7 @@ struct EditIntentionsView: View {
                     }
                 }
             }
-            .navigationTitle("Edit Intentions")
+            .navigationTitle("Intentions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -225,16 +301,69 @@ struct EditIntentionsView: View {
             } message: {
                 Text("Delete \(pendingDeleteDraftTitle)?")
             }
+            .sheet(isPresented: $showIntentionLimitPaywall) {
+                PaywallView(reason: "Free includes one active intention. Upgrade to Attune Pro to track more goals at once.")
+                    .environmentObject(subscriptionManager)
+            }
         }
     }
     
     private var canSave: Bool {
         hasChanges // requires real changes
+        && !hasValidationIssue
         && ( // allow either normal non-empty saves or explicit "clear all" saves
             !validIntentionsForSave.isEmpty // standard path: at least one valid intention remains
             || isClearingAllIntentions // special path: user removed every intention and wants to persist empty set
         ) // close save eligibility gate
     } // end canSave
+
+    private var intentionGuideCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "target")
+                .font(.title3)
+                .foregroundStyle(AttuneTheme.accent)
+                .frame(width: 36, height: 36)
+                .background(AttuneTheme.accent.opacity(0.14), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text("What do you want to move forward?")
+                    .font(.headline)
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text(intentionLimitDescription)
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .attuneCard()
+    }
+
+    private var intentionLimitDescription: String {
+        if subscriptionManager.hasPremiumAccess {
+            return "Choose a measurable target and whether it resets daily or weekly. You can track up to \(DraftIntention.maxCount)."
+        }
+        return "Free includes one active intention. Attune Pro lets you track up to \(DraftIntention.maxCount) at once."
+    }
+
+    private func handleDisabledAddTap() {
+        guard !subscriptionManager.hasPremiumAccess else { return }
+        showIntentionLimitPaywall = true
+    }
+
+    private var hasValidationIssue: Bool {
+        if draftIntentions.contains(where: { !isValidDraft($0) }) {
+            return true
+        }
+
+        let addHasChanges = addDraft.hasEditableChanges(comparedTo: baselineAddDraft)
+        return addHasChanges && !isValidDraft(addDraft)
+    }
+
+    private func isValidDraft(_ draft: DraftIntention) -> Bool {
+        !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && draft.targetValue > 0
+        && !draft.unit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
     
     /// True when user removed every intention from a previously non-empty baseline.
     private var isClearingAllIntentions: Bool {
@@ -265,7 +394,7 @@ struct EditIntentionsView: View {
     /// Detects whether any changes exist compared to baseline snapshots.
     private var hasChanges: Bool {
         // Check add draft change
-        if isDraftDifferent(addDraft, baselineAddDraft) { // compare add card to baseline
+        if addDraft.hasEditableChanges(comparedTo: baselineAddDraft) { // ignore the blank card's generated id
             return true // changed
         }
         // Check deletions or insertions
@@ -286,10 +415,7 @@ struct EditIntentionsView: View {
     /// Field-wise comparison for dirty tracking.
     private func isDraftDifferent(_ lhs: DraftIntention, _ rhs: DraftIntention) -> Bool {
         lhs.id != rhs.id // id difference counts as change
-        || lhs.title != rhs.title // title change
-        || lhs.targetValue != rhs.targetValue // target change
-        || lhs.unit != rhs.unit // unit change
-        || lhs.timeframe.lowercased() != rhs.timeframe.lowercased() // timeframe change with normalization
+        || lhs.hasEditableChanges(comparedTo: rhs) // user-editable field change
     } // end isDraftDifferent
     
     private func deleteDraft(at offsets: IndexSet) {
@@ -307,7 +433,7 @@ struct EditIntentionsView: View {
     
     /// Ensures only the Add card is expanded.
     private func collapseAllForAdd() {
-        withAnimation(.easeInOut(duration: 0.2)) { // smooth expand animation
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { // smooth expand animation
             expandedEditId = nil // collapse any open edit row
             isAddExpanded = true // expand add card
         }
@@ -315,7 +441,7 @@ struct EditIntentionsView: View {
     
     /// Toggles expansion for a specific intention id while collapsing others.
     private func toggleEditExpansion(for id: String) {
-        withAnimation(.easeInOut(duration: 0.2)) { // animate expand/collapse
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { // animate expand/collapse
             if expandedEditId == id { // if already open
                 expandedEditId = nil // collapse
             } else {
@@ -328,7 +454,7 @@ struct EditIntentionsView: View {
     /// Applies parsed intentions into the Add card fields (first parsed only).
     private func applyParsedToAddDraft(_ parsed: [ParsedIntention]) {
         guard let first = parsed.first else { return } // nothing to apply
-        withAnimation(.easeInOut(duration: 0.2)) { // animate opening add card when populated
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { // animate opening add card when populated
             isAddExpanded = true // open add card to show populated fields
             expandedEditId = nil // ensure exclusivity
         }
@@ -362,7 +488,7 @@ struct EditIntentionsView: View {
             // Defer UI update to next run loop so sheet animation can complete;
             // avoids "multiple updates per frame" and keyboard snapshot errors.
             DispatchQueue.main.async {
-                draftIntentions = results.map { r in
+                draftIntentions = results.filter { $0.id != replacementIntentionId }.map { r in
                     DraftIntention(
                         id: r.id,
                         title: r.title,
@@ -371,11 +497,13 @@ struct EditIntentionsView: View {
                         timeframe: r.timeframe
                     )
                 }
-                baselineDrafts = draftIntentions // capture baseline for dirty tracking
-                addDraft = DraftIntention.empty() // reset add card to empty on load
-                baselineAddDraft = addDraft // align baseline add draft id with current add draft
+                baselineDrafts = results.map { r in
+                    DraftIntention(id: r.id, title: r.title, targetValue: r.targetValue, unit: r.unit, timeframe: r.timeframe)
+                } // keep the full saved baseline so replacement is an explicit pending deletion
+                addDraft = initialAddDraft ?? DraftIntention.empty() // optionally review a suggested intention
+                baselineAddDraft = DraftIntention.empty() // suggestion remains an explicit unsaved change
                 expandedEditId = nil // collapse edits on load
-                isAddExpanded = false // collapse add card on load
+                isAddExpanded = initialAddDraft != nil // show every suggested field before Save
                 isLoadingDraft = false
             }
         }
@@ -388,6 +516,25 @@ struct EditIntentionsView: View {
             dismiss() // no persistable intention changes, so close sheet
             return // stop early
         } // end guard
+
+        let baselineIDs = Set(baselineDrafts.map(\.id))
+        let proposedIDs = valid.map(\.id)
+        guard subscriptionManager.canSaveIntentions(baselineIDs: baselineIDs, proposedIDs: proposedIDs) else {
+            AppLogger.log(AppLogger.STORE, "EditIntentions blocked by subscription policy baseline=\(baselineIDs.count) proposed=\(proposedIDs.count)")
+            if !subscriptionManager.hasPremiumAccess {
+                showIntentionLimitPaywall = true
+            }
+            return
+        }
+
+        let baselineByID = Dictionary(uniqueKeysWithValues: baselineDrafts.map { ($0.id, $0) })
+        let proposedByID = Dictionary(uniqueKeysWithValues: valid.map { ($0.id, $0) })
+        let createdCount = proposedByID.keys.filter { baselineByID[$0] == nil }.count
+        let archivedCount = baselineByID.keys.filter { proposedByID[$0] == nil }.count
+        let editedCount = proposedByID.values.filter { draft in
+            guard let baseline = baselineByID[draft.id] else { return false }
+            return draft.hasEditableChanges(comparedTo: baseline)
+        }.count
         
         do {
             // 1. Save each intention (create or update) and collect IDs
@@ -402,6 +549,12 @@ struct EditIntentionsView: View {
             _ = try IntentionSetStore.shared.updateCurrentIntentionSet(intentionIds: intentionIds)
             
             AppLogger.log(AppLogger.STORE, "EditIntentions saved IntentionSet with \(intentionIds.count) intentions")
+            EngagementMetricsStore.shared.record(.intentionCreated, quantity: createdCount)
+            EngagementMetricsStore.shared.record(.intentionEdited, quantity: editedCount)
+            EngagementMetricsStore.shared.record(.intentionArchived, quantity: archivedCount)
+            if let initialAddDraft, valid.contains(where: { $0.id == initialAddDraft.id }) {
+                onSuggestedIntentionSaved?()
+            }
             
             baselineDrafts = draftIntentions // update baseline to latest saved existing drafts
             addDraft = DraftIntention.empty() // clear add card after save
@@ -429,7 +582,7 @@ private struct IntentionSummaryRow: View {
                 Text(displayTitle) // primary intention title text with empty fallback
                     .font(.headline) // clear hierarchy for quick scanning
                     .foregroundColor(.white) // force high-contrast title on dark glass background for readability
-                Text("\(displayValue) \(displayUnit) • \(displayTimeframe)") // concise metadata line with value + unit + cadence
+                Text("\(displayValue) \(displayUnit) \(displayTimeframe)")
                     .font(.subheadline) // secondary text scale for supporting details
                     .foregroundColor(NeonPalette.neonTeal.opacity(0.72)) // teal-tinted support text to match Home accent without losing contrast
             }
@@ -465,7 +618,7 @@ private struct IntentionSummaryRow: View {
     
     /// Human-friendly timeframe display string.
     private var displayTimeframe: String {
-        draft.timeframe.lowercased() == "weekly" ? "weekly" : "daily" // normalize unexpected values to daily for consistent copy
+        draft.timeframe.lowercased() == "weekly" ? "per week" : "per day"
     }
 }
 
@@ -500,6 +653,9 @@ private struct InlineIntentionEditor: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) { // compact stack keeps controls closer for quicker scanning/editing
+            Text("Intention")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textSecondary)
             TextField("Title", text: $draft.title) // title input
                 .textFieldStyle(.plain) // plain style for glass aesthetic
                 .foregroundColor(.white) // white text for dark bg
@@ -518,6 +674,15 @@ private struct InlineIntentionEditor: View {
                 }
             
             VStack(alignment: .leading, spacing: 8) { // tighter value group reduces empty vertical gaps
+                HStack {
+                    Text("Target")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                    Spacer()
+                    Text("\(Self.displayString(for: draft.targetValue)) \(displayUnitAbbreviation) \(targetPeriodText)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.accent)
+                }
                 HStack(spacing: 10) { // tighter horizontal spacing keeps related controls visually grouped
                     Slider(
                         value: $draft.targetValue, // bind to numeric value
@@ -535,7 +700,7 @@ private struct InlineIntentionEditor: View {
                         onValueChanged() // propagate dirty state
                     }
                     
-                    Text("\(Self.displayString(for: draft.targetValue)) \(displayUnitAbbreviation)") // live value label
+                    Text("\(Self.displayString(for: draft.targetValue))") // live value label
                         .font(.system(size: 18, weight: .semibold)) // slightly smaller type reduces visual heaviness in compact editor
                         .foregroundColor(NeonPalette.neonTeal) // teal numeric readout to mirror Home progress cards
                         .monospacedDigit() // monospaced for stability
@@ -560,12 +725,21 @@ private struct InlineIntentionEditor: View {
                     .onChange(of: manualValueText) { _, newValue in // parse manual edits
                         applyManualValueInput(newValue) // sync numeric value
                     }
+
+                if draft.targetValue <= 0 {
+                    Label("Enter a target greater than zero", systemImage: "exclamationmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(AttuneTheme.warning)
+                }
             }
-            
-            HStack(spacing: 10) { // tighter unit/timeframe row improves scan speed
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Measure in")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textSecondary)
                 Picker("Unit", selection: $draft.unit) { // unit picker
                     ForEach(DraftIntention.unitOptions, id: \.self) { unit in
-                        Text(unit).tag(unit) // unit option
+                        Text(unit.capitalized).tag(unit) // unit option
                     }
                 }
                 .pickerStyle(.menu) // compact menu style
@@ -573,7 +747,10 @@ private struct InlineIntentionEditor: View {
                     applyUnitReset() // reset value defaults for unit
                     onUnitChanged() // notify parent
                 }
-                
+
+                Text("Target period")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textSecondary)
                 Picker("Timeframe", selection: $draft.timeframe) { // timeframe picker
                     Text("Daily").tag("daily") // daily option
                     Text("Weekly").tag("weekly") // weekly option
@@ -582,6 +759,10 @@ private struct InlineIntentionEditor: View {
                 .onChange(of: draft.timeframe) { _, _ in // timeframe change
                     onUnitChanged() // still counts as dirty
                 }
+
+                Text(draft.timeframe.lowercased() == "weekly" ? "This target is measured across the full week." : "This target starts fresh each day.")
+                    .font(.caption)
+                    .foregroundStyle(AttuneTheme.textTertiary)
             }
         }
         .padding(12) // compact internal padding keeps edit panel dense and fast to read
@@ -608,6 +789,10 @@ private struct InlineIntentionEditor: View {
         case "pages": return "pg" // pages abbreviation
         default: return draft.unit // fallback
         }
+    }
+
+    private var targetPeriodText: String {
+        draft.timeframe.lowercased() == "weekly" ? "per week" : "per day"
     }
     
     /// Applies soft snap near multiples of 10 after slider release.
@@ -671,6 +856,7 @@ private struct AddIntentionCard: View {
     @Binding var draft: DraftIntention // add draft binding
     @Binding var isExpanded: Bool // expansion flag
     let disableAdd: Bool // disables interaction when at cap
+    let onDisabledTap: () -> Void // routes Free plan limit taps to Pro
     let onExpand: () -> Void // called when expanding add card
     let onParsed: ([ParsedIntention]) -> Void // routes parsed intentions into add draft
     let hapticEngine: UIImpactFeedbackGenerator // shared haptic
@@ -681,7 +867,10 @@ private struct AddIntentionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button(action: {
-                guard !disableAdd else { return } // prevent expansion when at cap
+                guard !disableAdd else {
+                    onDisabledTap()
+                    return
+                } // prevent expansion when at cap
                 onExpand() // collapse others, expand add
             }) {
                 HStack {
@@ -695,7 +884,7 @@ private struct AddIntentionCard: View {
                 .padding(.vertical, 8) // padding for tap target
             }
             .buttonStyle(.plain) // keep custom styling
-            .disabled(disableAdd) // respect cap
+            .opacity(disableAdd ? 0.65 : 1) // keep tappable so Free users get an explanation
             
             if let recordStatus { // show status when present
                 Text(recordStatus) // status text
@@ -707,7 +896,7 @@ private struct AddIntentionCard: View {
                 VStack(spacing: 10) { // tighter spacing keeps expanded add editor compact
                     RecordIntentionsSection(onIntentionsParsed: { parsed in // embed record UI
                         onParsed(parsed) // populate add draft fields
-                        recordStatus = parsed.isEmpty ? "No intentions found." : "Parsed into Add card. Review then Save." // status message
+                        recordStatus = parsed.isEmpty ? "No intentions found." : "Attune filled this in. Review it, then save." // status message
                         onDirty() // mark dirty
                     })
                     
@@ -862,6 +1051,8 @@ private struct IntentionCardVariation {
 /// Compact pill button style for Record Intentions: red gradient, soft shadow, centered.
 /// Kept local to EditIntentionsView; minimal scope per constraints.
 private struct RecordIntentionsPillStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold)) // readable but not oversized
@@ -880,8 +1071,8 @@ private struct RecordIntentionsPillStyle: ButtonStyle {
             )
             .clipShape(Capsule()) // pill/oval shape
             .shadow(color: Color.black.opacity(0.14), radius: 4, x: 0, y: 2) // flatter shadow keeps CTA crisp without heavy glow
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1.0)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
@@ -919,7 +1110,7 @@ private struct RecordIntentionsSection: View { // encapsulates record flow UI
             .padding(.bottom, 4)
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView(reason: "Voice Record Intentions is included with Attune Monthly. You can still add intentions manually for free.")
+            PaywallView(reason: "Creating tracked intentions by voice is included with Attune Pro. You can still add intentions manually on Free.")
                 .environmentObject(subscriptionManager)
         }
     } // end body

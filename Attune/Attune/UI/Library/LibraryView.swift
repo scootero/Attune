@@ -2,127 +2,345 @@
 //  LibraryView.swift
 //  Attune
 //
-//  Debug cockpit: toggle between Sessions, Segments, and Insights views.
-//  Sessions tab has sub-picker: All-day (sessions) | Check-ins.
+//  Consumer Insights home: recent captures, themes, and recording history.
+//  The former segment/debug cockpit is intentionally not part of this surface.
 //
 
 import SwiftUI
 
-/// Sub-tab for Sessions: All-day recordings vs Check-ins
-private enum SessionsSubTab {
-    case allDay
-    case checkIns
-}
-
 struct LibraryView: View {
-    @EnvironmentObject var appRouter: AppRouter
-    
-    /// When Sessions is selected: All-day or Check-ins sub-tab
-    @State private var sessionsSubTab: SessionsSubTab = .allDay
-    
-    /// Loaded sessions from disk (for All-day list)
+    @State private var items: [ExtractedItem] = []
+    @State private var topics: [TopicAggregate] = []
+    @State private var corrections: [String: ItemCorrection] = [:]
     @State private var sessions: [Session] = []
-    
-    /// Loaded check-ins from disk (for Check-ins list)
     @State private var checkIns: [CheckIn] = []
-    
+
     var body: some View {
-        NavigationStack {  // Use NavigationStack so ProgressContentView's navigationDestination works (NavigationView does not support it)
-            VStack(spacing: 0) {
-                // Top-level segmented picker (Sessions, Segments, Insights, Momentum)
-                Picker("View", selection: $appRouter.selectedLibraryTab) {
-                    Text("Sessions").tag(LibraryTab.sessions)
-                    Text("Segments").tag(LibraryTab.segments)
-                    Text("Insights").tag(LibraryTab.insights)
-                    Text("Progress").tag(LibraryTab.momentum) // Rename tab label to Progress while keeping enum for minimal churn
-                }
-                .pickerStyle(.segmented)
-                .padding()
-                
-                // When Sessions tab: show All-day | Check-ins sub-picker
-                if appRouter.selectedLibraryTab == .sessions {
-                    Picker("Sessions content", selection: $sessionsSubTab) {
-                        Text("All-day").tag(SessionsSubTab.allDay)
-                        Text("Check-ins").tag(SessionsSubTab.checkIns)
+        NavigationStack {
+            ZStack {
+                AttuneScreenBackground()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        header
+
+                        if visibleItems.isEmpty && visibleTopics.isEmpty {
+                            emptyState
+                        } else {
+                            summaryCard
+                            themesSection
+                            recentSection
+                        }
+
+                        if CalendarFeature.isEnabled {
+                            calendarSection
+                        }
+
+                        historySection
                     }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
+                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.top, 12)
+                    .padding(.bottom, 104)
                 }
-                
-                // Content based on selected tab
-                contentView
+                .scrollIndicators(.hidden)
+                .refreshable { loadData() }
             }
-            .navigationTitle(appRouter.selectedLibraryTab == .momentum ? "Progress" : "Library") // Show Progress title when the repurposed tab is selected
-            .onAppear {
-                loadData()
+            .toolbar(.hidden, for: .navigationBar)
+            .onAppear(perform: loadData)
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Insights")
+                    .font(.title.bold())
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text("What you’ve said—and what keeps coming up.")
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
             }
-            .refreshable {
-                loadData()
+
+            Spacer(minLength: 4)
+
+            if CalendarFeature.isEnabled {
+                NavigationLink(destination: AttuneCalendarView()) {
+                    Label("Calendar", systemImage: "calendar")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.accent)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 36)
+                        .background(AttuneTheme.accent.opacity(0.12), in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .stroke(AttuneTheme.accent.opacity(0.28), lineWidth: 1)
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens your captured events calendar")
             }
         }
     }
-    
-    /// Content for current tab selection
-    @ViewBuilder
-    private var contentView: some View {
-        switch appRouter.selectedLibraryTab {
-        case .sessions:
-            sessionsContentView
-        case .segments:
-            if sessions.isEmpty {
-                libraryEmptyState(message: "Start a recording to create your first session")
-            } else {
-                SegmentListView()
+
+    private var summaryCard: some View {
+        HStack(spacing: 0) {
+            summaryMetric(value: visibleItems.count, label: "Captured", icon: "sparkles")
+            Rectangle()
+                .fill(AttuneTheme.border)
+                .frame(width: 1, height: 40)
+            summaryMetric(value: recurringTopicCount, label: "Recurring", icon: "repeat")
+            Rectangle()
+                .fill(AttuneTheme.border)
+                .frame(width: 1, height: 40)
+            summaryMetric(value: sessions.count, label: "Sessions", icon: "waveform")
+        }
+        .padding(.vertical, 14)
+        .attuneCard()
+    }
+
+    private func summaryMetric(value: Int, label: String, icon: String) -> some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(AttuneTheme.accent)
+                    .accessibilityHidden(true)
+                Text("\(value)")
+                    .font(.headline.monospacedDigit())
+                    .foregroundStyle(AttuneTheme.textPrimary)
             }
-        case .insights:
-            InsightsListView()
-        case .momentum:
-            ProgressContentView() // Show Progress content inside Library for the renamed tab
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(AttuneTheme.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label), \(value)")
+    }
+
+    private var themesSection: some View {
+        Group {
+            if !featuredTopics.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionHeader(
+                        title: recurringTopicCount > 0 ? "Recurring themes" : "Themes forming",
+                        subtitle: recurringTopicCount > 0 ? "Ideas you’ve returned to." : "Related ideas Attune has started grouping.",
+                        destination: InsightsListView(initialTab: .themes)
+                    )
+
+                    ForEach(featuredTopics) { summary in
+                        NavigationLink(destination: TopicDetailView(topic: summary.topic)) {
+                            TopicSummaryRow(summary: summary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
     }
-    
-    /// Sessions tab content: All-day list or Check-ins list
-    @ViewBuilder
-    private var sessionsContentView: some View {
-        switch sessionsSubTab {
-        case .allDay:
-            if sessions.isEmpty {
-                libraryEmptyState(message: "Start a recording to create your first session")
-            } else {
-                SessionListView(sessions: sessions)
+
+    private var recentSection: some View {
+        Group {
+            if !visibleItems.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionHeader(
+                        title: "Recent captures",
+                        subtitle: "Organized when you talk things out.",
+                        destination: InsightsListView(initialTab: .captures)
+                    )
+
+                    ForEach(Array(visibleItems.prefix(2))) { item in
+                        NavigationLink(destination: InsightDetailView(item: item)) {
+                            InsightCaptureRow(item: item, correction: corrections[item.id])
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
-        case .checkIns:
-            CheckInsListView(checkIns: checkIns, title: "Check-ins")
         }
     }
-    
-    /// Shared empty state for Library (sessions/segments)
-    private func libraryEmptyState(message: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "tray")
-                .font(.system(size: 64))
-                .foregroundColor(.secondary)
-            Text("No Data Yet")
-                .font(.title2)
-                .fontWeight(.semibold)
-            Text(message)
+
+    private func sectionHeader<Destination: View>(title: String, subtitle: String, destination: Destination) -> some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+            Spacer()
+            NavigationLink(destination: destination) {
+                Text("View all")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.accent)
+            }
+        }
+    }
+
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("History")
+                .font(.headline)
+                .foregroundStyle(AttuneTheme.textPrimary)
+
+            VStack(spacing: 0) {
+                NavigationLink(destination: SessionListView(sessions: sessions)) {
+                    historyRow(
+                        title: "Past sessions",
+                        detail: "\(sessions.count) saved",
+                        icon: "waveform"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Divider().overlay(AttuneTheme.border)
+
+                NavigationLink(destination: CheckInsListView(checkIns: checkIns, title: "Voice Check-Ins")) {
+                    historyRow(
+                        title: "Voice check-ins",
+                        detail: "\(checkIns.count) saved",
+                        icon: "mic"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .attuneCard()
+        }
+    }
+
+    private var calendarSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Plan from your captures")
+                .font(.headline)
+                .foregroundStyle(AttuneTheme.textPrimary)
+
+            NavigationLink(destination: AttuneCalendarView()) {
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar")
+                        .font(.headline)
+                        .foregroundStyle(AttuneTheme.accent)
+                        .frame(width: 38, height: 38)
+                        .background(AttuneTheme.accent.opacity(0.12), in: Circle())
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Calendar")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AttuneTheme.textPrimary)
+                        Text(calendarCaptureCount == 0
+                             ? (undatedCalendarEventCount == 0
+                                ? "Clear dates and times will appear here."
+                                : "\(undatedCalendarEventCount) event\(undatedCalendarEventCount == 1 ? "" : "s") need a date")
+                             : "\(calendarCaptureCount) dated capture\(calendarCaptureCount == 1 ? "" : "s")")
+                            .font(.caption)
+                            .foregroundStyle(AttuneTheme.textSecondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.textTertiary)
+                }
+                .padding(14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .attuneCard()
+        }
+    }
+
+    private var calendarCaptureCount: Int {
+        CalendarCaptureParser.captures(from: items, corrections: corrections).count
+    }
+
+    private var undatedCalendarEventCount: Int {
+        CalendarCaptureParser.undatedCaptures(from: items, corrections: corrections).count
+    }
+
+    private func historyRow(title: String, detail: String, icon: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.headline)
+                .foregroundStyle(AttuneTheme.accent)
+                .frame(width: 34, height: 34)
+                .background(AttuneTheme.accent.opacity(0.12), in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textTertiary)
+        }
+        .padding(14)
+        .contentShape(Rectangle())
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(AttuneTheme.accent)
+            Text("Your patterns will appear here")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textPrimary)
+            Text("Use Talk it out and speak naturally. Attune will organize clear intentions, commitments, events, and states—and group related ideas over time.")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundStyle(AttuneTheme.textSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(22)
+        .frame(maxWidth: .infinity)
+        .attuneCard()
     }
-    
-    /// Loads sessions and check-ins from disk
+
+    private var visibleItems: [ExtractedItem] {
+        items.filter { !($0.applyingCorrection(corrections[$0.id]).isMarkedIncorrect) }
+    }
+
+    private var visibleTopics: [ConsumerTopicSummary] {
+        topics.compactMap { topic in
+            let occurrences = ItemResolver.resolveItems(itemIds: topic.itemIds)
+                .filter { !($0.applyingCorrection(corrections[$0.id]).isMarkedIncorrect) }
+                .sorted { $0.createdAt > $1.createdAt }
+            guard !occurrences.isEmpty else { return nil }
+            return ConsumerTopicSummary(topic: topic, occurrences: occurrences)
+        }
+        .sorted { lhs, rhs in
+            if lhs.mentionCount != rhs.mentionCount { return lhs.mentionCount > rhs.mentionCount }
+            return lhs.topic.lastSeenAtISO > rhs.topic.lastSeenAtISO
+        }
+    }
+
+    private var recurringTopicCount: Int {
+        visibleTopics.filter { $0.mentionCount > 1 }.count
+    }
+
+    private var featuredTopics: [ConsumerTopicSummary] {
+        let recurring = visibleTopics.filter { $0.mentionCount > 1 }
+        return recurring.isEmpty ? Array(visibleTopics.prefix(2)) : Array(recurring.prefix(2))
+    }
+
     private func loadData() {
-        sessions = SessionStore.shared.loadAllSessions()
-        checkIns = CheckInStore.shared.loadAllCheckIns()
+        corrections = CorrectionsStore.shared.loadCorrections()
+        items = ExtractionStore.shared.loadAllExtractions()
+        topics = Array(TopicAggregateStore.shared.loadTopics().values)
+        sessions = SessionStore.shared.loadAllSessions().sorted { $0.startedAt > $1.startedAt }
+        checkIns = CheckInStore.shared.loadAllCheckIns().sorted { $0.createdAt > $1.createdAt }
     }
 }
 
-/// Represents the tabs in Library view
+// Kept for AppRouter source compatibility. The consumer Insights UI no longer
+// exposes these former debug-cockpit tabs.
 enum LibraryTab {
     case sessions
     case segments
@@ -132,5 +350,4 @@ enum LibraryTab {
 
 #Preview {
     LibraryView()
-        .environmentObject(AppRouter())
 }

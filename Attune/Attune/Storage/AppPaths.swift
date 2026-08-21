@@ -42,6 +42,22 @@ struct AppPaths {
     static var correctionsFileURL: URL {
         baseDir.appendingPathComponent("Corrections.json")
     }
+
+    /// Additive Phase 4 state: cadence, outstanding suggestion, and user decisions.
+    static var intentionSuggestionsFileURL: URL {
+        baseDir.appendingPathComponent("IntentionSuggestions.json")
+    }
+
+    /// Reversible UI-only focus state; never changes the active IntentionSet.
+    static var oneThingModeFileURL: URL {
+        baseDir.appendingPathComponent("OneThingMode.json")
+    }
+
+    /// Privacy-safe local usage totals and review-prompt eligibility state.
+    /// Contains counts and dates only; never user-entered content.
+    static var engagementMetricsFileURL: URL {
+        baseDir.appendingPathComponent("EngagementMetrics.json")
+    }
     
     /// Audio directory for a specific session: Documents/Attune/Audio/<sessionId>/
     /// Each session has its own audio subdirectory

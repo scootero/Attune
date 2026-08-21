@@ -120,6 +120,11 @@ final class ProgressStore {
             sourceCheckInId: sourceCheckInId
         )
         try saveProgressEntry(entry)
+        EngagementMetricsStore.shared.record(
+            .voiceProgressUpdated,
+            eventID: "progress-entry:\(entry.id)",
+            at: entry.createdAt
+        )
         return entry
     }
 }

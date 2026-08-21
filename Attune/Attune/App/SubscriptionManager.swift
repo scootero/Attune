@@ -2,174 +2,251 @@
 //  SubscriptionManager.swift
 //  Attune
 //
-//  StoreKit 2 helper: loads the monthly product, purchases, restores,
-//  and tracks whether the user currently has an active subscription.
+//  StoreKit 2 subscription state and the single source for feature access.
 //
 
 import Combine
 import Foundation
 import StoreKit
 
-/// Owns StoreKit product + entitlement state for the rest of the UI.
-@MainActor
-final class SubscriptionManager: ObservableObject {
+enum SubscriptionActionState: Equatable {
+    case idle
+    case purchasing
+    case purchased
+    case pending
+    case cancelled
+    case restoring
+    case restored
+    case noActiveSubscription
+    case failed(String)
 
-    /// Shared instance injected via environmentObject from ContentView.
-    static let shared = SubscriptionManager()
-
-    /// True when the user has an active Attune Monthly subscription.
-    @Published private(set) var isSubscribed: Bool = false
-
-    /// Loaded StoreKit product (nil until loaded or if ASC product is missing).
-    @Published private(set) var product: Product?
-
-    /// True while a purchase / restore / product load is in flight.
-    @Published private(set) var isBusy: Bool = false
-
-    /// User-facing error from the last failed purchase/restore/load.
-    @Published var lastErrorMessage: String?
-
-    /// Watches StoreKit transaction updates in the background.
-    private var transactionListener: Task<Void, Never>?
-
-    private init() {
-        // Keep entitlement in sync when Apple delivers transaction updates.
-        transactionListener = Task { [weak self] in
-            for await update in Transaction.updates {
-                await self?.handle(transactionUpdate: update)
-            }
+    var message: String? {
+        switch self {
+        case .idle, .purchasing, .restoring:
+            return nil
+        case .purchased:
+            return "Attune Pro is active."
+        case .pending:
+            return "Purchase is pending approval. Pro will unlock when Apple completes it."
+        case .cancelled:
+            return "Purchase cancelled. You can continue using Attune Free."
+        case .restored:
+            return "Attune Pro was restored."
+        case .noActiveSubscription:
+            return "No active subscription was found for this Apple ID."
+        case .failed(let message):
+            return message
         }
-        Task { await refresh() }
     }
 
-    // MARK: - Public API
+    var isFailure: Bool {
+        if case .failed = self { return true }
+        return false
+    }
+}
 
-    /// Reloads product info and current entitlement from StoreKit.
+#if DEBUG
+enum DebugSubscriptionMode: String, CaseIterable, Identifiable {
+    case pro
+    case free
+    case system
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .pro: return "Pro"
+        case .free: return "Free"
+        case .system: return "System"
+        }
+    }
+}
+#endif
+
+@MainActor
+final class SubscriptionManager: ObservableObject {
+    static let shared = SubscriptionManager()
+
+    @Published private(set) var isSubscribed = false
+    @Published private(set) var productDetails: SubscriptionProductDetails?
+    @Published private(set) var isLoadingProduct = false
+    @Published private(set) var actionState: SubscriptionActionState = .idle
+
+    #if DEBUG
+    @Published var debugMode: DebugSubscriptionMode {
+        didSet {
+            if persistsDebugModeChanges {
+                UserDefaults.standard.set(debugMode.rawValue, forKey: Self.debugModeKey)
+            }
+        }
+    }
+    private static let debugModeKey = "attune.debug.subscriptionMode"
+    #endif
+
+    private let storeClient: SubscriptionStoreClient
+    private let persistsDebugModeChanges: Bool
+    private var transactionListener: Task<Void, Never>?
+
+    init(
+        storeClient: SubscriptionStoreClient? = nil,
+        listenForTransactions: Bool = true,
+        automaticallyRefresh: Bool = true,
+        persistsDebugModeChanges: Bool = true
+    ) {
+        self.storeClient = storeClient ?? LiveSubscriptionStoreClient()
+        self.persistsDebugModeChanges = persistsDebugModeChanges
+        #if DEBUG
+        let savedMode = UserDefaults.standard.string(forKey: Self.debugModeKey)
+            .flatMap(DebugSubscriptionMode.init(rawValue:))
+        debugMode = savedMode ?? .pro
+        #endif
+
+        if listenForTransactions {
+            transactionListener = Task { [weak self] in
+                for await update in Transaction.updates {
+                    guard let self else { return }
+                    if case .verified(let transaction) = update {
+                        await transaction.finish()
+                        await self.refreshEntitlement()
+                    }
+                }
+            }
+        }
+
+        if automaticallyRefresh {
+            Task { await refresh() }
+        }
+    }
+
+    deinit {
+        transactionListener?.cancel()
+    }
+
+    var isBusy: Bool {
+        actionState == .purchasing || actionState == .restoring
+    }
+
+    var isProductAvailable: Bool { productDetails != nil }
+
+    var hasPremiumAccess: Bool {
+        #if DEBUG
+        switch debugMode {
+        case .pro: return true
+        case .free: return false
+        case .system: return isSubscribed
+        }
+        #else
+        return isSubscribed
+        #endif
+    }
+
+    var accessPolicy: SubscriptionAccessPolicy {
+        SubscriptionAccessPolicy(hasProAccess: hasPremiumAccess)
+    }
+
     func refresh() async {
+        guard !isLoadingProduct else { return }
+        isLoadingProduct = true
+        defer { isLoadingProduct = false }
+        actionState = .idle
         await loadProduct()
         await refreshEntitlement()
     }
 
-    /// Starts a purchase for the monthly subscription.
+    func refreshEntitlement() async {
+        isSubscribed = await storeClient.hasCurrentMonthlyEntitlement()
+    }
+
     func purchase() async {
-        lastErrorMessage = nil
-        guard let product = product else {
-            lastErrorMessage = "Subscription is not available yet. Check your connection and try again."
+        guard !isBusy else { return }
+        guard isProductAvailable else {
+            actionState = .failed("Attune Pro isn’t available right now. Check your connection and try again.")
             await loadProduct()
             return
         }
 
-        isBusy = true
-        defer { isBusy = false }
-
+        actionState = .purchasing
         do {
-            let result = try await product.purchase()
-            switch result {
-            case .success(let verification):
-                let transaction = try checkVerified(verification)
-                await transaction.finish()
+            switch try await storeClient.purchaseMonthlyProduct() {
+            case .purchased:
                 await refreshEntitlement()
-            case .userCancelled:
-                break
+                actionState = isSubscribed
+                    ? .purchased
+                    : .failed("The purchase completed, but Pro access could not be verified yet. Try Restore Purchases.")
             case .pending:
-                lastErrorMessage = "Purchase is pending approval."
-            @unknown default:
-                lastErrorMessage = "Purchase could not be completed."
+                actionState = .pending
+            case .cancelled:
+                actionState = .cancelled
             }
         } catch {
-            lastErrorMessage = error.localizedDescription
+            actionState = .failed("The purchase couldn’t be completed. Please try again.")
+            AppLogger.log(AppLogger.ERR, "StoreKit purchase failed: \(error.localizedDescription)")
         }
     }
 
-    /// Restores previous purchases (required by App Store guidelines).
     func restore() async {
-        lastErrorMessage = nil
-        isBusy = true
-        defer { isBusy = false }
-
+        guard !isBusy else { return }
+        actionState = .restoring
         do {
-            try await AppStore.sync()
+            try await storeClient.restorePurchases()
             await refreshEntitlement()
-            if !isSubscribed {
-                lastErrorMessage = "No active subscription found for this Apple ID."
-            }
+            actionState = isSubscribed ? .restored : .noActiveSubscription
         } catch {
-            lastErrorMessage = error.localizedDescription
+            actionState = .failed("Purchases couldn’t be restored right now. Please try again.")
+            AppLogger.log(AppLogger.ERR, "StoreKit restore failed: \(error.localizedDescription)")
         }
     }
 
-    /// Free users get a daily check-in allowance; subscribers are unlimited.
     func canStartCheckIn(todayCheckInCount: Int) -> Bool {
-        if isSubscribed { return true }
-        return todayCheckInCount < SubscriptionConfig.freeCheckInsPerDay
+        accessPolicy.canStartCheckIn(todayCheckInCount: todayCheckInCount)
     }
 
-    /// All-day recording is a subscriber feature.
-    var canUseAllDayRecording: Bool { isSubscribed }
+    var canUseAllDayRecording: Bool { accessPolicy.canUseListeningSessions }
+    var canUseVoiceIntentions: Bool { accessPolicy.canUseVoiceIntentions }
 
-    /// Voice “Record Intentions” is a subscriber feature (manual add stays free).
-    var canUseVoiceIntentions: Bool { isSubscribed }
+    func canAddIntention(currentCount: Int) -> Bool {
+        accessPolicy.canAddIntention(currentCount: currentCount)
+    }
 
-    /// Price string from StoreKit when available, otherwise the known $5.99 fallback.
+    func canSaveIntentions(baselineIDs: Set<String>, proposedIDs: [String]) -> Bool {
+        accessPolicy.canSaveIntentions(baselineIDs: baselineIDs, proposedIDs: proposedIDs)
+    }
+
+    var canUseInsights: Bool { accessPolicy.canUseInsights }
+    var canUseMomentumHistory: Bool { accessPolicy.canUseMomentumHistory }
+    var canExportData: Bool { accessPolicy.canExportData }
+
     var priceText: String {
-        if let product = product {
-            return product.displayPrice + " / month"
+        if let productDetails {
+            return productDetails.displayPrice + " / month"
         }
         return SubscriptionConfig.displayPriceFallback
     }
 
-    // MARK: - Private
-
     private func loadProduct() async {
         do {
-            let products = try await Product.products(for: [SubscriptionConfig.monthlyProductID])
-            product = products.first
-            if product == nil {
-                lastErrorMessage = "Could not find subscription product. Create it in App Store Connect first."
+            productDetails = try await storeClient.loadMonthlyProduct()
+            if productDetails == nil {
+                actionState = .failed("Attune Pro is temporarily unavailable. Please try again later.")
             }
         } catch {
-            lastErrorMessage = error.localizedDescription
-        }
-    }
-
-    private func refreshEntitlement() async {
-        var hasActive = false
-        // currentEntitlements includes active auto-renewable subscriptions.
-        for await result in Transaction.currentEntitlements {
-            guard let transaction = try? checkVerified(result) else { continue }
-            if transaction.productID == SubscriptionConfig.monthlyProductID {
-                hasActive = true
-                break
-            }
-        }
-        isSubscribed = hasActive
-    }
-
-    private func handle(transactionUpdate: VerificationResult<Transaction>) async {
-        guard let transaction = try? checkVerified(transactionUpdate) else { return }
-        await transaction.finish()
-        await refreshEntitlement()
-    }
-
-    /// Unwraps StoreKit’s verified transaction or throws if the payload is untrusted.
-    private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
-        switch result {
-        case .unverified:
-            throw SubscriptionError.unverified
-        case .verified(let safe):
-            return safe
+            productDetails = nil
+            actionState = .failed("Attune Pro couldn’t be loaded. Check your connection and try again.")
+            AppLogger.log(AppLogger.ERR, "StoreKit product load failed: \(error.localizedDescription)")
         }
     }
 }
 
-/// Local errors for subscription verification failures.
 enum SubscriptionError: LocalizedError {
+    case productUnavailable
     case unverified
+    case unknownPurchaseResult
 
     var errorDescription: String? {
         switch self {
-        case .unverified:
-            return "Could not verify the App Store purchase."
+        case .productUnavailable: return "Attune Pro is unavailable."
+        case .unverified: return "Could not verify the App Store purchase."
+        case .unknownPurchaseResult: return "StoreKit returned an unknown purchase result."
         }
     }
 }

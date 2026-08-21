@@ -2,481 +2,214 @@
 //  InsightDetailView.swift
 //  Attune
 //
-//  Shows full details of an extracted item including provenance and metadata.
+//  Consumer detail for a stored extracted item. Technical extraction metadata
+//  remains in logs/debug storage, not in the primary experience.
 //
 
 import SwiftUI
 
 struct InsightDetailView: View {
-    /// The extracted item to display
     let item: ExtractedItem
-    
-    /// Current correction loaded from store
+
     @State private var correction: ItemCorrection?
-    
-    /// Edit sheet state
-    @State private var showingEditSheet = false
-    
+    @State private var showingReviewSheet = false
+
+    private var corrected: CorrectedItemView { item.applyingCorrection(correction) }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Corrections section (if any exist)
-                if correction != nil {
-                    CorrectionsSection(item: item, correction: $correction)
-                    Divider()
+        ZStack {
+            AttuneScreenBackground()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    captureHeader
+                    summaryCard
+
+                    if CalendarFeature.isEnabled,
+                       corrected.displayType == ExtractedItem.ItemType.event {
+                        scheduleCard
+                    }
+
+                    if !item.sourceQuote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        sourceCard
+                    }
+
+                    if let note = corrected.correctionNote, !note.isEmpty {
+                        noteCard(note)
+                    }
+
+                    trackingClarification
                 }
-                
-                // Item info section
-                ItemInfoSection(item: item, correction: correction)
-                
-                Divider()
-                
-                // Review status section
-                ReviewStatusSection(item: item)
-                
-                Divider()
-                
-                // Provenance section
-                ProvenanceSection(item: item)
-                
-                Divider()
-                
-                // Metadata section
-                MetadataSection(item: item)
+                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.top, 12)
+                .padding(.bottom, 96)
             }
-            .padding()
+            .scrollIndicators(.hidden)
         }
-        .navigationTitle("Insight")
+        .navigationTitle("Capture")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Edit") {
-                    showingEditSheet = true
-                }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Review") { showingReviewSheet = true }
             }
         }
-        .sheet(isPresented: $showingEditSheet) {
-            CorrectionEditSheet(item: item, correction: $correction)
+        .sheet(isPresented: $showingReviewSheet) {
+            CaptureReviewSheet(item: item, correction: $correction)
         }
         .onAppear {
-            loadCorrection()
+            correction = CorrectionsStore.shared.getCorrection(itemId: item.id)
         }
     }
-    
-    /// Loads correction from store
-    private func loadCorrection() {
-        correction = CorrectionsStore.shared.getCorrection(itemId: item.id)
-    }
-}
 
-// MARK: - Corrections Section
-
-struct CorrectionsSection: View {
-    let item: ExtractedItem
-    @Binding var correction: ItemCorrection?
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var captureHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("User Corrections")
-                    .font(.headline)
-                
+                TypeBadge(type: corrected.displayType)
                 Spacer()
-                
-                if correction?.isIncorrect == true {
-                    Label("Marked Incorrect", systemImage: "xmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                } else {
-                    Label("Corrected", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
+                if corrected.isMarkedIncorrect {
+                    Label("Hidden", systemImage: "eye.slash")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.textTertiary)
                 }
             }
-            
-            // Show what was corrected
-            if let correctedTitle = correction?.correctedTitle {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Corrected Title:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(correctedTitle)
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(.green)
-                }
-            }
-            
-            if let correctedType = correction?.correctedType {
-                HStack {
-                    Text("Corrected Type:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    TypeBadge(type: correctedType)
-                }
-            }
-            
-            if let correctedCategories = correction?.correctedCategories {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Corrected Categories:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(formatCategories(correctedCategories))
-                        .font(.body)
-                        .foregroundColor(.green)
-                }
-            }
-            
-            if let note = correction?.note, !note.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Note:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(note)
-                        .font(.caption)
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(8)
-                }
-            }
-        }
-        .padding(12)
-        .background(Color.green.opacity(0.05))
-        .cornerRadius(12)
-    }
-    
-    /// Formats categories for display
-    private func formatCategories(_ categories: [String]) -> String {
-        categories.map { category in
-            category.replacingOccurrences(of: "_", with: " ")
-                .capitalized
-        }.joined(separator: ", ")
-    }
-}
 
-// MARK: - Item Info Section
+            Text(corrected.displayTitle)
+                .font(.title2.bold())
+                .foregroundStyle(corrected.isMarkedIncorrect ? AttuneTheme.textSecondary : AttuneTheme.textPrimary)
 
-struct ItemInfoSection: View {
-    let item: ExtractedItem
-    let correction: ItemCorrection?
-    
-    /// Computed corrected view
-    private var correctedView: CorrectedItemView {
-        item.applyingCorrection(correction)
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Item Info")
-                    .font(.headline)
-                
-                Spacer()
-                
-                // Show if displaying original AI values
-                if correction == nil {
-                    Label("AI Generated", systemImage: "sparkles")
-                        .font(.caption)
-                        .foregroundColor(.blue)
+                Text(InsightDisplay.fullDate(item.createdAt))
+                if let category = corrected.displayCategories.first {
+                    Text("·")
+                    Label(InsightDisplay.categoryLabel(category), systemImage: InsightDisplay.categoryIcon(category))
                 }
             }
-            
-            // Title (with strikethrough if corrected)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Title:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                if correction?.correctedTitle != nil {
-                    Text(item.title)
-                        .font(.body)
-                        .strikethrough()
-                        .foregroundColor(.secondary)
-                }
-                
-                Text(correctedView.displayTitle)
-                    .font(.body)
-                    .fontWeight(.medium)
-            }
-            
-            // Type (with strikethrough if corrected)
-            HStack {
-                Text("Type:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                if correction?.correctedType != nil {
-                    TypeBadge(type: item.type)
-                        .opacity(0.5)
-                }
-                
-                TypeBadge(type: correctedView.displayType)
-            }
-            
-            // Categories (with strikethrough if corrected)
-            if !item.categories.isEmpty || !correctedView.displayCategories.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Categories:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    if correction?.correctedCategories != nil {
-                        Text(formatCategories(item.categories))
-                            .font(.body)
-                            .strikethrough()
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Text(formatCategories(correctedView.displayCategories))
-                        .font(.body)
-                }
-            }
-            
-            // Summary
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Summary:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(item.summary)
-                    .font(.body)
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(8)
-            }
-            
-            // Confidence and strength
-            HStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Confidence:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.blue)
-                        Text(formatPercentage(item.confidence))
-                            .fontWeight(.medium)
-                    }
-                    .font(.body)
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Strength:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    HStack(spacing: 4) {
-                        Image(systemName: "bolt.fill")
-                            .foregroundColor(.orange)
-                        Text(formatPercentage(item.strength))
-                            .fontWeight(.medium)
-                    }
-                    .font(.body)
-                }
-            }
-        }
-    }
-    
-    /// Formats categories for display
-    private func formatCategories(_ categories: [String]) -> String {
-        categories.map { category in
-            category.replacingOccurrences(of: "_", with: " ")
-                .capitalized
-        }.joined(separator: ", ")
-    }
-    
-    /// Formats a value as percentage
-    private func formatPercentage(_ value: Double) -> String {
-        "\(Int(value * 100))%"
-    }
-}
-
-// MARK: - Review Status Section
-
-struct ReviewStatusSection: View {
-    let item: ExtractedItem
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Review Status")
-                .font(.headline)
-            
-            HStack {
-                Text("Status:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                ReviewStateBadge(state: item.reviewState)
-            }
-            
-            if let reviewedAt = item.reviewedAt {
-                HStack {
-                    Text("Reviewed:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(formatDate(reviewedAt))
-                        .font(.caption)
-                }
-            }
-        }
-    }
-    
-    /// Formats ISO8601 date string for display
-    private func formatDate(_ iso8601String: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        if let date = formatter.date(from: iso8601String) {
-            return date.formatted(date: .abbreviated, time: .shortened)
-        }
-        return iso8601String
-    }
-}
-
-/// Review state badge view
-struct ReviewStateBadge: View {
-    let state: String
-    
-    var body: some View {
-        Text(state.capitalized)
             .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(backgroundColor)
-            .foregroundColor(.white)
-            .cornerRadius(4)
-    }
-    
-    /// Color based on review state
-    private var backgroundColor: Color {
-        switch state {
-        case ExtractedItem.ReviewState.new:
-            return .blue
-        case ExtractedItem.ReviewState.confirmed:
-            return .green
-        case ExtractedItem.ReviewState.rejected:
-            return .red
-        case ExtractedItem.ReviewState.edited:
-            return .orange
-        default:
-            return .gray
+            .foregroundStyle(AttuneTheme.textSecondary)
         }
+        .padding(16)
+        .attuneCard()
+    }
+
+    private var summaryCard: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("What Attune captured")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textPrimary)
+            Text(item.summary.isEmpty ? corrected.displayTitle : item.summary)
+                .font(.body)
+                .foregroundStyle(AttuneTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .attuneCard()
+    }
+
+    private var scheduleCard: some View {
+        let capture = CalendarCaptureParser.capture(for: item, correction: correction)
+        return VStack(alignment: .leading, spacing: 8) {
+            Label("Calendar", systemImage: "calendar")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textPrimary)
+
+            if let capture {
+                Text(capture.start.formatted(.dateTime.weekday(.wide).month(.wide).day().year()))
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                Text(scheduleTimeLabel(capture))
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            } else {
+                Text("Needs a date and time")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.warning)
+                Text("Tap Review to schedule this capture.")
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .attuneCard()
+    }
+
+    private func scheduleTimeLabel(_ capture: CalendarCapture) -> String {
+        guard capture.hasSpecifiedTime else { return "Time not specified" }
+        let start = capture.start.formatted(date: .omitted, time: .shortened)
+        guard let end = capture.end, end > capture.start else { return start }
+        return "\(start)–\(end.formatted(date: .omitted, time: .shortened))"
+    }
+
+    private var sourceCard: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("From your words")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textPrimary)
+            Text("“\(item.sourceQuote)”")
+                .font(.body)
+                .italic()
+                .foregroundStyle(AttuneTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .attuneCard()
+    }
+
+    private func noteCard(_ note: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Your note")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textPrimary)
+            Text(note)
+                .font(.body)
+                .foregroundStyle(AttuneTheme.textSecondary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .attuneCard()
+    }
+
+    private var trackingClarification: some View {
+        Label {
+            Text(corrected.displayType == ExtractedItem.ItemType.intention
+                 ? "Captured intention—not yet added to Today’s tracked progress."
+                 : "This capture does not change Today’s tracked progress.")
+        } icon: {
+            Image(systemName: "info.circle")
+        }
+        .font(.caption)
+        .foregroundStyle(AttuneTheme.textTertiary)
+        .padding(.horizontal, 4)
     }
 }
 
-// MARK: - Provenance Section
-
-struct ProvenanceSection: View {
-    let item: ExtractedItem
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Provenance")
-                .font(.headline)
-            
-            // Source quote
-            VStack(alignment: .leading, spacing: 4) {
-                Text("You said:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text("\"\(item.sourceQuote)\"")
-                    .font(.body)
-                    .italic()
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(8)
-            }
-            
-            // Context before
-            if let contextBefore = item.contextBefore, !contextBefore.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Context before:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(contextBefore)
-                        .font(.caption)
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.secondary.opacity(0.1))
-                        .cornerRadius(8)
-                }
-            }
-            
-            // Context after
-            if let contextAfter = item.contextAfter, !contextAfter.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Context after:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(contextAfter)
-                        .font(.caption)
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.secondary.opacity(0.1))
-                        .cornerRadius(8)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Metadata Section
-
-struct MetadataSection: View {
-    let item: ExtractedItem
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Metadata")
-                .font(.headline)
-            
-            MetadataRow(label: "Session", value: shortId(item.sessionId))
-            MetadataRow(label: "Segment Index", value: "\(item.segmentIndex)")
-            MetadataRow(label: "Item ID", value: item.id)
-            MetadataRow(label: "Fingerprint", value: item.fingerprint)
-            MetadataRow(label: "Created", value: formatDate(item.createdAt))
-            MetadataRow(label: "Captured", value: formatDate(item.extractedAt))
-        }
-    }
-    
-    /// Returns a short ID (first 6 characters) for display
-    private func shortId(_ id: String) -> String {
-        String(id.prefix(6))
-    }
-    
-    /// Formats ISO8601 date string for display
-    private func formatDate(_ iso8601String: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        if let date = formatter.date(from: iso8601String) {
-            return date.formatted(date: .abbreviated, time: .shortened)
-        }
-        return iso8601String
-    }
-}
-
-// MARK: - Correction Edit Sheet
-
-struct CorrectionEditSheet: View {
+struct CaptureReviewSheet: View {
     let item: ExtractedItem
     @Binding var correction: ItemCorrection?
-    
+
     @Environment(\.dismiss) private var dismiss
-    
-    // Edit state
-    @State private var isIncorrect: Bool
+    @State private var isHidden: Bool
     @State private var editedTitle: String
     @State private var editedType: String
     @State private var editedCategories: Set<String>
     @State private var note: String
-    
-    // Available options
+    @State private var isScheduled: Bool
+    @State private var scheduledDate: Date
+    @State private var hasSpecifiedTime: Bool
+    @State private var startTime: Date
+    @State private var hasEndTime: Bool
+    @State private var endTime: Date
+    @State private var scheduleWasEdited = false
+
     private let availableTypes = [
         ExtractedItem.ItemType.event,
         ExtractedItem.ItemType.intention,
         ExtractedItem.ItemType.commitment,
         ExtractedItem.ItemType.state
     ]
-    
+
     private let availableCategories = [
         ExtractedItem.Category.fitnessHealth,
         ExtractedItem.Category.careerWork,
@@ -486,193 +219,250 @@ struct CorrectionEditSheet: View {
         ExtractedItem.Category.stressLoad,
         ExtractedItem.Category.peaceWellbeing
     ]
-    
+
     init(item: ExtractedItem, correction: Binding<ItemCorrection?>) {
         self.item = item
-        self._correction = correction
-        
-        // Initialize state from existing correction or defaults
-        if let existing = correction.wrappedValue {
-            _isIncorrect = State(initialValue: existing.isIncorrect)
-            _editedTitle = State(initialValue: existing.correctedTitle ?? item.title)
-            _editedType = State(initialValue: existing.correctedType ?? item.type)
-            _editedCategories = State(initialValue: Set(existing.correctedCategories ?? item.categories))
-            _note = State(initialValue: existing.note ?? "")
-        } else {
-            _isIncorrect = State(initialValue: false)
-            _editedTitle = State(initialValue: item.title)
-            _editedType = State(initialValue: item.type)
-            _editedCategories = State(initialValue: Set(item.categories))
-            _note = State(initialValue: "")
-        }
+        _correction = correction
+        let existing = correction.wrappedValue
+        _isHidden = State(initialValue: existing?.isIncorrect ?? false)
+        _editedTitle = State(initialValue: existing?.correctedTitle ?? item.title)
+        _editedType = State(initialValue: existing?.correctedType ?? item.type)
+        _editedCategories = State(initialValue: Set(existing?.correctedCategories ?? item.categories))
+        _note = State(initialValue: existing?.note ?? "")
+
+        let capture = CalendarCaptureParser.capture(for: item, correction: existing)
+        let capturedAt = CalendarCaptureParser.parseDate(item.createdAt) ?? Date()
+        let initialStart = capture?.start ?? capturedAt
+        _isScheduled = State(initialValue: capture != nil)
+        _scheduledDate = State(initialValue: initialStart)
+        _hasSpecifiedTime = State(initialValue: capture?.hasSpecifiedTime ?? false)
+        _startTime = State(initialValue: initialStart)
+        _hasEndTime = State(initialValue: capture?.end != nil)
+        _endTime = State(initialValue: capture?.end ?? Calendar.current.date(byAdding: .hour, value: 1, to: initialStart) ?? initialStart)
     }
-    
+
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
-                // Mark incorrect toggle
                 Section {
-                    Toggle("Mark as incorrect", isOn: $isIncorrect)
-                } header: {
-                    Text("Correction Status")
-                }
-                
-                // Edit fields
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Original: \(item.title)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        TextField("Corrected title", text: $editedTitle)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                } header: {
-                    Text("Title")
+                    Toggle("Hide from Insights", isOn: $isHidden)
                 } footer: {
-                    Text("Edit the title if the AI got it wrong")
+                    Text("Hidden captures no longer appear in Recent captures or theme counts.")
                 }
-                
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Original: \(item.type.capitalized)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        Picker("Corrected type", selection: $editedType) {
-                            ForEach(availableTypes, id: \.self) { type in
-                                Text(type.capitalized).tag(type)
+
+                Section("Capture") {
+                    TextField("Title", text: $editedTitle)
+
+                    Picker("Type", selection: $editedType) {
+                        ForEach(availableTypes, id: \.self) { type in
+                            Label(InsightDisplay.typeLabel(type), systemImage: InsightDisplay.typeIcon(type))
+                                .tag(type)
+                        }
+                    }
+                }
+
+
+                if CalendarFeature.isEnabled,
+                   editedType == ExtractedItem.ItemType.event {
+                    Section {
+                        Toggle("Show on Calendar", isOn: editedBinding($isScheduled))
+
+                        if isScheduled {
+                            DatePicker(
+                                "Date",
+                                selection: editedBinding($scheduledDate),
+                                displayedComponents: .date
+                            )
+
+                            Toggle("Specific time", isOn: editedBinding($hasSpecifiedTime))
+
+                            if hasSpecifiedTime {
+                                DatePicker(
+                                    "Starts",
+                                    selection: editedBinding($startTime),
+                                    displayedComponents: .hourAndMinute
+                                )
+
+                                Toggle("End time", isOn: editedBinding($hasEndTime))
+                                if hasEndTime {
+                                    DatePicker(
+                                        "Ends",
+                                        selection: editedBinding($endTime),
+                                        displayedComponents: .hourAndMinute
+                                    )
+                                }
                             }
                         }
-                        .pickerStyle(.menu)
+                    } header: {
+                        Text("Calendar")
+                    } footer: {
+                        Text("A time without a spoken date is scheduled on the recording day. You can change or remove it here.")
                     }
-                } header: {
-                    Text("Type")
-                } footer: {
-                    Text("Change the type if needed")
                 }
-                
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Original: \(formatCategories(item.categories))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        ForEach(availableCategories, id: \.self) { category in
-                            Toggle(formatCategory(category), isOn: Binding(
+
+                Section("Categories") {
+                    ForEach(availableCategories, id: \.self) { category in
+                        Toggle(
+                            InsightDisplay.categoryLabel(category),
+                            isOn: Binding(
                                 get: { editedCategories.contains(category) },
-                                set: { isSelected in
-                                    if isSelected {
+                                set: { selected in
+                                    if selected {
                                         editedCategories.insert(category)
                                     } else {
                                         editedCategories.remove(category)
                                     }
                                 }
-                            ))
-                        }
+                            )
+                        )
                     }
-                } header: {
-                    Text("Categories")
-                } footer: {
-                    Text("Select all categories that apply")
                 }
-                
-                Section {
+
+                Section("Personal note") {
                     TextEditor(text: $note)
                         .frame(minHeight: 80)
-                } header: {
-                    Text("Note (Optional)")
-                } footer: {
-                    Text("Add a note explaining why you made this correction")
                 }
             }
-            .navigationTitle("Edit Insight")
+            .navigationTitle("Review Capture")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+                    Button("Cancel") { dismiss() }
                 }
-                
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         saveCorrection()
                         dismiss()
                     }
+                    .disabled(editedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
     }
-    
-    /// Saves the correction
+
     private func saveCorrection() {
-        // Determine what changed
-        let titleChanged = editedTitle != item.title
+        let cleanTitle = editedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let titleChanged = cleanTitle != item.title
         let typeChanged = editedType != item.type
         let categoriesChanged = Set(item.categories) != editedCategories
-        
-        // Only save if something changed or isIncorrect is true
-        if isIncorrect || titleChanged || typeChanged || categoriesChanged || !note.isEmpty {
-            let newCorrection = ItemCorrection(
+        let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let calendarSchedule = scheduleCorrection()
+
+        if isHidden || titleChanged || typeChanged || categoriesChanged || !cleanNote.isEmpty || calendarSchedule != nil {
+            let updated = ItemCorrection(
                 itemId: item.id,
-                isIncorrect: isIncorrect,
-                correctedTitle: titleChanged ? editedTitle : nil,
+                isIncorrect: isHidden,
+                correctedTitle: titleChanged ? cleanTitle : nil,
                 correctedType: typeChanged ? editedType : nil,
                 correctedCategories: categoriesChanged ? Array(editedCategories).sorted() : nil,
-                note: note.isEmpty ? nil : note
+                note: cleanNote.isEmpty ? nil : cleanNote,
+                calendarSchedule: calendarSchedule
             )
-            
             do {
-                try CorrectionsStore.shared.setCorrection(newCorrection)
-                correction = newCorrection
+                try CorrectionsStore.shared.setCorrection(updated)
+                correction = updated
             } catch {
-                print("Failed to save correction: \(error)")
+                AppLogger.log(AppLogger.ERR, "Capture correction save failed item=\(AppLogger.shortId(item.id))")
             }
-        } else {
-            // No changes - delete correction if it exists
-            if correction != nil {
-                do {
-                    try CorrectionsStore.shared.deleteCorrection(itemId: item.id)
-                    correction = nil
-                } catch {
-                    print("Failed to delete correction: \(error)")
-                }
+        } else if correction != nil {
+            do {
+                try CorrectionsStore.shared.deleteCorrection(itemId: item.id)
+                correction = nil
+            } catch {
+                AppLogger.log(AppLogger.ERR, "Capture correction delete failed item=\(AppLogger.shortId(item.id))")
             }
         }
     }
-    
-    /// Formats a single category for display
-    private func formatCategory(_ category: String) -> String {
-        category.replacingOccurrences(of: "_", with: " ").capitalized
+
+    private func editedBinding<Value>(_ binding: Binding<Value>) -> Binding<Value> {
+        Binding(
+            get: { binding.wrappedValue },
+            set: { value in
+                binding.wrappedValue = value
+                scheduleWasEdited = true
+            }
+        )
     }
-    
-    /// Formats categories for display
-    private func formatCategories(_ categories: [String]) -> String {
-        if categories.isEmpty {
-            return "None"
+
+    private func scheduleCorrection() -> CalendarScheduleCorrection? {
+        guard editedType == ExtractedItem.ItemType.event else {
+            if item.type == ExtractedItem.ItemType.event,
+               (scheduleWasEdited || correction?.calendarSchedule != nil) {
+                return CalendarScheduleCorrection(
+                    isScheduled: false,
+                    startISO8601: nil,
+                    endISO8601: nil,
+                    hasSpecifiedTime: false
+                )
+            }
+            return nil
         }
-        return categories.map { formatCategory($0) }.joined(separator: ", ")
+
+        guard scheduleWasEdited else { return correction?.calendarSchedule }
+        guard isScheduled else {
+            return CalendarScheduleCorrection(
+                isScheduled: false,
+                startISO8601: nil,
+                endISO8601: nil,
+                hasSpecifiedTime: false
+            )
+        }
+
+        guard hasSpecifiedTime else {
+            return CalendarScheduleCorrection(
+                isScheduled: true,
+                startISO8601: localDayString(scheduledDate),
+                endISO8601: nil,
+                hasSpecifiedTime: false
+            )
+        }
+
+        let start = combining(day: scheduledDate, time: startTime)
+        let end = hasEndTime ? combining(day: scheduledDate, time: endTime) : nil
+        return CalendarScheduleCorrection(
+            isScheduled: true,
+            startISO8601: ISO8601DateFormatter().string(from: start),
+            endISO8601: end.map { ISO8601DateFormatter().string(from: $0) },
+            hasSpecifiedTime: true
+        )
+    }
+
+    private func combining(day: Date, time: Date) -> Date {
+        let calendar = Calendar.autoupdatingCurrent
+        let timeParts = calendar.dateComponents([.hour, .minute], from: time)
+        return calendar.date(
+            bySettingHour: timeParts.hour ?? 0,
+            minute: timeParts.minute ?? 0,
+            second: 0,
+            of: day
+        ) ?? day
+    }
+
+    private func localDayString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         InsightDetailView(
             item: ExtractedItem(
-                sessionId: "test-session-123",
-                segmentId: "test-segment-456",
-                segmentIndex: 3,
-                type: ExtractedItem.ItemType.event,
-                title: "Morning workout planned",
-                summary: "User mentioned planning to go to the gym tomorrow morning at 6 AM for a cardio session.",
+                sessionId: "sample-session",
+                segmentId: "sample-segment",
+                segmentIndex: 0,
+                type: ExtractedItem.ItemType.intention,
+                title: "Get back to morning workouts",
+                summary: "You want to rebuild a consistent morning workout routine.",
                 categories: [ExtractedItem.Category.fitnessHealth],
-                confidence: 0.85,
-                strength: 0.72,
-                sourceQuote: "I'm going to hit the gym tomorrow morning at 6 for some cardio",
-                contextBefore: "I've been feeling sluggish lately.",
-                contextAfter: "Need to get back into my routine.",
-                fingerprint: "abc123def456"
+                confidence: 0.9,
+                strength: 0.8,
+                sourceQuote: "I really want to start working out in the mornings again.",
+                fingerprint: "sample"
             )
         )
     }

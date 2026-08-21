@@ -2,7 +2,7 @@
 //  RootTabView.swift
 //  Attune
 //
-//  Bottom tab bar with Home, All Day, Library, Settings, and Progress tabs.
+//  Four consumer-facing tabs: Today, Record, Insights, and Momentum.
 //  Uses AppRouter so Home momentum card can switch to Library → Momentum tab.
 //
 
@@ -10,53 +10,103 @@ import SwiftUI
 
 struct RootTabView: View {
     @EnvironmentObject var appRouter: AppRouter
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
 
     // Track whether recovery has been performed to avoid running it multiple times
     @State private var hasPerformedRecovery = false
+    @State private var showSettings = false
+    @State private var reminderConfirmation: String?
 
     init() {
         // Wire up dependency: inject TranscriptionQueue into RecorderService
         RecorderService.shared.transcriptionQueue = TranscriptionQueue.shared
+        AttuneTheme.configureAppearance()
     }
 
     var body: some View {
-        TabView(selection: $appRouter.selectedRootTab) {
-            // Tab 1: Home — daily intentions, momentum card taps to Library → Momentum
-            HomeView()
-                .tabItem {
-                    Label("Home", systemImage: "house.fill")
+        VStack(spacing: 0) {
+            appHeader
+
+            TabView(selection: $appRouter.selectedRootTab) {
+                // Tab 1: Today — check-ins, intentions, mood, and weekly summary.
+                HomeView()
+                    .tabItem {
+                        Label("Today", systemImage: "house.fill")
+                    }
+                    .tag(RootTab.home)
+
+                // Tab 2: Record — user-started Listening Sessions.
+                Group {
+                    if subscriptionManager.canUseAllDayRecording {
+                        HomeRecordView()
+                    } else {
+                        ProLockedFeatureView(
+                            title: "Talk it out",
+                            detail: "Talk through what’s on your mind. Attune organizes clear intentions, commitments, events, and states into reviewable Insights.",
+                            icon: "waveform.badge.mic"
+                        )
+                    }
                 }
-                .tag(RootTab.home)
-            
-            // Tab 2: All Day — continuous recording screen
-            HomeRecordView()
-                .tabItem {
-                    Label("All Day", systemImage: "record.circle")
+                    .tabItem {
+                        Label("Talk", systemImage: "waveform.circle.fill")
+                            .accessibilityLabel("Talk it out")
+                    }
+                    .tag(RootTab.allDay)
+
+                // Tab 3: Insights — captures, recurring themes, and history.
+                Group {
+                    if subscriptionManager.canUseInsights {
+                        LibraryView()
+                    } else {
+                        ProLockedFeatureView(
+                            title: "Insights",
+                            detail: "Review what Attune found when you talked things out and notice themes that repeat over time.",
+                            icon: "sparkles"
+                        )
+                    }
                 }
-                .tag(RootTab.allDay)
-            
-            // Tab 3: Library — browse sessions, segments, insights, momentum
-            LibraryView()
-                .tabItem {
-                    Label("Library", systemImage: "books.vertical.fill")
+                    .tabItem {
+                        Label("Insights", systemImage: "sparkles")
+                    }
+                    .tag(RootTab.library)
+
+                // Tab 5: Momentum — charted daily progress now lives here
+                NavigationStack { // Provide navigation container for Momentum when used as root tab
+                    if subscriptionManager.canUseMomentumHistory {
+                        MomentumView(selectedDate: appRouter.momentumSelectedDate ?? Date()) // Full historical Momentum for Pro
+                    } else {
+                        FreeMomentumTodayView() // Free is intentionally limited to the current day
+                    }
                 }
-                .tag(RootTab.library)
-            
-            // Tab 4: Settings — app settings and logs
-            SettingsView()
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
-                }
-                .tag(RootTab.settings)
-            
-            // Tab 5: Momentum — charted daily progress now lives here
-            NavigationStack { // Provide navigation container for Momentum when used as root tab
-                MomentumView(selectedDate: appRouter.momentumSelectedDate ?? Date()) // Show Momentum screen and seed date from router when available
+                    .tabItem {
+                        Label("Momentum", systemImage: "chart.line.uptrend.xyaxis") // Rename tab to Momentum while reusing chart icon
+                    }
+                    .tag(RootTab.progress) // Keep enum tag unchanged to avoid churn elsewhere
             }
-                .tabItem {
-                    Label("Momentum", systemImage: "chart.line.uptrend.xyaxis") // Rename tab to Momentum while reusing chart icon
-                }
-                .tag(RootTab.progress) // Keep enum tag unchanged to avoid churn elsewhere
+        }
+        .tint(AttuneTheme.accent)
+        .preferredColorScheme(.dark)
+        .background(AttuneScreenBackground())
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environmentObject(subscriptionManager)
+        }
+        .alert("Okay", isPresented: Binding(
+            get: { reminderConfirmation != nil },
+            set: { if !$0 { reminderConfirmation = nil } }
+        )) {
+            Button("Got it", role: .cancel) { reminderConfirmation = nil }
+        } message: {
+            Text(reminderConfirmation ?? "")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .attuneDailyReminderRouteRequested)) { _ in
+            handlePendingReminderRoute()
+        }
+        .onChange(of: appRouter.selectedRootTab) { _, selectedTab in
+            guard selectedTab == .home else { return }
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.84)) {
+                IntentionSuggestionToastCenter.shared.presentPendingHomeSuggestion()
+            }
         }
         .onAppear {
             // Perform recovery on first appearance only
@@ -64,7 +114,51 @@ struct RootTabView: View {
                 performRecoveryOnLaunch()
                 hasPerformedRecovery = true
             }
+            handlePendingReminderRoute()
         }
+    }
+
+    private func handlePendingReminderRoute() {
+        guard let route = DailyReminderNotificationService.shared.consumePendingRoute() else { return }
+        appRouter.navigateToProgressUpdate(intentionID: route.intentionId)
+        if route.showsFollowUpConfirmation {
+            reminderConfirmation = "We’ll check back in one hour if you haven’t updated your progress."
+        }
+    }
+
+    private var appHeader: some View {
+        HStack(spacing: 12) {
+            Color.clear
+                .frame(width: 44, height: 44)
+                .accessibilityHidden(true)
+
+            Spacer(minLength: 0)
+
+            Text("Attune")
+                .font(.title2.bold())
+                .foregroundStyle(AttuneTheme.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            Spacer(minLength: 0)
+
+            Button {
+                showSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .frame(width: 44, height: 44)
+                    .background(AttuneTheme.surface, in: Circle())
+                    .overlay(Circle().stroke(AttuneTheme.border, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Settings")
+            .accessibilityHint("Opens Attune settings")
+        }
+        .padding(.horizontal, AttuneTheme.horizontalPadding)
+        .padding(.top, 4)
+        .background(AttuneTheme.background)
     }
     
     /// Performs recovery of incomplete sessions and segments on app launch.

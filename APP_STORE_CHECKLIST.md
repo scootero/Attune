@@ -1,5 +1,8 @@
 # App Store Readiness Checklist
 
+> Engineering history/reference. Scott's current ordered manual actions are in
+> `YOUR_REMAINING_STEPS.md`; keep version 1.0 at $4.99/month with no introductory offer.
+
 Working rules: one phase at a time; minimal diffs; update this file after each phase.
 
 ---
@@ -16,9 +19,9 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 - [x] Rewire `OpenAIClient` to use proxy URL + app proxy token
 - [x] Replace `Secrets.openAIKey` with `proxyBaseURL` + `appProxyToken`
 - [x] Add `Secrets.swift.example` for clean checkouts
-- [ ] Deploy worker + set `OPENAI_API_KEY` and `APP_PROXY_TOKEN` (manual)
+- [x] Deploy worker + set `OPENAI_API_KEY` and `APP_PROXY_TOKEN`
 - [ ] Revoke exposed OpenAI key in OpenAI dashboard (manual)
-- [ ] Verify extraction / check-in AI calls succeed through proxy (manual)
+- [x] Verify extraction / check-in AI calls succeed through proxy
 
 ---
 
@@ -48,6 +51,8 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 
 ## Phase 5 — Manual App Store Connect
 
+- [ ] Set app name to `Attune: Intentions Tracking`
+- [ ] Set subtitle to `Are you in tune?`
 - [ ] Host Privacy Policy + Terms + Support pages
 - [ ] Paste live URLs into `LegalLinks.swift` (`Attune/App/LegalLinks.swift`)
 - [ ] Fill App Privacy nutrition labels (Audio, User Content, OpenAI third party)
@@ -55,6 +60,10 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 - [ ] App Review notes (background audio, demo recording, AI disclosure)
 - [ ] Archive → TestFlight → Submit
 - [ ] Confirm old OpenAI key revoked
+
+Current release values are $4.99/month with no introductory trial.
+Free includes one active intention and one Voice Check-In per day; use
+`ATTUNE_REMAINING_WORK.md` as the controlling release tracker.
 
 ### Suggested App Review notes (copy/paste draft)
 

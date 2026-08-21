@@ -1,4 +1,4 @@
-# ATTUNE V1 BACKBONE — HANDOFF / CONTEXT PACK (UPDATED)
+# Attune V1 BACKBONE — HANDOFF / CONTEXT PACK (UPDATED)
 # (Copy/paste into a new chat or share with another AI)
 
 ## Current status (where we are right now)

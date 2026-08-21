@@ -10,6 +10,8 @@ import SwiftUI
 import Combine
 
 struct LogsView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     // State for logs content
     @State private var logsText: String = ""
     @State private var isAutoScrollEnabled: Bool = true
@@ -30,9 +32,9 @@ struct LogsView: View {
                         .id("logsContent")
                 }
                 .background(Color(UIColor.systemGroupedBackground))
-                .onChange(of: logsText) { _ in
+                .onChange(of: logsText) { _, _ in
                     if isAutoScrollEnabled {
-                        withAnimation {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
                             proxy.scrollTo("logsContent", anchor: .bottom)
                         }
                     }

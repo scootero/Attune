@@ -58,12 +58,37 @@ struct CheckInExtractorService {
         }
         
         do {
-            let jsonString = try await OpenAIClient.chatCompletion(
-                model: defaultModel,
-                systemMessage: systemMessage,
-                userMessage: userMessage,
-                schema: schema
-            )
+            let jsonString: String
+            if OpenAIClient.usesServerOwnedV2(.checkIn) {
+                // Debug rollout: preserve the existing extraction inputs while
+                // the Worker owns the model, prompt, schema, and output limit.
+                let intentionPayload: [[String: Any]] = intentions.map { intention in
+                    [
+                        "id": intention.id,
+                        "title": intention.title,
+                        "aliases": intention.aliases,
+                        "targetValue": intention.targetValue,
+                        "unit": intention.unit,
+                        "timeframe": intention.timeframe
+                    ]
+                }
+                jsonString = try await OpenAIClient.serverOwnedTask(
+                    .checkIn,
+                    body: [
+                        "transcript": transcript,
+                        "intentions": intentionPayload,
+                        "todaysTotals": todaysTotals
+                    ]
+                )
+            } else {
+                // Release fallback remains unchanged until v2 comparison is approved.
+                jsonString = try await OpenAIClient.chatCompletion(
+                    model: defaultModel,
+                    systemMessage: systemMessage,
+                    userMessage: userMessage,
+                    schema: schema
+                )
+            }
             
             let intentionIds = Set(intentions.map { $0.id })
             return parseResponse(jsonString: jsonString, checkInId: checkInId, intentionIds: intentionIds)
@@ -179,6 +204,9 @@ TIME (required fields; use null when no explicit time):
 MOOD (optional, Slice A):
 - moodLabel: one word or short phrase (e.g., "Calm", "Anxious", "Tired") or null.
 - moodScore: integer 0 to 10 (0 = lowest, 10 = highest; 5 = neutral) or null.
+- Capture mood when the user directly describes their current mood, feeling, happiness, or emotional state. Qualitative language such as "I'm doing well" may be approximated to the closest reasonable score.
+- Do not infer mood merely because a positive or negative event happened.
+- If several current mood statements appear, use the latest clear self-report in transcript order.
 
 Return ONLY valid JSON matching the schema. No markdown, no explanations.
 If no progress or mood is clearly stated, return: {"updates": [], "moodLabel": null, "moodScore": null}

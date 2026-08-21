@@ -6,7 +6,23 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D251D07030228ECD002565CD /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D251D06F30228ECD002565CD /* StoreKit.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D213C6EF3024D9F800D5EFA2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D2F8FEA92F2E7D5D00DB8E5E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D2F8FEB02F2E7D5D00DB8E5E;
+			remoteInfo = Attune;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		D251D06F30228ECD002565CD /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
+		D2A1000130240001002565CD /* AttuneTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AttuneTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2F8FEB12F2E7D5D00DB8E5E /* Attune.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Attune.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -21,6 +37,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		D2A1000230240001002565CD /* AttuneTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AttuneTests;
+			sourceTree = "<group>";
+		};
 		D2F8FEB32F2E7D5D00DB8E5E /* Attune */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -32,20 +53,38 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		D2F8FEAE2F2E7D5D00DB8E5E /* Frameworks */ = {
+		D2A1000430240001002565CD /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D2F8FEAE2F2E7D5D00DB8E5E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D251D07030228ECD002565CD /* StoreKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		D251D06E30228ECD002565CD /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D251D06F30228ECD002565CD /* StoreKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		D2F8FEA82F2E7D5D00DB8E5E = {
 			isa = PBXGroup;
 			children = (
 				D2F8FEB32F2E7D5D00DB8E5E /* Attune */,
+				D2A1000230240001002565CD /* AttuneTests */,
+				D251D06E30228ECD002565CD /* Frameworks */,
 				D2F8FEB22F2E7D5D00DB8E5E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -54,6 +93,7 @@
 			isa = PBXGroup;
 			children = (
 				D2F8FEB12F2E7D5D00DB8E5E /* Attune.app */,
+				D2A1000130240001002565CD /* AttuneTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -61,6 +101,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		D2A1000630240001002565CD /* AttuneTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D2A1000B30240001002565CD /* Build configuration list for PBXNativeTarget "AttuneTests" */;
+			buildPhases = (
+				D2A1000330240001002565CD /* Sources */,
+				D2A1000430240001002565CD /* Frameworks */,
+				D2A1000530240001002565CD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D2A1000830240001002565CD /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D2A1000230240001002565CD /* AttuneTests */,
+			);
+			name = AttuneTests;
+			packageProductDependencies = (
+			);
+			productName = AttuneTests;
+			productReference = D2A1000130240001002565CD /* AttuneTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		D2F8FEB02F2E7D5D00DB8E5E /* Attune */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D2F8FEBE2F2E7D5F00DB8E5E /* Build configuration list for PBXNativeTarget "Attune" */;
@@ -93,6 +156,10 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					D2A1000630240001002565CD = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = D2F8FEB02F2E7D5D00DB8E5E;
+					};
 					D2F8FEB02F2E7D5D00DB8E5E = {
 						CreatedOnToolsVersion = 26.2;
 						SystemCapabilities = {
@@ -118,11 +185,19 @@
 			projectRoot = "";
 			targets = (
 				D2F8FEB02F2E7D5D00DB8E5E /* Attune */,
+				D2A1000630240001002565CD /* AttuneTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		D2A1000530240001002565CD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D2F8FEAF2F2E7D5D00DB8E5E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -133,6 +208,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		D2A1000330240001002565CD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D2F8FEAD2F2E7D5D00DB8E5E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -142,7 +224,61 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		D2A1000830240001002565CD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D2F8FEB02F2E7D5D00DB8E5E /* Attune */;
+			targetProxy = D213C6EF3024D9F800D5EFA2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		D2A1000930240001002565CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BLAUCQ8H26;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.scottoliver.AttuneTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Attune.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Attune";
+			};
+			name = Debug;
+		};
+		D2A1000A30240001002565CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BLAUCQ8H26;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.scottoliver.AttuneTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Attune.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Attune";
+			};
+			name = Release;
+		};
 		D2F8FEBC2F2E7D5F00DB8E5E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -276,13 +412,13 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Attune/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Attune;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Attune uses the microphone to record your voice during sessions so it can be transcribed and organized into personal insights. Audio is processed only for this purpose.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Attune uses speech recognition to convert your recorded audio into text so you can review, reflect on, and organize your sessions.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = audio;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -292,12 +428,16 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.scottoliver.Attune;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -313,13 +453,13 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Attune/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Attune;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Attune uses the microphone to record your voice during sessions so it can be transcribed and organized into personal insights. Audio is processed only for this purpose.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Attune uses speech recognition to convert your recorded audio into text so you can review, reflect on, and organize your sessions.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = audio;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -329,18 +469,31 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.scottoliver.Attune;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		D2A1000B30240001002565CD /* Build configuration list for PBXNativeTarget "AttuneTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D2A1000930240001002565CD /* Debug */,
+				D2A1000A30240001002565CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		D2F8FEAC2F2E7D5D00DB8E5E /* Build configuration list for PBXProject "Attune" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

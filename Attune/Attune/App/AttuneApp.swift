@@ -10,6 +10,7 @@ import SwiftData
 
 @main
 struct AttuneApp: App {
+    @UIApplicationDelegateAdaptor(AttuneNotificationDelegate.self) private var notificationDelegate
     @Environment(\.scenePhase) private var scenePhase // Observe foreground/background transitions to refresh reminder scheduling.
     
     var sharedModelContainer: ModelContainer = {
@@ -25,6 +26,15 @@ struct AttuneApp: App {
         }
     }()
 
+    init() {
+        #if !DEBUG
+        // Keep this cleanup even if the simulator-only Settings controls are removed.
+        // Installing a Release build over Debug can preserve Documents; this purge
+        // prevents ATTUNE_DEMO_ Momentum records from becoming production ghost data.
+        MomentumDemoDataManager.purgeResidueForNonDebugLaunch()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -33,6 +43,7 @@ struct AttuneApp: App {
         .onChange(of: scenePhase) { _, newPhase in // Refresh reminder when app becomes active so today's state is always up-to-date.
             if newPhase == .active { // Only refresh on active to avoid unnecessary work in background/inactive states.
                 DailyReminderNotificationService.shared.refreshReminderForToday() // Recompute reminder at user-selected time based on latest check-ins/progress.
+                Task { await SubscriptionManager.shared.refreshEntitlement() }
             }
         }
     }

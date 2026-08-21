@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-	<!-- In-App Purchase is enabled via Xcode capability + this entitlements file.
-	     StoreKit 2 does not require extra entitlement keys beyond the IAP capability. -->
-</dict>
+<dict/>
 </plist>

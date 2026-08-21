@@ -2,195 +2,113 @@
 //  TopicDetailView.swift
 //  Attune
 //
-//  Detail view for a single topic showing metadata and all occurrences.
-//  Resolves item IDs from topic.itemIds using orphan-safe ItemResolver.
+//  Consumer detail for a grouped theme and the user's visible mentions.
 //
 
 import SwiftUI
 
 struct TopicDetailView: View {
-    /// The topic to display
     let topic: TopicAggregate
-    
-    /// Resolved occurrences (items) for this topic
+
     @State private var occurrences: [ExtractedItem] = []
-    
-    /// Corrections loaded from store
     @State private var corrections: [String: ItemCorrection] = [:]
-    
+
     var body: some View {
-        List {
-            // Section 1: Topic Metadata
-            Section("Topic Summary") {
-                // Display title
-                LabeledContent("Title", value: topic.displayTitle)
-                
-                // Occurrence count
-                LabeledContent("Mentions", value: "\(topic.occurrenceCount)")
-                
-                // First seen
-                LabeledContent("First Seen", value: formatDate(topic.firstSeenAtISO))
-                
-                // Last seen
-                LabeledContent("Last Seen", value: formatDate(topic.lastSeenAtISO))
-                
-                // Categories
-                if !topic.categories.isEmpty {
-                    LabeledContent("Categories", value: formatCategories(topic.categories))
-                }
-                
-                // Canonical key (debug info, subtle)
-                LabeledContent("Key", value: topic.canonicalKey)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            // Section 2: Occurrences
-            Section("Occurrences (\(occurrences.count))") {
-                if occurrences.isEmpty {
-                    // Empty state (shouldn't happen, but handle gracefully)
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle")
-                            .foregroundColor(.orange)
-                        Text("No occurrences found")
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    ForEach(occurrences) { item in
-                        NavigationLink(destination: InsightDetailView(item: item)) {
-                            OccurrenceRow(item: item, correction: corrections[item.id])
+        ZStack {
+            AttuneScreenBackground()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    topicHeader
+
+                    if visibleOccurrences.isEmpty {
+                        insightsEmptyState(
+                            icon: "eye.slash",
+                            title: "No visible captures",
+                            detail: "Captures you hide during review are removed from this theme."
+                        )
+                        .padding(.horizontal, -AttuneTheme.horizontalPadding)
+                    } else {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(visibleOccurrences.count == 1 ? "Mention" : "Mentions")
+                                .font(.headline)
+                                .foregroundStyle(AttuneTheme.textPrimary)
+
+                            ForEach(visibleOccurrences) { item in
+                                NavigationLink(destination: InsightDetailView(item: item)) {
+                                    InsightCaptureRow(item: item, correction: corrections[item.id])
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
+                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.top, 12)
+                .padding(.bottom, 96)
             }
+            .scrollIndicators(.hidden)
         }
-        .navigationTitle("Topic")
+        .navigationTitle("Theme")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            loadOccurrences()
-            loadCorrections()
-        }
+        .onAppear(perform: loadData)
     }
-    
-    /// Loads occurrences by resolving item IDs (orphan-safe)
-    private func loadOccurrences() {
-        // Use ItemResolver for efficient, orphan-safe resolution
-        let resolvedItems = ItemResolver.resolveItems(itemIds: topic.itemIds)
-        
-        // Sort by createdAt descending (newest first)
-        occurrences = resolvedItems.sorted { $0.createdAt > $1.createdAt }
-    }
-    
-    /// Loads corrections from store
-    private func loadCorrections() {
-        corrections = CorrectionsStore.shared.loadCorrections()
-    }
-    
-    /// Formats ISO8601 timestamp as human-readable date
-    private func formatDate(_ isoString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        
-        guard let date = formatter.date(from: isoString) else {
-            return isoString
-        }
-        
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .medium
-        dateFormatter.timeStyle = .short
-        
-        return dateFormatter.string(from: date)
-    }
-    
-    /// Formats categories for display
-    private func formatCategories(_ categories: [String]) -> String {
-        categories.map { category in
-            category.replacingOccurrences(of: "_", with: " ")
-                .capitalized
-        }.joined(separator: ", ")
-    }
-}
 
-/// Row view for a single occurrence in the TopicDetailView
-struct OccurrenceRow: View {
-    let item: ExtractedItem
-    let correction: ItemCorrection?
-    
-    /// Computed corrected view
-    private var correctedView: CorrectedItemView {
-        item.applyingCorrection(correction)
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Type badge and date
-            HStack {
-                TypeBadge(type: correctedView.displayType)
-                
-                Spacer()
-                
-                // Show correction indicator
-                if correctedView.isMarkedIncorrect {
-                    Label("Incorrect", systemImage: "xmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                } else if correction != nil {
-                    Label("Corrected", systemImage: "pencil.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                }
-                
-                Text(formatDate(item.createdAt))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            // Source quote
-            Text("\"\(item.sourceQuote)\"")
+    private var topicHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(
+                visibleOccurrences.count > 1 ? "Recurring theme" : "Mentioned once",
+                systemImage: visibleOccurrences.count > 1 ? "repeat" : "circle.dotted"
+            )
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(AttuneTheme.accentSecondary)
+
+            Text(topic.displayTitle)
+                .font(.title2.bold())
+                .foregroundStyle(AttuneTheme.textPrimary)
+
+            Text("\(visibleOccurrences.count) \(visibleOccurrences.count == 1 ? "mention" : "mentions") · Last mentioned \(InsightDisplay.relativeDate(topic.lastSeenAtISO))")
                 .font(.subheadline)
-                .italic()
-                .lineLimit(3)
-            
-            // Session provenance
-            HStack(spacing: 8) {
-                Image(systemName: "waveform")
-                    .font(.caption)
-                Text("\(shortId(item.sessionId)) • seg \(item.segmentIndex)")
-                    .font(.caption)
+                .foregroundStyle(AttuneTheme.textSecondary)
+
+            if !topic.categories.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(topic.categories.prefix(3), id: \.self) { category in
+                        Label(InsightDisplay.categoryLabel(category), systemImage: InsightDisplay.categoryIcon(category))
+                            .font(.caption)
+                            .foregroundStyle(AttuneTheme.textSecondary)
+                    }
+                }
             }
-            .foregroundColor(.secondary)
+
+            Text("Attune groups related captures into a theme. A theme does not change Today’s progress or create a tracked intention.")
+                .font(.caption)
+                .foregroundStyle(AttuneTheme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.vertical, 4)
+        .padding(16)
+        .attuneCard()
     }
-    
-    /// Returns a short ID (first 6 characters) for display
-    private func shortId(_ id: String) -> String {
-        String(id.prefix(6))
+
+    private var visibleOccurrences: [ExtractedItem] {
+        occurrences.filter { !($0.applyingCorrection(corrections[$0.id]).isMarkedIncorrect) }
     }
-    
-    /// Formats ISO8601 timestamp as human-readable date
-    private func formatDate(_ isoString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        
-        guard let date = formatter.date(from: isoString) else {
-            return "recently"
-        }
-        
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .short
-        dateFormatter.timeStyle = .short
-        
-        return dateFormatter.string(from: date)
+
+    private func loadData() {
+        corrections = CorrectionsStore.shared.loadCorrections()
+        occurrences = ItemResolver.resolveItems(itemIds: topic.itemIds)
+            .sorted { $0.createdAt > $1.createdAt }
     }
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         TopicDetailView(
             topic: TopicAggregate(
                 canonicalKey: "exercise__abc123",
                 displayTitle: "Exercise",
                 firstSeenAtISO: ISO8601DateFormatter().string(from: Date()),
-                categories: ["fitness_health"],
+                categories: [ExtractedItem.Category.fitnessHealth],
                 itemId: "sample-id"
             )
         )

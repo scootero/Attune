@@ -19,14 +19,16 @@ enum ReminderPreferences {
     /// UserDefaults key controlling whether the in-app daily reminder is enabled.
     private static let reminderEnabledKey = "attune.reminder.enabled" // Stable key for persisted on/off state of daily reminder feature.
     
-    /// Default reminder hour (6 PM) used when user has not selected a custom time.
-    private static let defaultHour = 18 // Product default reminder time hour.
+    /// Default reminder hour (2 PM) used when user has not selected a custom time.
+    private static let defaultHour = 14 // Product default reminder time hour.
     
     /// Default reminder minute (:00) used when user has not selected a custom time.
     private static let defaultMinute = 0 // Product default reminder time minute.
     
     /// Default in-app reminder toggle value when user has not set a preference.
-    private static let defaultIsEnabled = true // Keep reminder enabled by default so feature works immediately for new users.
+    /// Product default is on at 2 PM. iOS still requires notification permission,
+    /// so scheduling remains inactive until the user accepts the system prompt.
+    private static let defaultIsEnabled = true
     
     /// Current in-app reminder enabled preference.
     static var isReminderEnabled: Bool {

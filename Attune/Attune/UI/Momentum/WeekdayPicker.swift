@@ -34,8 +34,7 @@ struct WeekdayPicker: View {
                 dayButton(for: day)
             }
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 2)
     }
 
     /// Single day button: tappable for past/today, gray + disabled for future
@@ -47,12 +46,16 @@ struct WeekdayPicker: View {
                 selectedDate = day.date
             }
         }) {
-            Text(day.weekdayLetter)
-                .font(.subheadline)
-                .fontWeight(isSelected ? .semibold : .regular)
+            VStack(spacing: 1) {
+                Text(day.weekdayLetter)
+                    .font(.caption2.weight(.semibold))
+                Text(day.date.formatted(.dateTime.day()))
+                    .font(.caption.monospacedDigit())
+                    .fontWeight(isSelected ? .bold : .medium)
+            }
                 .foregroundColor(foregroundColor(day: day, isSelected: isSelected))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
+                .frame(minHeight: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .fill(backgroundColor(day: day, isSelected: isSelected))
@@ -60,25 +63,29 @@ struct WeekdayPicker: View {
         }
         .buttonStyle(.plain)
         .disabled(day.isFutureDay)
+        .accessibilityLabel(day.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+        .accessibilityValue(day.isFutureDay ? "Unavailable, future date" : (isSelected ? "Selected" : "Available"))
+        .accessibilityHint(day.isFutureDay ? "" : "Shows Momentum for this day")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func foregroundColor(day: WeekDayItem, isSelected: Bool) -> Color {
         if day.isFutureDay {
-            return .gray.opacity(0.5)
+            return AttuneTheme.textTertiary.opacity(0.55)
         }
         if isSelected {
-            return .white
+            return AttuneTheme.textPrimary
         }
-        return .gray
+        return AttuneTheme.textSecondary
     }
 
     private func backgroundColor(day: WeekDayItem, isSelected: Bool) -> Color {
         if day.isFutureDay {
-            return Color.gray.opacity(0.15)
+            return AttuneTheme.surface.opacity(0.5)
         }
         if isSelected {
-            return NeonPalette.neonTeal.opacity(0.5)
+            return AttuneTheme.accent.opacity(0.28)
         }
-        return Color.white.opacity(0.08)
+        return Color.clear
     }
 }

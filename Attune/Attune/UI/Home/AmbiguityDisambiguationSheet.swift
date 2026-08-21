@@ -105,41 +105,44 @@ struct AmbiguityDisambiguationSheet: View {
                 Button {
                     choices[index] = .totalToday
                 } label: {
-                    Text("Total today")
-                        .font(.caption)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        Text("Total today")
+                            .font(.caption)
+                            .padding(.horizontal, 10)
+                            .frame(minHeight: 44)
                         .background(choiceBg(for: index, is: .totalToday))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(choices[index] == .totalToday ? .isSelected : [])
                 
                 // "X more" = treat as increment
                 Button {
                     choices[index] = .increment
                 } label: {
-                    Text("\(formatAmount(update.amount)) more")
-                        .font(.caption)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        Text("\(formatAmount(update.amount)) more")
+                            .font(.caption)
+                            .padding(.horizontal, 10)
+                            .frame(minHeight: 44)
                         .background(choiceBg(for: index, is: .increment))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(choices[index] == .increment ? .isSelected : [])
                 
                 // "Skip" = do not apply
                 Button {
                     choices[index] = .skip
                 } label: {
-                    Text("Skip")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        Text("Skip")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 10)
+                            .frame(minHeight: 44)
                         .background(choiceBg(for: index, is: .skip))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(choices[index] == .skip ? .isSelected : [])
             }
         }
         .padding()

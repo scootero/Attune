@@ -569,10 +569,15 @@ class TranscriptionQueue: ObservableObject {
         }()
         
         // Build extraction work item
+        let sourceSegment = session.segments.first(where: { $0.id == segmentId })
+        let referenceDate = sourceSegment?.startedAt ?? session.startedAt
+        let observedAt = sourceSegment?.endedAt ?? referenceDate
         let workItem = ExtractionWorkItem(
             sessionId: sessionId,
             segmentId: segmentId,
             segmentIndex: segmentIndex,
+            referenceDate: referenceDate,
+            observedAt: observedAt,
             transcriptText: transcriptText,
             priorContextText: priorContextText
         )
@@ -580,8 +585,29 @@ class TranscriptionQueue: ObservableObject {
         let sessionShort = AppLogger.shortId(sessionId)
         
         // Enqueue extraction with completion handler for filtering + persistence
-        ExtractionQueue.shared.enqueue(workItem: workItem) { items in
+        ExtractionQueue.shared.enqueue(workItem: workItem) { result in
             // Handle extraction results with trust filtering
+
+            if result.moodLabel != nil || result.moodScore != nil {
+                let dateKey = AppPaths.dateKey(from: observedAt)
+                do {
+                    try DailyMoodStore.shared.setMoodFromTalkItOut(
+                        dateKey: dateKey,
+                        moodLabel: result.moodLabel,
+                        moodScore: result.moodScore,
+                        sourceSessionId: sessionId,
+                        sourceSegmentId: segmentId,
+                        observedAt: observedAt
+                    )
+                } catch {
+                    AppLogger.log(
+                        AppLogger.ERR,
+                        "Talk mood save failed session=\(sessionShort) seg=\(segmentIndex) error=\"\(error.localizedDescription)\""
+                    )
+                }
+            }
+
+            let items = result.items
             
             // Case 1: Service returned nothing (sparse by design)
             if items.isEmpty {

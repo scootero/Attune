@@ -88,7 +88,7 @@ struct DayDetailView: View {
             }
             
             // Intentions with expandable entries
-            if let set = data.intentionSet, !data.intentions.isEmpty {
+            if data.intentionSet != nil, !data.intentions.isEmpty {
                 Section("Intentions") {
                     ForEach(data.intentions, id: \.id) { intention in
                         intentionSection(dayData: data, intention: intention)
@@ -231,12 +231,12 @@ struct DayDetailView: View {
         return formatter.string(from: date)
     }
     
-    /// Slice A: Mood display with 0-10 score. Format: "Label (7/10)" or "Set mood"
+    /// Mood display on the centered -5...+5 scale.
     private func moodDisplayText(for mood: DailyMood?) -> String {
         guard let mood = mood else { return "Set mood" }
         let label = mood.moodLabel ?? "Set mood"
         if let score = mood.moodScore {
-            return "\(label) (\(score)/10)"
+            return "\(label) (\(MoodDisplayScale.formattedCenteredValue(forStoredScore: score)))"
         }
         return label
     }
