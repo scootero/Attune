@@ -59,7 +59,7 @@ struct CheckInDetailView: View {
                 }
             }
             
-            // Optional mood (only if this check-in contributed it). Slice A: score is 0-10.
+            // Optional mood (only if this check-in contributed it).
             if let mood = mood, mood.sourceCheckInId == checkInId {
                 Section("Mood") {
                     HStack {
@@ -67,7 +67,7 @@ struct CheckInDetailView: View {
                             Text(label)
                         }
                         if let score = mood.moodScore {
-                            Text("(\(score)/10)")
+                            Text("(\(MoodDisplayScale.formattedCenteredValue(forStoredScore: score)))")
                                 .foregroundColor(.secondary)
                         }
                         if mood.moodLabel == nil && mood.moodScore == nil {

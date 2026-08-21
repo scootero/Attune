@@ -2,14 +2,11 @@
 //  MoodEditorView.swift
 //  Attune
 //
-//  Clear 0-10 mood score with optional descriptive tags.
+//  Clear centered mood score with optional descriptive tags.
 //  Saves as manual override. Clearing allows Attune to update mood from a check-in.
 //
 
 import SwiftUI
-
-/// Preset mood labels for quick selection
-private let moodLabels = ["Calm", "Focused", "Happy", "Energized", "Neutral", "Tired", "Anxious", "Stressed"]
 
 struct MoodEditorView: View {
     @Environment(\.dismiss) private var dismiss
@@ -17,7 +14,7 @@ struct MoodEditorView: View {
     let dateKey: String
     let onSaved: () -> Void
     
-    /// Mood score 0-10 (0 = lowest, 10 = highest). Slice A: migrated from -2..+2.
+    /// Compatible stored score (0...10); displayed as -5...+5.
     @State private var selectedLabel: String?
     @State private var moodScore: Int = 5
     @State private var hasExistingMood = false
@@ -35,11 +32,13 @@ struct MoodEditorView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         VStack(spacing: 10) {
-                            Text("\(moodScore)")
+                            Text(MoodDisplayScale.emoji(forStoredScore: moodScore))
+                                .font(.system(size: 48))
+                            Text(MoodDisplayScale.formattedCenteredValue(forStoredScore: moodScore))
                                 .font(.system(size: 64, weight: .bold, design: .rounded))
                                 .foregroundStyle(AttuneTheme.textPrimary)
                                 .contentTransition(.numericText())
-                            Text("out of 10 · \(scoreDescription)")
+                            Text(scoreDescription)
                                 .font(.headline)
                                 .foregroundStyle(AttuneTheme.accent)
 
@@ -53,12 +52,14 @@ struct MoodEditorView: View {
                             )
                             .tint(AttuneTheme.accent)
                             .accessibilityLabel("Mood score")
-                            .accessibilityValue("\(moodScore) out of 10")
+                            .accessibilityValue(MoodDisplayScale.formattedCenteredValue(forStoredScore: moodScore))
 
                             HStack {
-                                Text("Very low")
+                                Text("−5")
                                 Spacer()
-                                Text("Excellent")
+                                Text("0 neutral")
+                                Spacer()
+                                Text("+5")
                             }
                             .font(.caption)
                             .foregroundStyle(AttuneTheme.textTertiary)
@@ -75,7 +76,7 @@ struct MoodEditorView: View {
                                 .foregroundStyle(AttuneTheme.textSecondary)
 
                             LazyVGrid(columns: tagColumns, spacing: 10) {
-                                ForEach(moodLabels, id: \.self) { label in
+                                ForEach(MoodDisplayScale.feelingLabels, id: \.self) { label in
                                     Button {
                                         selectedLabel = selectedLabel == label ? nil : label
                                     } label: {
@@ -150,7 +151,7 @@ struct MoodEditorView: View {
         switch moodScore {
         case 0...2: return "Having a hard day"
         case 3...4: return "A little low"
-        case 5: return "In the middle"
+        case 5: return "Neutral"
         case 6...7: return "Doing well"
         case 8...9: return "Feeling strong"
         default: return "Excellent"

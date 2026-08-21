@@ -164,9 +164,13 @@ struct HomeView: View {
     @State private var todaysProgress: [IntentionProgressRow] = []
     @State private var currentIntentionSet: IntentionSet?
     @State private var todayMood: DailyMood?
+    /// Draft score for the inline mood rail. Stored in the existing 0...10
+    /// representation; the rail presents it as -5...+5.
+    @State private var inlineMoodScore: Int = MoodDisplayScale.neutralStoredScore
     @State private var streak: Int = 0
     @State private var showEditIntentions = false
     @State private var showMoodEditor = false
+    @State private var showFeelingPicker = false
     /// Slice 7: Data for ambiguity disambiguation sheet (nil = not showing)
     @State private var ambiguitySheetData: AmbiguitySheetData?
     /// Today's check-ins for the Today Check-ins card (newest-first)
@@ -212,6 +216,7 @@ struct HomeView: View {
     @State private var showSuggestionEvidence = false
     @ObservedObject private var suggestionToastCenter = IntentionSuggestionToastCenter.shared
     @State private var oneThingMode = OneThingModeState.empty
+    @State private var showFocusModeInfo = false
     @State private var suggestedReplacement: Intention?
     
     var body: some View {
@@ -225,7 +230,7 @@ struct HomeView: View {
                     VStack(spacing: 8) {
                         recordCheckInCTAArea
                         todaysProgressCard
-                        moodAndStreakCard
+                        moodAndFeelingCard
                         if subscriptionManager.canUseMomentumHistory {
                             weeklyMomentumCard
                         } else {
@@ -459,7 +464,7 @@ struct HomeView: View {
         }
     }
     
-    /// One compact glass row: "5 Check-ins • Mood 8/10 • 2 In Progress • 1 Done • 1 Not Started"
+    /// One compact glass row: "5 Check-ins • Mood +3 • 2 In Progress • 1 Done • 1 Not Started"
     /// Uses HomeStyle glassCard for modern crisp glassy look with bloom shadows.
     private var dailySummaryStrip: some View {
         Button(action: { showEditIntentions = true }) {
@@ -477,13 +482,17 @@ struct HomeView: View {
     }
     
     /// Slice B: Single-line format, omit zero counts. "Done" not "Complete".
-    /// Mood: shows "Mood ?" when unset (not yet from ChatGPT or manual); else "Mood X/10".
+    /// Mood: shows "Mood ?" when unset; otherwise uses the centered -5...+5 scale.
     private var compactSnapshotText: String {
         let total = intentionsInProgressCount + intentionsCompleteCount + intentionsNotStartedCount
         var parts: [String] = []
         parts.append("\(todayCheckIns.count) Check-ins")
         // When mood unset: show "Mood ?" (avoids defaulting 0 → "Stressed")
-        parts.append(hasMoodSet ? "Mood \(moodScoreToday)/10" : "Mood ?")
+        parts.append(
+            hasMoodSet
+                ? "Mood \(MoodDisplayScale.formattedCenteredValue(forStoredScore: moodScoreToday))"
+                : "Mood ?"
+        )
         if total > 0 {
             if intentionsInProgressCount > 0 { parts.append("\(intentionsInProgressCount) In Progress") }
             if intentionsCompleteCount > 0 { parts.append("\(intentionsCompleteCount) Done") }
@@ -499,9 +508,10 @@ struct HomeView: View {
         return m.moodLabel != nil || m.moodScore != nil
     }
     
-    /// Mood score 0-10 for display (from todayMood). Only valid when hasMoodSet; else use for button default.
+    /// Compatible stored mood score (0...10). User-facing mood values are
+    /// formatted through MoodDisplayScale as -5...+5.
     private var moodScoreToday: Int {
-        todayMood?.moodScore ?? 0
+        todayMood?.moodScore ?? MoodDisplayScale.neutralStoredScore
     }
     
     // MARK: - B) Intentions and Today's Progress
@@ -523,7 +533,7 @@ struct HomeView: View {
                 }
                 .padding(.vertical, 4)
             } else {
-                ForEach(Array(todaysProgress.enumerated()), id: \.element.id) { index, row in // render each intention row
+                ForEach(Array(visibleProgressRows.enumerated()), id: \.element.id) { index, row in // render each intention row
                     let neonTextColor = intentionNeonTextColor(at: index)
                     let neonAccentColor = intentionNeonAccentColor(at: index)
 
@@ -578,7 +588,6 @@ struct HomeView: View {
                         reduceMotion ? nil : .easeInOut(duration: 0.45),
                         value: highlightedProgressIntentionIDs
                     )
-                    .opacity(oneThingMode.isActive && oneThingMode.focusedIntentionId != row.id ? 0.38 : 1)
                     .accessibilityElement(children: .combine)
                 }
                 
@@ -608,30 +617,162 @@ struct HomeView: View {
     }
 
     private var oneThingModeBanner: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("ONE THING MODE", systemImage: "lock.shield")
-                .font(.caption.weight(.bold))
-                .tracking(0.9)
-                .foregroundStyle(AttuneTheme.warning)
-            Text("Two quiet days. The juggling act is off duty—pick one thing to move.")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(AttuneTheme.textPrimary)
-            HStack {
-                Menu {
-                    ForEach(todaysProgress) { row in
-                        Button(row.intention.title) { selectOneThing(row.intention.id) }
-                    }
-                } label: {
-                    Label("Switch focus", systemImage: "arrow.triangle.swap")
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Label("FOCUS MODE", systemImage: "scope")
+                    .font(.caption.weight(.bold))
+                    .tracking(1.1)
+                    .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.00))
+
                 Spacer()
-                Button("Exit") { exitOneThingMode() }
+
+                Button {
+                    showFocusModeInfo.toggle()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("About Focus Mode")
+                .popover(isPresented: $showFocusModeInfo, arrowEdge: .top) {
+                    focusModeInfo
+                        .presentationCompactAdaptation(.popover)
+                }
             }
-            .font(.caption.weight(.semibold))
+
+            HStack(alignment: .center, spacing: 14) {
+                Text(focusModePrompt)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                focusModeNavigator
+            }
         }
-        .padding(12)
-        .background(AttuneTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(AttuneTheme.warning.opacity(0.35)))
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .padding(.vertical, 12)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 0.08, green: 0.15, blue: 0.25).opacity(0.94),
+                    Color(red: 0.12, green: 0.10, blue: 0.23).opacity(0.90)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(red: 0.42, green: 0.68, blue: 0.93).opacity(0.34), lineWidth: 1)
+        )
+        .shadow(color: Color(red: 0.20, green: 0.45, blue: 0.80).opacity(0.12), radius: 10, y: 5)
+    }
+
+    private var focusModePrompt: String {
+        guard let title = focusedProgressRow?.intention.title else {
+            return "Let's just accomplish one thing today."
+        }
+        return "Let's just accomplish \(title) today."
+    }
+
+    private var focusModeNavigator: some View {
+        VStack(spacing: 5) {
+            Text("SWITCH FOCUS")
+                .font(.caption2.weight(.bold))
+                .tracking(0.7)
+                .foregroundStyle(AttuneTheme.textSecondary)
+
+            Text(adjacentFocusRow(offset: -1)?.intention.title ?? "Current")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(AttuneTheme.textSecondary)
+                .lineLimit(1)
+                .frame(maxWidth: 104)
+
+            Button { selectAdjacentFocus(offset: -1) } label: {
+                Image(systemName: "chevron.up")
+                    .font(.caption.weight(.bold))
+                    .frame(width: 44, height: 32)
+                    .background(Color.white.opacity(0.08), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(todaysProgress.count < 2)
+            .accessibilityLabel("Focus previous intention")
+
+            Button { selectAdjacentFocus(offset: 1) } label: {
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.bold))
+                    .frame(width: 44, height: 32)
+                    .background(Color.white.opacity(0.08), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(todaysProgress.count < 2)
+            .accessibilityLabel("Focus next intention")
+
+            Text(adjacentFocusRow(offset: 1)?.intention.title ?? "Current")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(AttuneTheme.textSecondary)
+                .lineLimit(1)
+                .frame(maxWidth: 104)
+        }
+        .foregroundStyle(Color(red: 0.48, green: 0.84, blue: 0.92))
+        .frame(width: 110)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var focusModeInfo: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Focus Mode", systemImage: "scope")
+                .font(.headline)
+
+            Text("Focus Mode appeared because no intention progress was recorded on either of the last two days. It keeps one intention visible so today feels more manageable.")
+                .font(.subheadline)
+                .foregroundStyle(AttuneTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button(role: .destructive) {
+                showFocusModeInfo = false
+                exitOneThingMode()
+            } label: {
+                Text("Exit Focus Mode")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(18)
+        .frame(idealWidth: 310)
+        .presentationBackground(.ultraThinMaterial)
+    }
+
+    private var focusedProgressRow: IntentionProgressRow? {
+        guard let focusedID = oneThingMode.focusedIntentionId else { return nil }
+        return todaysProgress.first(where: { $0.id == focusedID })
+    }
+
+    private var visibleProgressRows: [IntentionProgressRow] {
+        guard oneThingMode.isActive, let focusedProgressRow else { return todaysProgress }
+        return [focusedProgressRow]
+    }
+
+    private func adjacentFocusRow(offset: Int) -> IntentionProgressRow? {
+        guard todaysProgress.count > 1,
+              let focusedID = oneThingMode.focusedIntentionId,
+              let currentIndex = todaysProgress.firstIndex(where: { $0.id == focusedID }) else { return nil }
+        let count = todaysProgress.count
+        let wrappedIndex = (currentIndex + offset + count) % count
+        return todaysProgress[wrappedIndex]
+    }
+
+    private func selectAdjacentFocus(offset: Int) {
+        guard let destination = adjacentFocusRow(offset: offset) else { return }
+        selectOneThing(destination.id)
     }
 
     @ViewBuilder
@@ -824,28 +965,32 @@ struct HomeView: View {
         Button(action: {
             appRouter.navigateToMomentum(date: Date())
         }) {
-            VStack(alignment: .leading, spacing: 14) {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: 8) {
-                        weeklyMomentumDayTileTitle
-                        weeklyMomentumDayTileSummary
-                    }
-                } else {
-                    HStack(alignment: .top, spacing: 12) {
-                        weeklyMomentumDayTileTitle
-                        Spacer(minLength: 8)
-                        weeklyMomentumDayTileSummary
-                    }
-                }
+            ZStack {
+                WeeklyMomentumCardAtmosphere()
 
-                WeeklyMomentumDayTileStrip(
-                    days: weekMomentum.days,
-                    colorForProgress: colorForProgressRatio
-                )
+                VStack(alignment: .leading, spacing: 14) {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: 8) {
+                            weeklyMomentumDayTileTitle
+                            weeklyMomentumDayTileSummary
+                        }
+                    } else {
+                        HStack(alignment: .top, spacing: 12) {
+                            weeklyMomentumDayTileTitle
+                            Spacer(minLength: 8)
+                            weeklyMomentumDayTileSummary
+                        }
+                    }
+
+                    WeeklyMomentumDayTileStrip(
+                        days: weekMomentum.days,
+                        colorForProgress: colorForProgressRatio
+                    )
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 15)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 15)
-            .padding(.bottom, 16)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -862,26 +1007,57 @@ struct HomeView: View {
             Text("Daily intention progress")
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(AttuneTheme.textPrimary)
-            Text("Each tile shows that day's progress.")
-                .font(.caption2)
-                .foregroundStyle(AttuneTheme.textSecondary)
         }
     }
 
     private var weeklyMomentumDayTileSummary: some View {
-        HStack(spacing: 7) {
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(weeklyMomentumAverageRatio.map { "\(Int(($0 * 100).rounded()))%" } ?? "—")
-                    .font(.subheadline.monospacedDigit().weight(.bold))
-                    .foregroundStyle(weeklyMomentumAverageColor)
-                Text(weeklyMomentumAverageRatio == nil ? "no entries yet" : "week average")
-                    .font(.caption2)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+        HStack(spacing: 8) {
+            HStack(spacing: 7) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.orange.opacity(0.32), Color.red.opacity(0.10)],
+                                center: .topLeading,
+                                startRadius: 1,
+                                endRadius: 24
+                            )
+                        )
+                    Image(systemName: "flame.fill")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.yellow, Color.orange, Color.red.opacity(0.86)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
+                .frame(width: 25, height: 25)
+
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text("\(streak)")
+                        .font(.subheadline.monospacedDigit().weight(.bold))
+                        .foregroundStyle(AttuneTheme.textPrimary)
+                    Text("STREAK")
+                        .font(.system(size: 8, weight: .bold))
+                        .tracking(0.55)
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                }
             }
+            .padding(.leading, 6)
+            .padding(.trailing, 7)
+            .padding(.vertical, 4)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().stroke(Color.orange.opacity(0.22), lineWidth: 0.8))
+            .shadow(color: Color.orange.opacity(0.10), radius: 8, y: 3)
+
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(AttuneTheme.accent)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(streak) day streak. Open Momentum history")
     }
 
     /// A seven-point 3D path made from radial progress dials. The dial arc and
@@ -1334,15 +1510,15 @@ struct HomeView: View {
         return String(format: "%.1f", value) // one decimal for readability
     }
     
-    // MARK: - C) Mood and streak
+    // MARK: - C) Mood and feeling
 
-    private var moodAndStreakCard: some View {
+    private var moodAndFeelingCard: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 0) {
                     moodControl
                     Divider().overlay(AttuneTheme.border)
-                    streakSummary
+                    feelingControl
                 }
             } else {
                 HStack(spacing: 0) {
@@ -1350,89 +1526,262 @@ struct HomeView: View {
                     Rectangle()
                         .fill(AttuneTheme.border)
                         .frame(width: 1, height: 40)
-                    streakSummary
+                    feelingControl
                 }
             }
         }
         .attuneCard()
+        .overlay(alignment: .trailing) {
+            if showFeelingPicker {
+                feelingPicker
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .scale(scale: 0.94, anchor: .center).combined(with: .opacity)
+                    )
+            }
+        }
+        .zIndex(showFeelingPicker ? 30 : 0)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: showFeelingPicker)
     }
 
     private var moodControl: some View {
-        Button(action: { showMoodEditor = true }) {
-            HStack(spacing: 10) {
-                Text(moodEmoji)
-                    .font(.system(size: 27))
-                    .frame(width: 38, height: 38)
+        GeometryReader { geometry in
+            // Keep the emoji/value capsule inside its half of the split card at
+            // both extremes while leaving enough rail for eleven clear stops.
+            let horizontalInset: CGFloat = 30
+            let trackWidth = max(1, geometry.size.width - horizontalInset * 2)
+            let selectedX = horizontalInset + trackWidth * CGFloat(inlineMoodScore) / 10
+
+            ZStack(alignment: .topLeading) {
+                Rectangle()
+                    .fill(AttuneTheme.border)
+                    .frame(width: trackWidth, height: 2)
+                    .offset(x: horizontalInset, y: 50)
+
+                Rectangle()
+                    .fill(AttuneTheme.accent.opacity(0.62))
+                    .frame(
+                        width: abs(selectedX - geometry.size.width / 2),
+                        height: 2
+                    )
+                    .offset(x: min(selectedX, geometry.size.width / 2), y: 50)
+
+                ForEach(0...10, id: \.self) { score in
+                    let tickX = horizontalInset + trackWidth * CGFloat(score) / 10
+                    Rectangle()
+                        .fill(score == inlineMoodScore ? AttuneTheme.accent : AttuneTheme.textTertiary.opacity(0.72))
+                        .frame(width: score == 5 ? 2 : 1, height: score == 5 ? 12 : 8)
+                        .offset(x: tickX - (score == 5 ? 1 : 0.5), y: score == 5 ? 45 : 47)
+                }
+
+                HStack(spacing: 3) {
+                    Text(MoodDisplayScale.emoji(forStoredScore: inlineMoodScore))
+                        .font(.system(size: 25))
+                    Text(hasMoodSet ? MoodDisplayScale.formattedCenteredValue(forStoredScore: inlineMoodScore) : "?")
+                        .font(.caption2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(hasMoodSet ? AttuneTheme.accent : AttuneTheme.textSecondary)
+                }
+                .fixedSize()
+                .padding(.horizontal, 7)
+                .frame(height: 36)
+                .background(AttuneTheme.surfaceStrong.opacity(0.94), in: Capsule())
+                .overlay(Capsule().stroke(AttuneTheme.accent.opacity(0.28), lineWidth: 1))
+                .position(x: selectedX, y: 23)
+                .animation(reduceMotion ? nil : .snappy(duration: 0.18), value: inlineMoodScore)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    .onChanged { value in
+                        let progress = min(1, max(0, (value.location.x - horizontalInset) / trackWidth))
+                        let nextScore = Int((progress * 10).rounded())
+                        guard nextScore != inlineMoodScore else { return }
+                        inlineMoodScore = nextScore
+                        let generator = UISelectionFeedbackGenerator()
+                        generator.prepare()
+                        generator.selectionChanged()
+                    }
+                    .onEnded { _ in
+                        saveInlineMood(score: inlineMoodScore)
+                    }
+            )
+        }
+        .frame(maxWidth: .infinity, minHeight: 66)
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Today's mood")
+        .accessibilityValue(
+            hasMoodSet
+                ? MoodDisplayScale.formattedCenteredValue(forStoredScore: inlineMoodScore)
+                : "Not set, neutral position"
+        )
+        .accessibilityHint("Swipe up or down to change the mood one step")
+        .accessibilityAdjustableAction { direction in
+            let delta = direction == .increment ? 1 : -1
+            let nextScore = min(10, max(0, inlineMoodScore + delta))
+            guard nextScore != inlineMoodScore else { return }
+            inlineMoodScore = nextScore
+            saveInlineMood(score: nextScore)
+        }
+    }
+
+    private var feelingControl: some View {
+        Button {
+            showFeelingPicker.toggle()
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: "heart.text.square.fill")
+                    .font(.title3)
+                    .foregroundStyle(AttuneTheme.accent)
+                    .frame(width: 34, height: 34)
                     .background(AttuneTheme.accent.opacity(0.14), in: Circle())
+                    .accessibilityHidden(true)
+
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Mood")
+                    Text("Feeling")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AttuneTheme.textPrimary)
-                    Text(compactMoodSummaryText)
+                    Text(todayMood?.moodLabel ?? "Choose one")
                         .font(.caption)
-                        .foregroundStyle(AttuneTheme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(todayMood?.moodLabel == nil ? AttuneTheme.textSecondary : AttuneTheme.accent)
+                        .lineLimit(1)
                 }
-                Spacer(minLength: 4)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(AttuneTheme.textTertiary)
             }
             .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(hasMoodSet ? "Mood \(moodScoreToday) out of 10, \(moodSummaryText)" : "Set today's mood")
+        .accessibilityLabel("Feeling")
+        .accessibilityValue(todayMood?.moodLabel ?? "Not selected")
+        .accessibilityHint("Opens the feeling selector")
     }
 
-    private var streakSummary: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "flame.fill")
-                .font(.title3)
-                .foregroundStyle(AttuneTheme.accent)
-                .frame(width: 34, height: 34)
-                .background(AttuneTheme.accent.opacity(0.14), in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Streak")
+    private var feelingPicker: some View {
+        VStack(spacing: 3) {
+            ForEach(MoodDisplayScale.feelingLabels, id: \.self) { feeling in
+                feelingOption(feeling)
+            }
+        }
+        .padding(7)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(
+            Color(red: 0.035, green: 0.055, blue: 0.075).opacity(0.86),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [AttuneTheme.accent.opacity(0.62), Color.white.opacity(0.12)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        }
+        .shadow(color: Color.black.opacity(0.48), radius: 22, y: 10)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func feelingOption(_ feeling: String) -> some View {
+        let dotColor = feelingColor(feeling)
+        let isSelected = todayMood?.moodLabel == feeling
+
+        return Button {
+            selectFeeling(feeling)
+        } label: {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(dotColor)
+                    .frame(width: 8, height: 8)
+                    .shadow(color: dotColor.opacity(0.55), radius: 4)
+
+                Text(feeling)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AttuneTheme.textPrimary)
-                Text("\(streak) \(streak == 1 ? "day" : "days")")
-                    .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+
+                Spacer(minLength: 8)
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(AttuneTheme.accent)
+                }
             }
-            Spacer(minLength: 0)
+            .padding(.horizontal, 12)
+            .frame(width: 184)
+            .frame(minHeight: 39)
+            .background(
+                isSelected ? AttuneTheme.accent.opacity(0.13) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Streak")
-        .accessibilityValue("\(streak) \(streak == 1 ? "day" : "days")")
+        .buttonStyle(.plain)
     }
 
     private var moodEmoji: String {
-        guard hasMoodSet else { return "🙂" }
-        switch moodScoreToday {
-        case 0...2: return "😞"
-        case 3...4: return "🙁"
-        case 5...6: return "😐"
-        case 7...8: return "🙂"
-        default: return "😄"
-        }
+        MoodDisplayScale.emoji(forStoredScore: moodScoreToday)
     }
 
     private var compactMoodSummaryText: String {
         guard hasMoodSet else { return "Not set" }
         if let label = todayMood?.moodLabel, !label.isEmpty {
-            return "\(moodScoreToday)/10 · \(label)"
+            return "\(MoodDisplayScale.formattedCenteredValue(forStoredScore: moodScoreToday)) · \(label)"
         }
-        return "\(moodScoreToday)/10 · \(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday)))"
+        return "\(MoodDisplayScale.formattedCenteredValue(forStoredScore: moodScoreToday)) · \(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday)))"
     }
 
     private var moodSummaryText: String {
         guard hasMoodSet else { return "Add a score and optional feeling" }
         if let label = todayMood?.moodLabel, !label.isEmpty {
-            return "\(label) · \(moodScoreToday)/10"
+            return "\(label) · \(MoodDisplayScale.formattedCenteredValue(forStoredScore: moodScoreToday))"
         }
-        return "\(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday))) · \(moodScoreToday)/10"
+        return "\(MoodTier.moodLabel(for: MoodTier.moodTier(for: moodScoreToday))) · \(MoodDisplayScale.formattedCenteredValue(forStoredScore: moodScoreToday))"
+    }
+
+    private func saveInlineMood(score: Int) {
+        guard !hasMoodSet || moodScoreToday != score else { return }
+        do {
+            try DailyMoodStore.shared.setMoodManual(
+                dateKey: ProgressCalculator.dateKey(for: Date()),
+                moodLabel: todayMood?.moodLabel,
+                moodScore: score
+            )
+            refreshMoodAndStreak()
+        } catch {
+            AppLogger.log(AppLogger.ERR, "Inline mood save failed error=\"\(error.localizedDescription)\"")
+        }
+    }
+
+    private func selectFeeling(_ feeling: String) {
+        do {
+            try DailyMoodStore.shared.setMoodManual(
+                dateKey: ProgressCalculator.dateKey(for: Date()),
+                moodLabel: feeling,
+                moodScore: inlineMoodScore
+            )
+            showFeelingPicker = false
+            refreshMoodAndStreak()
+        } catch {
+            AppLogger.log(AppLogger.ERR, "Feeling save failed error=\"\(error.localizedDescription)\"")
+        }
+    }
+
+    private func feelingColor(_ feeling: String) -> Color {
+        switch feeling {
+        case "Happy", "Energized": return Color(red: 0.32, green: 0.90, blue: 0.62)
+        case "Calm", "Focused": return Color(red: 0.34, green: 0.80, blue: 0.96)
+        case "Neutral": return Color(red: 0.78, green: 0.76, blue: 0.68)
+        case "Tired": return Color(red: 0.64, green: 0.58, blue: 0.88)
+        case "Anxious": return Color(red: 0.98, green: 0.66, blue: 0.30)
+        default: return Color(red: 0.96, green: 0.38, blue: 0.42)
+        }
     }
 
     // MARK: - D) Record Check-In Hero
@@ -1615,7 +1964,7 @@ struct HomeView: View {
             let dateKey = ProgressCalculator.dateKey(for: checkIn.createdAt)
             if let mood = DailyMoodStore.shared.loadDailyMood(dateKey: dateKey), mood.sourceCheckInId == checkInId {
                 if let score = mood.moodScore {
-                    changes.append("Mood \(score)/10")
+                    changes.append("Mood \(MoodDisplayScale.formattedCenteredValue(forStoredScore: score))")
                 } else if let label = mood.moodLabel, !label.isEmpty {
                     changes.append("Mood: \(label)")
                 }
@@ -2117,6 +2466,7 @@ struct HomeView: View {
     private func loadTodayMood() {
         let dateKey = ProgressCalculator.dateKey(for: Date())
         todayMood = DailyMoodStore.shared.loadDailyMood(dateKey: dateKey)
+        inlineMoodScore = todayMood?.moodScore ?? MoodDisplayScale.neutralStoredScore
     }
     
     private func loadTodaysProgress() {
@@ -2609,6 +2959,10 @@ private struct WeeklyMomentumDayTile: View {
         return min(1, max(0, ratio))
     }
 
+    private var isMissedDay: Bool {
+        !day.isFutureDay && !day.hasData
+    }
+
     private var percentageText: String {
         guard let ratio = visibleRatio else { return "—" }
         return "\(Int((ratio * 100).rounded()))%"
@@ -2616,49 +2970,88 @@ private struct WeeklyMomentumDayTile: View {
 
     var body: some View {
         GeometryReader { geometry in
-            ZStack(alignment: .bottom) {
+            ZStack {
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(Color.white.opacity(0.055))
+                    .fill(isMissedDay ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.white.opacity(0.055)))
 
-                if let ratio = visibleRatio {
+                if isMissedDay {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
                         .fill(
-                            LinearGradient(
-                                colors: [color.opacity(0.48), color.opacity(0.15)],
-                                startPoint: .bottom,
-                                endPoint: .top
+                            RadialGradient(
+                                colors: [
+                                    Color(red: 0.80, green: 0.12, blue: 0.18).opacity(0.24),
+                                    Color(red: 0.45, green: 0.04, blue: 0.10).opacity(0.10),
+                                    Color.clear
+                                ],
+                                center: .topLeading,
+                                startRadius: 2,
+                                endRadius: 90
                             )
                         )
-                        .frame(height: max(7, geometry.size.height * CGFloat(ratio)))
                         .padding(2)
-                        .shadow(color: color.opacity(0.34), radius: 6, y: 2)
+
+                    Circle()
+                        .fill(Color.red.opacity(0.16))
+                        .frame(width: 52, height: 52)
+                        .blur(radius: 14)
+                        .offset(x: geometry.size.width * 0.24, y: -geometry.size.height * 0.28)
+                } else if let ratio = visibleRatio {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(color.opacity(0.07 + ratio * 0.10))
+                        .padding(2)
                 }
 
-                VStack(spacing: 0) {
+                VStack(spacing: 4) {
                     Text(day.weekdayLetter)
                         .font(.caption.weight(.bold))
                         .foregroundStyle(isToday ? AttuneTheme.accent : AttuneTheme.textSecondary)
 
-                    Spacer(minLength: 4)
+                    Spacer(minLength: 1)
+
+                    DayProgressBarSilhouette(
+                        progress: visibleRatio,
+                        color: color,
+                        isFuture: day.isFutureDay,
+                        isMissed: isMissedDay
+                    )
+                    .frame(height: 34)
 
                     Text(percentageText)
                         .font(.caption.monospacedDigit().weight(.bold))
-                        .foregroundStyle(visibleRatio == nil ? AttuneTheme.textTertiary : Color.white)
+                        .foregroundStyle(
+                            isMissedDay
+                                ? Color(red: 0.96, green: 0.48, blue: 0.50).opacity(0.76)
+                                : (visibleRatio == nil ? AttuneTheme.textTertiary : Color.white)
+                        )
                         .minimumScaleFactor(0.72)
                         .lineLimit(1)
-
-                    Circle()
-                        .fill(isToday ? AttuneTheme.accent : Color.clear)
-                        .frame(width: 5, height: 5)
-                        .padding(.top, 7)
                 }
                 .padding(.horizontal, 4)
-                .padding(.vertical, 9)
+                .padding(.top, 8)
+                .padding(.bottom, 7)
+
+                if isMissedDay {
+                    Path { path in
+                        path.move(to: CGPoint(x: geometry.size.width * 0.17, y: geometry.size.height * 0.62))
+                        path.addLine(to: CGPoint(x: geometry.size.width * 0.83, y: geometry.size.height * 0.38))
+                    }
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.red.opacity(0.34), Color.white.opacity(0.66), Color.red.opacity(0.34)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
+                    )
+                    .shadow(color: Color.red.opacity(0.32), radius: 4)
+                }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .stroke(
-                        isToday ? AttuneTheme.accent.opacity(0.88) : Color.white.opacity(0.09),
+                        isToday
+                            ? AttuneTheme.accent.opacity(0.88)
+                            : (isMissedDay ? Color.red.opacity(0.25) : Color.white.opacity(0.09)),
                         lineWidth: isToday ? 1.4 : 0.7
                     )
             }
@@ -2673,6 +3066,52 @@ private struct WeeklyMomentumDayTile: View {
         if day.isFutureDay { return "\(prefix)\(day.weekdayLetter), future day" }
         guard visibleRatio != nil else { return "\(prefix)\(day.weekdayLetter), no progress entry" }
         return "\(prefix)\(day.weekdayLetter), \(percentageText) intention progress"
+    }
+}
+
+/// Three quiet target bars remain visible before progress is recorded. Each
+/// one fills from its baseline as the day's completion ratio grows.
+private struct DayProgressBarSilhouette: View {
+    let progress: Double?
+    let color: Color
+    let isFuture: Bool
+    let isMissed: Bool
+
+    private let heights: [CGFloat] = [16, 24, 33]
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 3) {
+            ForEach(Array(heights.enumerated()), id: \.offset) { _, height in
+                ZStack(alignment: .bottom) {
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(Color.white.opacity(isFuture ? 0.025 : 0.05))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                                .stroke(
+                                    isMissed ? Color.red.opacity(0.20) : Color.white.opacity(0.14),
+                                    lineWidth: 0.75
+                                )
+                        }
+
+                    if let progress {
+                        RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [color.opacity(0.62), color],
+                                    startPoint: .bottom,
+                                    endPoint: .top
+                                )
+                            )
+                            .frame(height: max(2, height * CGFloat(progress)))
+                            .shadow(color: color.opacity(0.30), radius: 3, y: 1)
+                    }
+                }
+                .frame(width: 7, height: height)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .opacity(isFuture ? 0.36 : 1)
+        .accessibilityHidden(true)
     }
 }
 

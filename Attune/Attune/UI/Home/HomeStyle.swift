@@ -344,8 +344,8 @@ private struct TodayIntentionsCardModifier: ViewModifier {
                         .offset(x: 102, y: -54)
                         .blur(radius: 3)
 
-                    RetroDistanceTexture()
-                        .opacity(0.68)
+                    FabricSpaceTexture()
+                        .opacity(0.52)
 
                     LinearGradient(
                         colors: [Color.white.opacity(0.07), .clear, Color.black.opacity(0.28)],
@@ -379,101 +379,58 @@ private struct TodayIntentionsCardModifier: ViewModifier {
     }
 }
 
-private struct RetroDistanceTexture: View {
+/// A quiet field of soft, drifting threads. The curves span the full card and
+/// never converge, keeping the texture atmospheric instead of forming a point.
+private struct FabricSpaceTexture: View {
     private let neonPink = Color(red: 1.00, green: 0.22, blue: 0.62)
     private let neonPurple = Color(red: 0.58, green: 0.34, blue: 1.00)
     private let neonCyan = Color(red: 0.10, green: 0.90, blue: 0.94)
 
     var body: some View {
         Canvas { context, size in
-            let vanishingPoint = CGPoint(x: size.width * 0.52, y: size.height * 0.28)
-
-            // A long radial tunnel extends to both vertical edges. There are no
-            // horizontal cross-lines, so the field cannot be confused with the
-            // intention progress tracks.
-            for (rayIndex, x) in stride(from: -size.width, through: size.width * 2, by: 25).enumerated() {
-                let bottom = CGPoint(x: x, y: size.height * 1.08)
-                var ray = Path()
-                ray.move(to: vanishingPoint)
-                ray.addLine(to: bottom)
-                context.stroke(
-                    ray,
-                    with: .color(neonPurple.opacity(0.24)),
-                    lineWidth: 0.65
+            for index in 0..<18 {
+                let progress = CGFloat(index) / 17
+                let baseY = size.height * (-0.08 + progress * 1.16)
+                let wave = sin(CGFloat(index) * 1.37) * size.height * 0.075
+                var thread = Path()
+                thread.move(to: CGPoint(x: -size.width * 0.08, y: baseY))
+                thread.addCurve(
+                    to: CGPoint(x: size.width * 1.08, y: baseY - wave * 0.35),
+                    control1: CGPoint(x: size.width * 0.24, y: baseY + wave),
+                    control2: CGPoint(x: size.width * 0.70, y: baseY - wave)
                 )
-
-                drawDepthParticles(
-                    context: &context,
-                    from: vanishingPoint,
-                    to: bottom,
-                    rayIndex: rayIndex
-                )
+                let color: Color = index.isMultiple(of: 3)
+                    ? neonCyan
+                    : (index.isMultiple(of: 2) ? neonPurple : neonPink)
+                context.stroke(thread, with: .color(color.opacity(0.075)), lineWidth: 0.7)
             }
 
-            for (rayIndex, x) in stride(from: -size.width * 0.4, through: size.width * 1.4, by: 38).enumerated() {
-                let top = CGPoint(x: x, y: -size.height * 0.08)
-                var ray = Path()
-                ray.move(to: vanishingPoint)
-                ray.addLine(to: top)
-                context.stroke(
-                    ray,
-                    with: .color(neonCyan.opacity(0.10)),
-                    lineWidth: 0.5
+            // A second, diagonal weave gives the field a fabric-like gravity
+            // without requiring animation or an image asset.
+            for index in 0..<11 {
+                let progress = CGFloat(index) / 10
+                let startX = size.width * (-0.18 + progress * 1.26)
+                var thread = Path()
+                thread.move(to: CGPoint(x: startX, y: -size.height * 0.08))
+                thread.addCurve(
+                    to: CGPoint(x: startX + size.width * 0.20, y: size.height * 1.08),
+                    control1: CGPoint(x: startX - size.width * 0.12, y: size.height * 0.30),
+                    control2: CGPoint(x: startX + size.width * 0.26, y: size.height * 0.68)
                 )
-
-                drawDepthParticles(
-                    context: &context,
-                    from: vanishingPoint,
-                    to: top,
-                    rayIndex: rayIndex + 40
-                )
+                context.stroke(thread, with: .color(Color.white.opacity(0.035)), lineWidth: 0.55)
             }
 
-            // Sparse deterministic grain makes the gradient feel printed rather
-            // than digitally flat.
-            for x in stride(from: CGFloat(2), through: size.width, by: 7) {
-                for y in stride(from: CGFloat(2), through: size.height, by: 7) {
-                    let signal = sin(x * 0.19) + cos(y * 0.23) + sin((x + y) * 0.11)
-                    let opacity = 0.025 + abs(signal) * 0.018
-                    let speck = CGRect(x: x, y: y, width: 1.15, height: 1.15)
-                    context.fill(Path(ellipseIn: speck), with: .color(Color.white.opacity(opacity)))
+            for x in stride(from: CGFloat(6), through: size.width, by: 18) {
+                for y in stride(from: CGFloat(8), through: size.height, by: 18) {
+                    let signal = sin(x * 0.13) + cos(y * 0.17) + sin((x + y) * 0.07)
+                    if signal > 1.15 {
+                        let speck = CGRect(x: x, y: y, width: 1.4, height: 1.4)
+                        context.fill(Path(ellipseIn: speck), with: .color(Color.white.opacity(0.055)))
+                    }
                 }
             }
         }
-        .blur(radius: 0.55)
-    }
-
-    private func drawDepthParticles(
-        context: inout GraphicsContext,
-        from start: CGPoint,
-        to end: CGPoint,
-        rayIndex: Int
-    ) {
-        for step in 1...5 {
-            let base = CGFloat(step) / 5
-            let distance = pow(base, 2.15)
-            let jitter = CGFloat((rayIndex + step).isMultiple(of: 3) ? 0.018 : -0.012)
-            let progress = min(1, max(0, distance + jitter))
-            let x = start.x + (end.x - start.x) * progress
-            let y = start.y + (end.y - start.y) * progress
-            let diameter = 0.7 + progress * 2.2
-            let color: Color
-            switch (rayIndex + step) % 3 {
-            case 0: color = neonPink
-            case 1: color = neonPurple
-            default: color = neonCyan
-            }
-            let particle = CGRect(
-                x: x - diameter / 2,
-                y: y - diameter / 2,
-                width: diameter,
-                height: diameter
-            )
-            context.fill(
-                Path(ellipseIn: particle),
-                with: .color(color.opacity(0.09 + progress * 0.22))
-            )
-        }
+        .blur(radius: 5.5)
     }
 }
 

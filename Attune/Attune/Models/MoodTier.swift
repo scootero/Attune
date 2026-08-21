@@ -60,3 +60,43 @@ extension MoodTier {
         }
     }
 }
+
+/// User-facing mood scale. Persistence and check-in extraction continue to use
+/// the compatible 0...10 score, while the UI presents neutral as 0 with five
+/// steps in either direction.
+enum MoodDisplayScale {
+    static let neutralStoredScore = 5
+    static let feelingLabels = [
+        "Calm", "Focused", "Happy", "Energized",
+        "Neutral", "Tired", "Anxious", "Stressed"
+    ]
+
+    static func centeredValue(forStoredScore score: Int) -> Int {
+        min(10, max(0, score)) - neutralStoredScore
+    }
+
+    static func storedScore(forCenteredValue value: Int) -> Int {
+        min(5, max(-5, value)) + neutralStoredScore
+    }
+
+    static func formattedCenteredValue(forStoredScore score: Int) -> String {
+        let value = centeredValue(forStoredScore: score)
+        return value > 0 ? "+\(value)" : "\(value)"
+    }
+
+    static func emoji(forStoredScore score: Int) -> String {
+        switch min(10, max(0, score)) {
+        case 0: return "😫"
+        case 1: return "😣"
+        case 2: return "😞"
+        case 3: return "🙁"
+        case 4: return "😕"
+        case 5: return "😶"
+        case 6: return "🙂"
+        case 7: return "😊"
+        case 8: return "😄"
+        case 9: return "😁"
+        default: return "🤩"
+        }
+    }
+}
