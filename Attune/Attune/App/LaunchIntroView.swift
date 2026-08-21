@@ -53,7 +53,7 @@ struct LaunchIntroView: View {
 
         // Never trap someone on the intro if playback or its completion notification fails.
         fallbackTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2.25))
+            try? await Task.sleep(for: .seconds(3.25))
             guard !Task.isCancelled else { return }
             finish()
         }

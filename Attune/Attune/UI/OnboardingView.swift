@@ -50,7 +50,7 @@ struct OnboardingView: View {
                             .foregroundStyle(AttuneTheme.textTertiary)
                     }
                     if selectedPage == 0 {
-                        Text("Track what matters. Talk out the rest.")
+                        Text("Your voice, made meaningful.")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(AttuneTheme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)

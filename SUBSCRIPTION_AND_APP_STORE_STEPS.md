@@ -23,7 +23,8 @@ Tech choice:
 ### App identity
 | Field | Exact value |
 |------|-------------|
-| App name | `Attune` |
+| App Store name | `Attune: Intentions Tracking` |
+| Subtitle | `Are you in tune?` |
 | Bundle ID | `com.scottoliver.Attune` |
 | Xcode project | `/Users/scott/Desktop/Attune/Attune/Attune/Attune.xcodeproj` |
 | Scheme | `Attune` |

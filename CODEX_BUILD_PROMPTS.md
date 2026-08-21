@@ -158,7 +158,7 @@ The project currently uses Xcode's generated launch screen, not a customizable
 SwiftUI loading view. Do NOT introduce an artificial splash delay to display a
 tagline.
 
-Place "Track what matters. Talk out the rest." beneath the Attune wordmark on
+Place "Your voice, made meaningful." beneath the Attune wordmark on
 the first onboarding screen only. Do not duplicate it in the Talk it out empty
 state; that screen gets the concrete occasion copy in Task 1E instead.
 

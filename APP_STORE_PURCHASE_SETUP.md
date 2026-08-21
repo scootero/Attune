@@ -21,7 +21,8 @@ This is the full checklist to make Attune purchasable with one subscription.
 
 ## Fixed values (use exactly)
 
-- App name: `Attune`
+- App Store name: `Attune: Intentions Tracking`
+- Subtitle: `Are you in tune?`
 - Bundle ID: `com.scottoliver.Attune`
 - Team ID: `BLAUCQ8H26`
 - Subscription Group: `Attune Premium`
@@ -49,7 +50,7 @@ This is the full checklist to make Attune purchasable with one subscription.
 
 ### 2) Create subscription product
 - App Store Connect → My Apps → Attune → Monetization → Subscriptions
-- Create group: `Attune Premium`
+- Rename or create group: `Attune Premium`
 - Create product:
   - Reference Name: `Attune Pro Monthly`
   - Product ID: `com.scottoliver.Attune.monthly`

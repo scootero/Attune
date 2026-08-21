@@ -412,6 +412,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Attune/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Attune;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Attune uses the microphone to record your voice during sessions so it can be transcribed and organized into personal insights. Audio is processed only for this purpose.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Attune uses speech recognition to convert your recorded audio into text so you can review, reflect on, and organize your sessions.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -452,6 +453,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Attune/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Attune;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Attune uses the microphone to record your voice during sessions so it can be transcribed and organized into personal insights. Audio is processed only for this purpose.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Attune uses speech recognition to convert your recorded audio into text so you can review, reflect on, and organize your sessions.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

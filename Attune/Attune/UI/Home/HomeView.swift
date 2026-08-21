@@ -51,13 +51,14 @@ private enum CheckInHighlightKind {
 }
 
 /// Keep the redesigned Home chart independently reversible while it is being
-/// evaluated. Change this one value to `.classicBars` to restore the previous
-/// card without touching its implementation or the weekly data pipeline.
+/// evaluated. Change this one value to `.depthDials` or `.classicBars` to
+/// restore either earlier card without touching its implementation or data.
 private enum HomeWeeklyMomentumDesign {
+    case dayTiles
     case depthDials
     case classicBars
 
-    static let active: Self = .depthDials
+    static let active: Self = .dayTiles
 }
 
 /// Slice 7: Context for ambiguity disambiguation sheet (Identifiable for .sheet(item:))
@@ -808,10 +809,78 @@ struct HomeView: View {
     @ViewBuilder
     private var weeklyMomentumCard: some View {
         switch HomeWeeklyMomentumDesign.active {
+        case .dayTiles:
+            weeklyMomentumDayTileCard
         case .depthDials:
             weeklyMomentumDepthDialCard
         case .classicBars:
             classicWeeklyMomentumCard
+        }
+    }
+
+    /// A literal seven-day mosaic: every tile names the day and prints its
+    /// percentage, while color and fill act only as supporting cues.
+    private var weeklyMomentumDayTileCard: some View {
+        Button(action: {
+            appRouter.navigateToMomentum(date: Date())
+        }) {
+            VStack(alignment: .leading, spacing: 14) {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 8) {
+                        weeklyMomentumDayTileTitle
+                        weeklyMomentumDayTileSummary
+                    }
+                } else {
+                    HStack(alignment: .top, spacing: 12) {
+                        weeklyMomentumDayTileTitle
+                        Spacer(minLength: 8)
+                        weeklyMomentumDayTileSummary
+                    }
+                }
+
+                WeeklyMomentumDayTileStrip(
+                    days: weekMomentum.days,
+                    colorForProgress: colorForProgressRatio
+                )
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 15)
+            .padding(.bottom, 16)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .attuneCard()
+        .accessibilityHint("Opens detailed Momentum history")
+    }
+
+    private var weeklyMomentumDayTileTitle: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("THIS WEEK")
+                .font(.caption2.weight(.bold))
+                .tracking(1.4)
+                .foregroundStyle(AttuneTheme.accent)
+            Text("Daily intention progress")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textPrimary)
+            Text("Each tile shows that day's progress.")
+                .font(.caption2)
+                .foregroundStyle(AttuneTheme.textSecondary)
+        }
+    }
+
+    private var weeklyMomentumDayTileSummary: some View {
+        HStack(spacing: 7) {
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(weeklyMomentumAverageRatio.map { "\(Int(($0 * 100).rounded()))%" } ?? "—")
+                    .font(.subheadline.monospacedDigit().weight(.bold))
+                    .foregroundStyle(weeklyMomentumAverageColor)
+                Text(weeklyMomentumAverageRatio == nil ? "no entries yet" : "week average")
+                    .font(.caption2)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(AttuneTheme.accent)
         }
     }
 
@@ -2486,6 +2555,124 @@ struct HomeView: View {
             highlightKind = .failure
             scheduleClearHighlight()
         }
+    }
+}
+
+/// Seven literal day tiles make the compact Home summary self-explanatory:
+/// the printed percentage is primary and the rising color is redundant.
+private struct WeeklyMomentumDayTileStrip: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    let days: [DayMomentum]
+    let colorForProgress: (Double) -> Color
+
+    var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4),
+                    spacing: 8
+                ) {
+                    tiles
+                }
+            } else {
+                HStack(spacing: 6) {
+                    tiles
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var tiles: some View {
+        ForEach(days) { day in
+            WeeklyMomentumDayTile(
+                day: day,
+                color: day.completionRatio.map(colorForProgress) ?? AttuneTheme.textTertiary
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 92)
+        }
+    }
+}
+
+private struct WeeklyMomentumDayTile: View {
+    let day: DayMomentum
+    let color: Color
+
+    private var isToday: Bool {
+        Calendar.current.isDateInToday(day.date)
+    }
+
+    private var visibleRatio: Double? {
+        guard !day.isFutureDay, day.hasData, let ratio = day.completionRatio else { return nil }
+        return min(1, max(0, ratio))
+    }
+
+    private var percentageText: String {
+        guard let ratio = visibleRatio else { return "—" }
+        return "\(Int((ratio * 100).rounded()))%"
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color.white.opacity(0.055))
+
+                if let ratio = visibleRatio {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [color.opacity(0.48), color.opacity(0.15)],
+                                startPoint: .bottom,
+                                endPoint: .top
+                            )
+                        )
+                        .frame(height: max(7, geometry.size.height * CGFloat(ratio)))
+                        .padding(2)
+                        .shadow(color: color.opacity(0.34), radius: 6, y: 2)
+                }
+
+                VStack(spacing: 0) {
+                    Text(day.weekdayLetter)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(isToday ? AttuneTheme.accent : AttuneTheme.textSecondary)
+
+                    Spacer(minLength: 4)
+
+                    Text(percentageText)
+                        .font(.caption.monospacedDigit().weight(.bold))
+                        .foregroundStyle(visibleRatio == nil ? AttuneTheme.textTertiary : Color.white)
+                        .minimumScaleFactor(0.72)
+                        .lineLimit(1)
+
+                    Circle()
+                        .fill(isToday ? AttuneTheme.accent : Color.clear)
+                        .frame(width: 5, height: 5)
+                        .padding(.top, 7)
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 9)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .stroke(
+                        isToday ? AttuneTheme.accent.opacity(0.88) : Color.white.opacity(0.09),
+                        lineWidth: isToday ? 1.4 : 0.7
+                    )
+            }
+            .opacity(day.isFutureDay ? 0.42 : 1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        let prefix = isToday ? "Today, " : ""
+        if day.isFutureDay { return "\(prefix)\(day.weekdayLetter), future day" }
+        guard visibleRatio != nil else { return "\(prefix)\(day.weekdayLetter), no progress entry" }
+        return "\(prefix)\(day.weekdayLetter), \(percentageText) intention progress"
     }
 }
 

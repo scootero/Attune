@@ -10,7 +10,8 @@ in `ATTUNE_REMAINING_WORK.md`.
 
 | Field | Value |
 |---|---|
-| App | `Attune` |
+| App Store name | `Attune: Intentions Tracking` |
+| Subtitle | `Are you in tune?` |
 | Bundle ID | `com.scottoliver.Attune` |
 | Subscription group | `Attune Premium` |
 | Reference name | `Attune Pro Monthly` |
@@ -116,7 +117,7 @@ Recommended choices and checks:
 ### C. Create the subscription in App Store Connect
 
 - [ ] My Apps > Attune > Monetization > Subscriptions.
-- [ ] Create or confirm subscription group `Attune Premium`.
+- [ ] Rename or confirm subscription group `Attune Premium`.
 - [ ] Create one monthly product using the fixed values above.
 - [ ] Set the United States price to $4.99/month.
 - [ ] Add the required localization, description, and review screenshot.
@@ -127,7 +128,7 @@ How to enter it:
 
 1. App Store Connect > **My Apps** > **Attune** > **Monetization** >
    **Subscriptions**.
-2. Create or confirm the group `Attune Premium`.
+2. Rename or confirm the group `Attune Premium`.
 3. Create one auto-renewable subscription using the fixed values at the top of
    this document. Carefully enter the immutable product ID
    `com.scottoliver.Attune.monthly` exactly as shown.
@@ -147,7 +148,7 @@ screenshot inventory. Scott completes or confirms the App Store Connect entries.
   Apple's standard Licensed Application End User License Agreement or a custom
   EULA; do not invent or publish a custom legal agreement without approval.
 - [ ] Complete App Privacy answers for audio, transcripts/user content, optional mood/wellness-related content where Apple asks, and third-party OpenAI processing through Attune's Worker.
-- [ ] Prepare the app name, subtitle, description, keywords, category, age rating, copyright, and contact information.
+- [ ] Enter app name `Attune: Intentions Tracking` and subtitle `Are you in tune?`, then prepare the description, keywords, category, age rating, copyright, and contact information.
 - [ ] Prepare iPhone screenshots. Attune 1.0 is configured as an iPhone-only app,
   so native iPad screenshots are not required.
 - [ ] Include the paywall/subscription experience in review preparation.

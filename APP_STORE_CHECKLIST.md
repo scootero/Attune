@@ -51,6 +51,8 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 
 ## Phase 5 — Manual App Store Connect
 
+- [ ] Set app name to `Attune: Intentions Tracking`
+- [ ] Set subtitle to `Are you in tune?`
 - [ ] Host Privacy Policy + Terms + Support pages
 - [ ] Paste live URLs into `LegalLinks.swift` (`Attune/App/LegalLinks.swift`)
 - [ ] Fill App Privacy nutrition labels (Audio, User Content, OpenAI third party)

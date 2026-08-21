@@ -37,10 +37,11 @@ struct AboutView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
-                        Text("A voice-first companion for intentions, reflection, and momentum.")
+                        Text("Your voice, made meaningful.")
                             .font(.subheadline)
                             .multilineTextAlignment(.center)
                             .foregroundColor(.secondary)
+
                     }
                     .padding(.vertical, 14)
                     Spacer()
@@ -49,6 +50,9 @@ struct AboutView: View {
             }
 
             Section("How Attune Helps") {
+                Text("A private, voice-first app for capturing intentions, recognizing patterns, and understanding your progress.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 aboutPoint(
                     icon: "mic.fill",
                     title: "Voice Check-Ins",

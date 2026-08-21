@@ -89,6 +89,7 @@ struct MomentumView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: viewMode == .day ? 8 : 16) {
                     header
+                    momentumGuideCard
                     modeSelector
                     periodNavigation
                     modeContent
@@ -147,6 +148,42 @@ struct MomentumView: View {
         }
         .pickerStyle(.segmented)
         .accessibilityHint("Changes the momentum chart period")
+    }
+
+    /// A quiet orientation card for people arriving from Home. The neutral,
+    /// fading texture keeps it distinct from the data colors used in charts.
+    private var momentumGuideCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("YOUR PROGRESS, OVER TIME")
+                .font(.caption.weight(.bold))
+                .tracking(1.1)
+                .foregroundStyle(AttuneTheme.textPrimary)
+
+            VStack(alignment: .leading, spacing: 5) {
+                momentumGuidePoint("Each check-in adds progress to your day.")
+                momentumGuidePoint("Switch Day, Week, or Month to spot patterns.")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
+        .background {
+            MomentumGuideCardBackground()
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func momentumGuidePoint(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Circle()
+                .fill(Color.white.opacity(0.48))
+                .frame(width: 4, height: 4)
+
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(AttuneTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var periodNavigation: some View {
@@ -684,6 +721,70 @@ struct MomentumView: View {
         case 0.75..<1: return .good
         default: return .great
         }
+    }
+}
+
+/// Faint etched lines sit inside clear glass and disappear toward the lower
+/// edge. The treatment is intentionally neutral so chart colors retain meaning.
+private struct MomentumGuideCardBackground: View {
+    private let shape = RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+
+    var body: some View {
+        ZStack {
+            shape
+                .fill(.ultraThinMaterial)
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.055),
+                    Color.white.opacity(0.018),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            Canvas { context, size in
+                for index in 0..<5 {
+                    let inset = CGFloat(index) * 18
+                    var line = Path()
+                    line.move(to: CGPoint(x: size.width * 0.42 + inset, y: -8))
+                    line.addCurve(
+                        to: CGPoint(x: size.width + 14, y: size.height * 0.72 + inset * 0.18),
+                        control1: CGPoint(x: size.width * 0.66 + inset, y: size.height * 0.06),
+                        control2: CGPoint(x: size.width * 0.80 + inset, y: size.height * 0.50)
+                    )
+                    context.stroke(
+                        line,
+                        with: .linearGradient(
+                            Gradient(colors: [Color.white.opacity(0.12), Color.clear]),
+                            startPoint: CGPoint(x: size.width * 0.55, y: 0),
+                            endPoint: CGPoint(x: size.width, y: size.height)
+                        ),
+                        lineWidth: 0.55
+                    )
+                }
+            }
+            .opacity(0.52)
+
+            LinearGradient(
+                colors: [Color.clear, Color.black.opacity(0.13), Color.clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .clipShape(shape)
+        .overlay {
+            shape.strokeBorder(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.18), Color.white.opacity(0.055), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.8
+            )
+        }
+        .allowsHitTesting(false)
     }
 }
 
