@@ -488,12 +488,17 @@ function hasExpectedTaskOutputShape(
         hasExactKeys(value, ["updates", "moodLabel", "moodScore"]) &&
         Array.isArray(value.updates) &&
         (value.moodLabel === null || typeof value.moodLabel === "string") &&
-        (value.moodScore === null || typeof value.moodScore === "number")
+        isValidMoodScore(value.moodScore)
       );
     case "intentions":
       return hasExactKeys(value, ["intentions"]) && Array.isArray(value.intentions);
     case "listening":
-      return hasExactKeys(value, ["items"]) && Array.isArray(value.items);
+      return (
+        hasExactKeys(value, ["items", "moodLabel", "moodScore"]) &&
+        Array.isArray(value.items) &&
+        (value.moodLabel === null || typeof value.moodLabel === "string") &&
+        isValidMoodScore(value.moodScore)
+      );
     case "intention_suggestion":
       return hasExactKeys(value, ["title", "targetValue", "unit", "timeframe", "reason", "actionFingerprint", "actionFamily", "evidenceItemIds"]) &&
         (value.title === null || typeof value.title === "string") &&
@@ -505,6 +510,15 @@ function hasExpectedTaskOutputShape(
         (value.actionFamily === null || typeof value.actionFamily === "string") &&
         Array.isArray(value.evidenceItemIds);
   }
+}
+
+function isValidMoodScore(value: unknown): boolean {
+  return value === null || (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= 10
+  );
 }
 
 const SUGGESTION_UNITS = new Set(["pages", "minutes", "sessions", "steps", "reps", "cups", "glasses", "times"]);

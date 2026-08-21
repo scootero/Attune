@@ -45,7 +45,6 @@ final class DailyMoodStore {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         
-        var migrated = false
         for url in files where url.pathExtension == "json" {
             guard let data = try? Data(contentsOf: url),
                   let mood = try? decoder.decode(DailyMood.self, from: data),
@@ -58,22 +57,26 @@ final class DailyMoodStore {
                 moodLabel: mood.moodLabel,
                 moodScore: converted,
                 updatedAt: mood.updatedAt,
+                observedAt: mood.observedAt,
+                source: mood.source,
                 sourceCheckInId: mood.sourceCheckInId,
+                sourceSessionId: mood.sourceSessionId,
+                sourceSegmentId: mood.sourceSegmentId,
                 isManualOverride: mood.isManualOverride
             )
             if let encoded = try? encoder.encode(migratedMood) {
                 try? encoded.write(to: url, options: .atomic)
-                migrated = true
                 AppLogger.log(AppLogger.STORE, "DailyMood migrated dateKey=\(mood.dateKey) \(score)→\(converted)")
             }
         }
-        if migrated {
-            UserDefaults.standard.set(true, forKey: Self.migrationKey)
-        }
+        // The directory has now been scanned. Mark migration complete even if
+        // it contained no legacy records so future valid 0...2 scores are not
+        // mistaken for the old centered scale.
+        UserDefaults.standard.set(true, forKey: Self.migrationKey)
     }
     
     /// Converts legacy -2..+2 score to 0-10 scale.
-    static func legacyMoodScoreTo0_10(_ legacy: Int) -> Int {
+    nonisolated static func legacyMoodScoreTo0_10(_ legacy: Int) -> Int {
         switch legacy {
         case -2: return 0
         case -1: return 2
@@ -84,10 +87,11 @@ final class DailyMoodStore {
         }
     }
     
-    /// Clamps score to 0-10 for storage (call before saving).
-    static func clampMoodScore(_ score: Int?) -> Int? {
+    /// Clamps a current score to 0-10 for storage. Legacy conversion belongs
+    /// only in the one-time file migration above because 0...2 are also valid
+    /// values on the current scale.
+    nonisolated static func clampMoodScore(_ score: Int?) -> Int? {
         guard let s = score else { return nil }
-        if (-2...2).contains(s) { return legacyMoodScoreTo0_10(s) }
         return max(0, min(10, s))
     }
     
@@ -95,7 +99,7 @@ final class DailyMoodStore {
     
     /// Loads mood for a specific date
     /// Returns nil if no record exists for that date.
-    /// Any legacy -2..+2 scores are converted to 0-10 on read (after migration).
+    /// Legacy -2...+2 files are converted by the one-time migration before read.
     func loadDailyMood(dateKey: String) -> DailyMood? {
         let fileURL = AppPaths.dailyMoodFileURL(dateKey: dateKey)
         guard FileManager.default.fileExists(atPath: fileURL.path),
@@ -105,19 +109,7 @@ final class DailyMoodStore {
         
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        guard var mood = try? decoder.decode(DailyMood.self, from: data) else { return nil }
-        
-        if let score = mood.moodScore, (-2...2).contains(score) {
-            mood = DailyMood(
-                dateKey: mood.dateKey,
-                moodLabel: mood.moodLabel,
-                moodScore: Self.legacyMoodScoreTo0_10(score),
-                updatedAt: mood.updatedAt,
-                sourceCheckInId: mood.sourceCheckInId,
-                isManualOverride: mood.isManualOverride
-            )
-        }
-        return mood
+        return try? decoder.decode(DailyMood.self, from: data)
     }
     
     /// Loads mood for today (uses current local date)
@@ -143,38 +135,73 @@ final class DailyMoodStore {
         AppLogger.log(AppLogger.STORE, "DailyMood saved dateKey=\(mood.dateKey) moodLabel=\(mood.moodLabel ?? "nil")")
     }
     
-    /// Updates or creates mood for a date with extracted values from a check-in.
-    /// Skips overwrite if existing mood has isManualOverride == true (latest wins unless user overrode).
-    func setMoodFromCheckInIfNotOverridden(dateKey: String, moodLabel: String?, moodScore: Int?, sourceCheckInId: String) throws {
-        let existing = loadDailyMood(dateKey: dateKey)
-        if existing?.isManualOverride == true {
-            return  // Don't overwrite user's manual mood
-        }
-        try setMoodFromCheckIn(dateKey: dateKey, moodLabel: moodLabel, moodScore: moodScore, sourceCheckInId: sourceCheckInId)
-    }
-    
-    /// Updates or creates mood for a date with extracted values from a check-in (unconditional overwrite)
-    /// moodScore is clamped to 0-10; legacy -2..+2 values are converted automatically.
-    func setMoodFromCheckIn(dateKey: String, moodLabel: String?, moodScore: Int?, sourceCheckInId: String) throws {
-        let mood = DailyMood(
+    /// Backward-compatible entry point. Manual values are no longer permanent
+    /// overrides; the mood with the latest observation time wins.
+    func setMoodFromCheckInIfNotOverridden(
+        dateKey: String,
+        moodLabel: String?,
+        moodScore: Int?,
+        sourceCheckInId: String,
+        observedAt: Date = Date()
+    ) throws {
+        try setMoodFromCheckIn(
             dateKey: dateKey,
             moodLabel: moodLabel,
-            moodScore: Self.clampMoodScore(moodScore),
-            updatedAt: Date(),
+            moodScore: moodScore,
             sourceCheckInId: sourceCheckInId,
-            isManualOverride: false
+            observedAt: observedAt
         )
-        try saveDailyMood(mood)
     }
     
-    /// Clears manual override for a date so GPT can overwrite on next check-in extraction.
-    /// Saves record with isManualOverride=false, moodLabel=nil, moodScore=nil.
+    /// Updates a date from Check-In only when this observation is newest.
+    /// moodScore is clamped to 0-10.
+    func setMoodFromCheckIn(
+        dateKey: String,
+        moodLabel: String?,
+        moodScore: Int?,
+        sourceCheckInId: String,
+        observedAt: Date = Date()
+    ) throws {
+        try setMoodIfNewer(
+            dateKey: dateKey,
+            moodLabel: moodLabel,
+            moodScore: moodScore,
+            observedAt: observedAt,
+            source: .checkIn,
+            sourceCheckInId: sourceCheckInId
+        )
+    }
+
+    /// Applies an extracted Talk it out mood without allowing delayed AI work
+    /// to overwrite a mood the user expressed or entered later.
+    func setMoodFromTalkItOut(
+        dateKey: String,
+        moodLabel: String?,
+        moodScore: Int?,
+        sourceSessionId: String,
+        sourceSegmentId: String,
+        observedAt: Date
+    ) throws {
+        try setMoodIfNewer(
+            dateKey: dateKey,
+            moodLabel: moodLabel,
+            moodScore: moodScore,
+            observedAt: observedAt,
+            source: .talkItOut,
+            sourceSessionId: sourceSessionId,
+            sourceSegmentId: sourceSegmentId
+        )
+    }
+    
+    /// Clears mood for a date. Older delayed extractions remain unable to
+    /// resurrect the cleared value; a later Check-In or Talk it out can update it.
     func clearManualOverride(dateKey: String) throws {
         let mood = DailyMood(
             dateKey: dateKey,
             moodLabel: nil,
             moodScore: nil,
             updatedAt: Date(),
+            observedAt: Date(),
             sourceCheckInId: nil,
             isManualOverride: false
         )
@@ -183,14 +210,51 @@ final class DailyMoodStore {
     
     /// Updates or creates mood for a date via manual user override
     /// moodScore is clamped to 0-10.
-    func setMoodManual(dateKey: String, moodLabel: String?, moodScore: Int?) throws {
+    func setMoodManual(
+        dateKey: String,
+        moodLabel: String?,
+        moodScore: Int?,
+        observedAt: Date = Date()
+    ) throws {
+        try setMoodIfNewer(
+            dateKey: dateKey,
+            moodLabel: moodLabel,
+            moodScore: moodScore,
+            observedAt: observedAt,
+            source: .manual
+        )
+    }
+
+    private func setMoodIfNewer(
+        dateKey: String,
+        moodLabel: String?,
+        moodScore: Int?,
+        observedAt: Date,
+        source: DailyMoodSource,
+        sourceCheckInId: String? = nil,
+        sourceSessionId: String? = nil,
+        sourceSegmentId: String? = nil
+    ) throws {
+        let existing = loadDailyMood(dateKey: dateKey)
+        guard DailyMoodUpdatePolicy.shouldReplace(existing: existing, observedAt: observedAt) else {
+            AppLogger.log(
+                AppLogger.STORE,
+                "DailyMood skipped older source=\(source.rawValue) dateKey=\(dateKey)"
+            )
+            return
+        }
+
         let mood = DailyMood(
             dateKey: dateKey,
             moodLabel: moodLabel,
             moodScore: Self.clampMoodScore(moodScore),
             updatedAt: Date(),
-            sourceCheckInId: nil,
-            isManualOverride: true
+            observedAt: observedAt,
+            source: source,
+            sourceCheckInId: sourceCheckInId,
+            sourceSessionId: sourceSessionId,
+            sourceSegmentId: sourceSegmentId,
+            isManualOverride: source == .manual
         )
         try saveDailyMood(mood)
     }

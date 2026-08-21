@@ -11,6 +11,10 @@ import Foundation
 /// Response structure from OpenAI matching our extraction schema
 private struct ExtractionResponse: Codable {
     let items: [ExtractionItem]
+    /// Optional for compatibility with a deployed Worker that predates mood
+    /// extraction on Talk it out.
+    let moodLabel: String?
+    let moodScore: Int?
     
     struct ExtractionItem: Codable {
         let type: String
@@ -35,6 +39,14 @@ private struct ExtractionResponse: Codable {
     }
 }
 
+struct ListeningExtractionResult {
+    let items: [ExtractedItem]
+    let moodLabel: String?
+    let moodScore: Int?
+
+    static let empty = ListeningExtractionResult(items: [], moodLabel: nil, moodScore: nil)
+}
+
 /// Service for extracting structured items from segment transcripts using LLM
 struct ExtractorService {
     
@@ -49,14 +61,14 @@ struct ExtractorService {
     // MARK: - Public API
     
     /// Extracts candidate items from a segment transcript.
-    /// Returns empty array if nothing is high-confidence and meaningful (sparse by default).
+    /// Returns an empty result if nothing is high-confidence and meaningful.
     /// - Parameters:
     ///   - transcriptText: Current segment transcript text
     ///   - priorContextText: Optional context from previous segment (last 2-3 sentences)
     ///   - sessionId: Parent session identifier
     ///   - segmentId: Parent segment identifier
     ///   - segmentIndex: Segment index within session
-    /// - Returns: Array of ExtractedItem candidates (may be empty)
+    /// - Returns: Extracted items plus an optional directly expressed mood.
     static func extractItems(
         transcriptText: String,
         priorContextText: String?,
@@ -64,7 +76,7 @@ struct ExtractorService {
         segmentId: String,
         segmentIndex: Int,
         referenceDate: Date
-    ) async -> [ExtractedItem] {
+    ) async -> ListeningExtractionResult {
         
         let sessionShort = AppLogger.shortId(sessionId)
         let charCount = transcriptText.count + (priorContextText?.count ?? 0)
@@ -86,7 +98,7 @@ struct ExtractorService {
         let schema = buildExtractionSchema()
         
         // Try extraction (with one retry on decode failure)
-        let extractedItems = await attemptExtraction(
+        let result = await attemptExtraction(
             transcriptText: transcriptText,
             priorContextText: priorContextText,
             systemMessage: systemMessage,
@@ -102,10 +114,10 @@ struct ExtractorService {
         // Log success
         AppLogger.log(
             AppLogger.AI,
-            "extract_ok session=\(sessionShort) seg=\(segmentIndex) items=\(extractedItems.count)"
+            "extract_ok session=\(sessionShort) seg=\(segmentIndex) items=\(result.items.count) moodLabel=\(result.moodLabel ?? "nil") moodScore=\(result.moodScore?.description ?? "nil")"
         )
         
-        return extractedItems
+        return result
     }
     
     // MARK: - Private Helpers
@@ -122,7 +134,7 @@ struct ExtractorService {
         segmentIndex: Int,
         referenceDate: Date,
         retryOnFailure: Bool
-    ) async -> [ExtractedItem] {
+    ) async -> ListeningExtractionResult {
         
         let sessionShort = AppLogger.shortId(sessionId)
         
@@ -169,8 +181,9 @@ struct ExtractorService {
             let decoder = JSONDecoder()
             let response = try decoder.decode(ExtractionResponse.self, from: data)
             
-            // Map to ExtractedItem instances
-            return response.items.map { item in
+            // Map to ExtractedItem instances while keeping the optional mood
+            // separate from Insights persistence.
+            let items = response.items.map { item in
                 mapToExtractedItem(
                     item: item,
                     sessionId: sessionId,
@@ -179,6 +192,11 @@ struct ExtractorService {
                     referenceDate: referenceDate
                 )
             }
+            return ListeningExtractionResult(
+                items: items,
+                moodLabel: response.moodLabel,
+                moodScore: DailyMoodStore.clampMoodScore(response.moodScore)
+            )
             
         } catch {
             // Log decode failure
@@ -205,8 +223,7 @@ struct ExtractorService {
                 )
             }
             
-            // Return empty array after exhausting retries
-            return []
+            return .empty
         }
     }
     
@@ -269,8 +286,16 @@ CALENDAR CANDIDATES:
 - If an event gives a date but no clock time, use yyyy-MM-dd for startISO8601, set endISO8601 to null, and isAllDay to false. This means "time not specified," not all-day.
 - If neither a date nor clock time is stated or strongly implied, calendarCandidate may be null.
 
+DAILY MOOD:
+- moodLabel: one word or a short phrase describing the user's current feeling, or null.
+- moodScore: the closest reasonable integer from 0 to 10, where 0 is lowest, 5 is neutral, and 10 is highest, or null.
+- Capture mood only when the user directly describes their own current mood, feeling, happiness, or emotional state. A qualitative statement such as "I'm doing well" may be approximated.
+- Do not infer mood merely because a positive or negative event happened.
+- If the transcript contains multiple current mood statements, use the latest clear self-report in transcript order.
+- Prior context can clarify the current transcript, but must not replace a newer mood stated in the current transcript.
+
 Return ONLY valid JSON matching the schema. No markdown, no explanations.
-If nothing meets the quality bar, return: {"items": []}
+If nothing meets the quality bar, return: {"items": [], "moodLabel": null, "moodScore": null}
 """
     }
     
@@ -361,9 +386,11 @@ If nothing meets the quality bar, return: {"items": []}
                             ],
                             "additionalProperties": false
                         ]
-                    ]
+                    ],
+                    "moodLabel": ["type": ["string", "null"]],
+                    "moodScore": ["type": ["integer", "null"]]
                 ],
-                "required": ["items"],
+                "required": ["items", "moodLabel", "moodScore"],
                 "additionalProperties": false
             ],
             "strict": true

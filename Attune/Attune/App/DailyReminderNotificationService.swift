@@ -2,113 +2,218 @@
 //  DailyReminderNotificationService.swift
 //  Attune
 //
-//  Schedules a daily local reminder at user-selected time when user needs a nudge.
+//  Schedules an actionable local reminder when no intention progress was updated.
 //
 
-import Foundation // Needed for Date, Calendar, and date calculations used by reminder scheduling.
-@preconcurrency import UserNotifications // Needed for local notification permission checks and scheduling notification requests.
+import Foundation
+@preconcurrency import UserNotifications
 
 enum DailyReminderCopy {
-    static let title = "A quick check-in"
-    static let body = "Anything you'd like to log today?"
+    static let title = "Attune — Let’s make some progress"
+
+    static func body(intentionTitles: [String]) -> String {
+        let titles = intentionTitles.prefix(2)
+        guard !titles.isEmpty else { return "Choose an intention to move forward." }
+        return "What would you like to move forward? \(titles.joined(separator: " • "))"
+    }
+
+    static func followUpBody(intentionTitle: String?) -> String {
+        guard let intentionTitle, !intentionTitle.isEmpty else {
+            return "Ready to update one of today’s intentions?"
+        }
+        return "Ready to update \(intentionTitle)?"
+    }
 }
 
-/// Keeps one pending reminder in sync with today's check-in/progress state.
-@MainActor // Ensures all store reads happen on main actor because app stores are main-actor isolated.
+enum DailyReminderPolicy {
+    static func shouldNotify(
+        hasActiveIntentions: Bool,
+        progressEntryCount: Int,
+        manualProgressUpdateCount: Int
+    ) -> Bool {
+        hasActiveIntentions && progressEntryCount == 0 && manualProgressUpdateCount == 0
+    }
+}
+
+extension Notification.Name {
+    static let attuneDailyReminderRouteRequested = Notification.Name("attune.daily.reminder.route.requested")
+}
+
+@MainActor
 final class DailyReminderNotificationService {
-    
-    /// Shared singleton used across UI and app lifecycle hooks.
-    static let shared = DailyReminderNotificationService() // Single source of truth for reminder scheduling logic.
-    
-    /// Stable identifier so we can replace/remove the same pending reminder safely.
-    private let reminderRequestId = "attune.daily.reminder" // Constant ID avoids duplicate pending notifications even when time changes.
-    
-    /// Reuse the system notification center instance for all notification operations.
-    private let notificationCenter = UNUserNotificationCenter.current() // Shared iOS notification manager.
-    
-    /// Prevent external construction to keep scheduling logic centralized.
-    private init() {} // Singleton-only initialization.
-    
-    /// Recomputes today's condition and updates the pending reminder at configured time.
+    static let shared = DailyReminderNotificationService()
+
+    // Keep the existing request identifier so upgrades replace the old reminder.
+    private let reminderRequestId = "attune.daily.reminder"
+    private let followUpRequestId = "attune.daily.reminder.follow-up"
+    private let primaryCategoryId = "attune.daily.reminder.category"
+    private let followUpCategoryId = "attune.daily.reminder.follow-up.category"
+    private let actionPrefix = "attune.daily.reminder.update."
+    private let followUpActionId = "attune.daily.reminder.follow-up.update"
+    private let notificationCenter = UNUserNotificationCenter.current()
+    private(set) var pendingRoute: ReminderNotificationRoute?
+
+    private init() {}
+
     func refreshReminderForToday(now: Date = Date()) {
-        guard ReminderPreferences.isReminderEnabled else { // Respect in-app reminder toggle so users can disable this reminder without system-level changes.
-            notificationCenter.removePendingNotificationRequests(withIdentifiers: [reminderRequestId]) // Remove any queued reminder immediately when toggle is off.
-            return // Exit because no reminder should be scheduled while disabled.
+        guard ReminderPreferences.isReminderEnabled else {
+            removeAllPendingReminders()
+            return
         }
-        
-        guard let triggerDate = scheduledReminderDateIfStillUpcoming(reference: now) else { // Only schedule while today's configured reminder time is still in the future.
-            notificationCenter.removePendingNotificationRequests(withIdentifiers: [reminderRequestId]) // Remove stale request when today's reminder time has already passed.
-            return // Stop because we only schedule for the current day in this version.
+
+        guard let context = reminderContext(now: now), context.shouldNotify else {
+            removeAllPendingReminders()
+            return
         }
-        
-        guard shouldNotify(for: now) else { // If user already checked in and is >= 50%, no reminder should exist.
-            notificationCenter.removePendingNotificationRequests(withIdentifiers: [reminderRequestId]) // Clear pending reminder to avoid false nudges.
-            return // Exit early because there is nothing to schedule.
-        }
-        
-        let requestId = reminderRequestId // Copy request identifier into local constant so closure avoids actor-isolated self access.
-        let center = notificationCenter // Copy notification center into local constant so closure can use it directly.
-        notificationCenter.getNotificationSettings { settings in // Check authorization before creating notification requests.
-            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return } // Only schedule when notifications are currently allowed.
-            
-            let content = UNMutableNotificationContent() // Build the visible content for the local reminder.
-            content.title = DailyReminderCopy.title // Short, neutral title shown above body text in notification UI.
-            content.body = DailyReminderCopy.body // Neutral prompt without a percentage, guilt framing, or private quote.
-            content.sound = .default // Plays the default notification sound so the user can hear it.
-            
-            let calendar = Calendar.current // Use local calendar/timezone for trigger construction.
-            let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate) // Pin this reminder to today's configured hour/minute date components.
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false) // Fire once at today's scheduled time.
-            let request = UNNotificationRequest(identifier: requestId, content: content, trigger: trigger) // Create replaceable request with stable identifier.
-            
-            center.removePendingNotificationRequests(withIdentifiers: [requestId]) // Remove prior request before adding updated content/conditions.
-            center.add(request) { _ in // Enqueue reminder; tapping notification opens the app by default.
-                // Intentionally no-op; failure is safe because reminder is non-critical UX enhancement.
+
+        let intentions = Array(context.intentions.prefix(2))
+        let reminderTime = ReminderPreferences.reminderTimeComponents
+        registerCategories(for: intentions)
+
+        let requestId = reminderRequestId
+        let center = notificationCenter
+        let categoryId = primaryCategoryId
+        notificationCenter.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+
+            let content = UNMutableNotificationContent()
+            content.title = DailyReminderCopy.title
+            content.body = DailyReminderCopy.body(intentionTitles: intentions.map(\.title))
+            content.sound = .default
+            content.categoryIdentifier = categoryId
+            if let first = intentions.first {
+                content.userInfo = [ReminderNotificationRoute.intentionIdKey: first.id]
             }
-        }
-    }
-    
-    /// Computes whether the user still needs a reminder using the existing scheduling threshold.
-    private func shouldNotify(for now: Date) -> Bool {
-        guard let intentionSet = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else { // If no intention set exists yet, do not notify by default.
-            return false // Safe default avoids reminders before user has setup data.
-        }
-        
-        let dateKey = ProgressCalculator.dateKey(for: now) // Convert current date into app's local YYYY-MM-DD key.
-        let checkIns = CheckInStore.shared.loadCheckIns(intentionSetId: intentionSet.id, dateKey: dateKey) // Load today's check-ins for current intention set.
-        let intentions = IntentionStore.shared.loadIntentions(ids: intentionSet.intentionIds).filter { $0.isActive } // Load only active intentions that count toward daily progress.
-        let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: intentionSet.id) // Load today's progress entries for this intention set.
-        let overrides = OverrideStore.shared.loadOverridesForDate(dateKey: dateKey) // Load manual override totals that supersede raw entries.
-        
-        var totalsByIntentionId: [String: Double] = [:] // Build a map of intention -> today's total for overall progress calculation.
-        for intention in intentions { // Iterate each active intention to compute its effective total.
-            let total = ProgressCalculator.totalForIntention( // Reuse existing progress rules (TOTAL precedence, weekly handling later in percentComplete).
-                entries: entries,
-                dateKey: dateKey,
-                intentionId: intention.id,
-                intentionSetId: intentionSet.id,
-                overrideAmount: overrides[intention.id]
+
+            let components = DateComponents(
+                hour: reminderTime.hour ?? 14,
+                minute: reminderTime.minute ?? 0
             )
-            totalsByIntentionId[intention.id] = total // Save computed total into lookup dictionary.
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+            let request = UNNotificationRequest(identifier: requestId, content: content, trigger: trigger)
+
+            center.removePendingNotificationRequests(withIdentifiers: [requestId])
+            center.add(request)
         }
-        
-        let overallPercent = ProgressCalculator.overallPercentComplete(intentions: intentions, totalsByIntentionId: totalsByIntentionId) // Compute average completion ratio across eligible active intentions.
-        let hasCheckedInToday = !checkIns.isEmpty // Condition A: whether at least one check-in exists today.
-        let isBelowFiftyPercent = overallPercent < 0.5 // Condition B: progress threshold trigger requested by product requirement.
-        return (!hasCheckedInToday) || isBelowFiftyPercent // Notify when either condition is true (no check-in OR below 50%).
     }
-    
-    /// Returns today's configured reminder date only when it is still upcoming.
-    private func scheduledReminderDateIfStillUpcoming(reference: Date) -> Date? {
-        let calendar = Calendar.current // Use local calendar so configured reminder time aligns with user's timezone.
-        var reminderComponents = calendar.dateComponents([.year, .month, .day], from: reference) // Start with today's date components.
-        let preferredTime = ReminderPreferences.reminderTimeComponents // Load persisted user-selected reminder hour/minute.
-        reminderComponents.hour = preferredTime.hour ?? 18 // Apply configured hour with 6 PM fallback for safety.
-        reminderComponents.minute = preferredTime.minute ?? 0 // Apply configured minute with :00 fallback for safety.
-        reminderComponents.second = 0 // Set trigger second at :00 for deterministic schedule time.
-        
-        guard let todayReminderTime = calendar.date(from: reminderComponents) else { return nil } // Build today's reminder date safely from configured components.
-        guard reference < todayReminderTime else { return nil } // Only keep today's reminder when current time is still before configured reminder time.
-        return todayReminderTime // Return valid upcoming trigger date for today's reminder.
+
+    func handleNotificationResponse(_ response: UNNotificationResponse) {
+        let requestIdentifier = response.notification.request.identifier
+        guard requestIdentifier == reminderRequestId || requestIdentifier == followUpRequestId else { return }
+
+        let intentionId = intentionId(
+            actionIdentifier: response.actionIdentifier,
+            userInfo: response.notification.request.content.userInfo
+        )
+        let isPrimaryReminder = requestIdentifier == reminderRequestId
+        pendingRoute = ReminderNotificationRoute(
+            intentionId: intentionId,
+            showsFollowUpConfirmation: isPrimaryReminder
+        )
+
+        if isPrimaryReminder, reminderContext(now: Date())?.shouldNotify == true {
+            scheduleOneHourFollowUp(intentionId: intentionId)
+        } else {
+            notificationCenter.removePendingNotificationRequests(withIdentifiers: [followUpRequestId])
+        }
+
+        NotificationCenter.default.post(name: .attuneDailyReminderRouteRequested, object: nil)
     }
+
+    func consumePendingRoute() -> ReminderNotificationRoute? {
+        defer { pendingRoute = nil }
+        return pendingRoute
+    }
+
+    private func reminderContext(now: Date) -> (intentions: [Intention], shouldNotify: Bool)? {
+        guard let intentionSet = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else { return nil }
+        let intentions = IntentionStore.shared.loadIntentions(ids: intentionSet.intentionIds).filter(\.isActive)
+        let dateKey = ProgressCalculator.dateKey(for: now)
+        let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: intentionSet.id)
+        let manualUpdates = OverrideStore.shared.loadOverrideRecordsForDate(dateKey: dateKey)
+        return (
+            intentions,
+            DailyReminderPolicy.shouldNotify(
+                hasActiveIntentions: !intentions.isEmpty,
+                progressEntryCount: entries.count,
+                manualProgressUpdateCount: manualUpdates.count
+            )
+        )
+    }
+
+    private func scheduleOneHourFollowUp(intentionId: String?) {
+        let intention = intentionId.flatMap { IntentionStore.shared.loadIntention(id: $0) }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Attune — How did it go?"
+        content.body = DailyReminderCopy.followUpBody(intentionTitle: intention?.title)
+        content.sound = .default
+        content.categoryIdentifier = followUpCategoryId
+        if let intentionId {
+            content.userInfo = [ReminderNotificationRoute.intentionIdKey: intentionId]
+        }
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 60 * 60, repeats: false)
+        let request = UNNotificationRequest(identifier: followUpRequestId, content: content, trigger: trigger)
+        notificationCenter.removePendingNotificationRequests(withIdentifiers: [followUpRequestId])
+        notificationCenter.add(request)
+    }
+
+    private func registerCategories(for intentions: [Intention]) {
+        let primaryActions = intentions.prefix(2).map { intention in
+            UNNotificationAction(
+                identifier: actionPrefix + intention.id,
+                title: intention.title,
+                options: [.foreground]
+            )
+        }
+        let followUpAction = UNNotificationAction(
+            identifier: followUpActionId,
+            title: "Update progress",
+            options: [.foreground]
+        )
+        let primary = UNNotificationCategory(
+            identifier: primaryCategoryId,
+            actions: primaryActions,
+            intentIdentifiers: [],
+            options: []
+        )
+        let followUp = UNNotificationCategory(
+            identifier: followUpCategoryId,
+            actions: [followUpAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        let primaryCategoryId = primaryCategoryId
+        let followUpCategoryId = followUpCategoryId
+        let center = notificationCenter
+        notificationCenter.getNotificationCategories { existing in
+            var categories = existing.filter {
+                $0.identifier != primaryCategoryId && $0.identifier != followUpCategoryId
+            }
+            categories.insert(primary)
+            categories.insert(followUp)
+            center.setNotificationCategories(categories)
+        }
+    }
+
+    private func intentionId(actionIdentifier: String, userInfo: [AnyHashable: Any]) -> String? {
+        if actionIdentifier.hasPrefix(actionPrefix) {
+            let value = String(actionIdentifier.dropFirst(actionPrefix.count))
+            return value.isEmpty ? nil : value
+        }
+        return userInfo[ReminderNotificationRoute.intentionIdKey] as? String
+    }
+
+    private func removeAllPendingReminders() {
+        notificationCenter.removePendingNotificationRequests(withIdentifiers: [reminderRequestId, followUpRequestId])
+    }
+
+}
+
+struct ReminderNotificationRoute: Equatable {
+    static let intentionIdKey = "intentionId"
+    let intentionId: String?
+    let showsFollowUpConfirmation: Bool
 }

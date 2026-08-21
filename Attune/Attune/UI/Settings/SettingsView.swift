@@ -155,7 +155,7 @@ struct SettingsView: View {
         } header: {
             Text("Notifications")
         } footer: {
-            Text("When enabled, Attune can send one neutral reminder at your chosen time when a check-in may still be useful.")
+            Text("When enabled, Attune reminds you at your chosen time only if no intention progress has been updated. You can choose an intention from the alert and get a one-hour follow-up.")
         }
     }
 

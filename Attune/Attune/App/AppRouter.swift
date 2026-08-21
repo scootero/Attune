@@ -29,9 +29,22 @@ final class AppRouter: ObservableObject {
     /// Optional selected date for Momentum so Home can pass the day we should show
     @Published var momentumSelectedDate: Date? = nil
 
+    /// Intention selected from an actionable reminder. Home consumes this by
+    /// opening the existing manual progress sliders.
+    @Published var progressUpdateIntentionID: String? = nil
+
     /// Call from Home momentum card: switch to root Momentum tab and seed its date.
     func navigateToMomentum(date: Date) {
         momentumSelectedDate = date  // Remember which day to show in Momentum
         selectedRootTab = .progress  // Switch root tab to the Momentum screen (formerly Progress slot)
+    }
+
+    func navigateToProgressUpdate(intentionID: String?) {
+        progressUpdateIntentionID = intentionID
+        selectedRootTab = .home
+    }
+
+    func consumeProgressUpdateRoute() {
+        progressUpdateIntentionID = nil
     }
 }

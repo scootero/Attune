@@ -17,6 +17,8 @@ struct ExtractionWorkItem: Equatable {
     let segmentIndex: Int
     /// Recording timestamp used to resolve today/tomorrow and time-only events.
     let referenceDate: Date
+    /// Best available time by which this segment's mood was expressed.
+    let observedAt: Date
     let transcriptText: String
     let priorContextText: String?
     
@@ -33,7 +35,7 @@ struct ExtractionWorkItem: Equatable {
 /// Internal work item with completion handler
 private struct QueuedWorkItem {
     let workItem: ExtractionWorkItem
-    let onComplete: ([ExtractedItem]) -> Void
+    let onComplete: (ListeningExtractionResult) -> Void
 }
 
 /// Manages the extraction queue and processes segments serially.
@@ -76,8 +78,8 @@ class ExtractionQueue: ObservableObject {
     /// Automatically starts processing if not already running.
     /// - Parameters:
     ///   - workItem: The work item containing segment data
-    ///   - onComplete: Completion handler called with extracted items (or empty array on failure)
-    func enqueue(workItem: ExtractionWorkItem, onComplete: @escaping ([ExtractedItem]) -> Void) {
+    ///   - onComplete: Completion handler called with extracted items and mood.
+    func enqueue(workItem: ExtractionWorkItem, onComplete: @escaping (ListeningExtractionResult) -> Void) {
         let key = workItem.key
         
         // Avoid duplicate enqueue
@@ -158,7 +160,7 @@ class ExtractionQueue: ObservableObject {
         )
         
         // Call ExtractorService (which handles its own retry logic internally)
-        let items = await ExtractorService.extractItems(
+        let result = await ExtractorService.extractItems(
             transcriptText: workItem.transcriptText,
             priorContextText: workItem.priorContextText,
             sessionId: workItem.sessionId,
@@ -174,11 +176,11 @@ class ExtractionQueue: ObservableObject {
         // Log completion
         AppLogger.log(
             AppLogger.QUE,
-            "[extract] done session=\(AppLogger.shortId(workItem.sessionId)) seg=\(workItem.segmentIndex) items=\(items.count)"
+            "[extract] done session=\(AppLogger.shortId(workItem.sessionId)) seg=\(workItem.segmentIndex) items=\(result.items.count) mood=\(result.moodScore?.description ?? "nil")"
         )
         
         // Call completion handler
-        queuedItem.onComplete(items)
+        queuedItem.onComplete(result)
     }
     
 }

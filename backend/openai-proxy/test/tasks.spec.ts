@@ -71,7 +71,7 @@ const taskCases = [
       timeZone: "America/Chicago",
     },
     schemaName: "items_extraction",
-    output: { items: [] },
+    output: { items: [], moodLabel: "Hopeful", moodScore: 7 },
   },
 ] as const;
 
@@ -133,6 +133,8 @@ describe("server-owned v2 task routes", () => {
         expect(forwarded.messages[1].content).toContain("referenceDateTime: 2026-08-06T15:00:00Z");
         expect(forwarded.messages[1].content).toContain("timeZone: America/Chicago");
         expect(forwarded.messages[0].content).toContain("clock time but no date");
+        expect(forwarded.messages[0].content).toContain("closest reasonable integer from 0 to 10");
+        expect(forwarded.messages[0].content).toContain("latest clear self-report");
       }
     });
   }
@@ -342,6 +344,17 @@ describe("server-owned v2 task routes", () => {
       taskRequest(TASK_PATHS.intentions, { transcript: "I want to walk." }),
       env,
       async () => new Response(JSON.stringify({ choices: [] }), { status: 200 }),
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "AI provider returned an invalid response" });
+  });
+
+  it("rejects a Listening mood score outside the daily scale", async () => {
+    const response = await handleRequest(
+      taskRequest(TASK_PATHS.listening, { transcript: "I feel great." }),
+      env,
+      async () => chatCompletion({ items: [], moodLabel: "Great", moodScore: 11 }),
     );
 
     expect(response.status).toBe(502);

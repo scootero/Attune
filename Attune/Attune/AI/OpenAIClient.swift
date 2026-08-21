@@ -98,11 +98,12 @@ struct OpenAIClient {
 
     static func usesServerOwnedV2(_ task: ServerOwnedTask) -> Bool {
         #if DEBUG
-        // Keep every feature independently switchable during physical-device rollout.
-        let useV2Intentions = true
-        let useV2CheckIns = true
-        let useV2Listening = true
-        let useV2IntentionSuggestions = true
+        // Keep Debug AI behavior aligned with the current Release build while
+        // retaining independent switches for a future staged v2 rollout.
+        let useV2Intentions = false
+        let useV2CheckIns = false
+        let useV2Listening = false
+        let useV2IntentionSuggestions = false
 
         switch task {
         case .intentions:

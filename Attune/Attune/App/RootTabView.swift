@@ -15,6 +15,7 @@ struct RootTabView: View {
     // Track whether recovery has been performed to avoid running it multiple times
     @State private var hasPerformedRecovery = false
     @State private var showSettings = false
+    @State private var reminderConfirmation: String?
 
     init() {
         // Wire up dependency: inject TranscriptionQueue into RecorderService
@@ -90,6 +91,17 @@ struct RootTabView: View {
             SettingsView()
                 .environmentObject(subscriptionManager)
         }
+        .alert("Okay", isPresented: Binding(
+            get: { reminderConfirmation != nil },
+            set: { if !$0 { reminderConfirmation = nil } }
+        )) {
+            Button("Got it", role: .cancel) { reminderConfirmation = nil }
+        } message: {
+            Text(reminderConfirmation ?? "")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .attuneDailyReminderRouteRequested)) { _ in
+            handlePendingReminderRoute()
+        }
         .onChange(of: appRouter.selectedRootTab) { _, selectedTab in
             guard selectedTab == .home else { return }
             withAnimation(.spring(response: 0.38, dampingFraction: 0.84)) {
@@ -102,6 +114,15 @@ struct RootTabView: View {
                 performRecoveryOnLaunch()
                 hasPerformedRecovery = true
             }
+            handlePendingReminderRoute()
+        }
+    }
+
+    private func handlePendingReminderRoute() {
+        guard let route = DailyReminderNotificationService.shared.consumePendingRoute() else { return }
+        appRouter.navigateToProgressUpdate(intentionID: route.intentionId)
+        if route.showsFollowUpConfirmation {
+            reminderConfirmation = "We’ll check back in one hour if you haven’t updated your progress."
         }
     }
 

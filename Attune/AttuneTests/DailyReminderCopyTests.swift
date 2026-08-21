@@ -2,16 +2,39 @@ import XCTest
 @testable import Attune
 
 final class DailyReminderCopyTests: XCTestCase {
-    func testReminderUsesApprovedNeutralCopy() {
-        XCTAssertEqual(DailyReminderCopy.title, "A quick check-in")
-        XCTAssertEqual(DailyReminderCopy.body, "Anything you'd like to log today?")
+    func testReminderUsesRequestedBrandAndProgressPrompt() {
+        XCTAssertEqual(DailyReminderCopy.title, "Attune — Let’s make some progress")
+        XCTAssertEqual(
+            DailyReminderCopy.body(intentionTitles: ["Walk", "Read", "Meditate"]),
+            "What would you like to move forward? Walk • Read"
+        )
     }
 
-    func testReminderCopyDoesNotExposeProgressOrPrivateQuotes() {
-        let visibleCopy = "\(DailyReminderCopy.title) \(DailyReminderCopy.body)"
+    func testPolicyOnlyNotifiesWhenNoProgressWasUpdated() {
+        XCTAssertTrue(DailyReminderPolicy.shouldNotify(
+            hasActiveIntentions: true,
+            progressEntryCount: 0,
+            manualProgressUpdateCount: 0
+        ))
+        XCTAssertFalse(DailyReminderPolicy.shouldNotify(
+            hasActiveIntentions: true,
+            progressEntryCount: 1,
+            manualProgressUpdateCount: 0
+        ))
+        XCTAssertFalse(DailyReminderPolicy.shouldNotify(
+            hasActiveIntentions: true,
+            progressEntryCount: 0,
+            manualProgressUpdateCount: 1
+        ))
+        XCTAssertFalse(DailyReminderPolicy.shouldNotify(
+            hasActiveIntentions: false,
+            progressEntryCount: 0,
+            manualProgressUpdateCount: 0
+        ))
+    }
 
-        XCTAssertFalse(visibleCopy.contains("%"))
-        XCTAssertFalse(visibleCopy.localizedCaseInsensitiveContains("You said"))
-        XCTAssertFalse(visibleCopy.localizedCaseInsensitiveContains("only at"))
+    func testFollowUpCopyCanNameSelectedIntention() {
+        XCTAssertEqual(DailyReminderCopy.followUpBody(intentionTitle: "Walk"), "Ready to update Walk?")
+        XCTAssertEqual(DailyReminderCopy.followUpBody(intentionTitle: nil), "Ready to update one of today’s intentions?")
     }
 }

@@ -505,6 +505,9 @@ TIME (required fields; use null when no explicit time):
 MOOD (optional, Slice A):
 - moodLabel: one word or short phrase (e.g., "Calm", "Anxious", "Tired") or null.
 - moodScore: integer 0 to 10 (0 = lowest, 10 = highest; 5 = neutral) or null.
+- Capture mood when the user directly describes their current mood, feeling, happiness, or emotional state. Qualitative language such as "I'm doing well" may be approximated to the closest reasonable score.
+- Do not infer mood merely because a positive or negative event happened.
+- If several current mood statements appear, use the latest clear self-report in transcript order.
 
 Return ONLY valid JSON matching the schema. No markdown, no explanations.
 If no progress or mood is clearly stated, return: {"updates": [], "moodLabel": null, "moodScore": null}`;
@@ -569,8 +572,16 @@ CALENDAR CANDIDATES:
 - If an event gives a date but no clock time, use yyyy-MM-dd for startISO8601, set endISO8601 to null, and isAllDay to false. This means "time not specified," not all-day.
 - If neither a date nor clock time is stated or strongly implied, calendarCandidate may be null.
 
+DAILY MOOD:
+- moodLabel: one word or a short phrase describing the user's current feeling, or null.
+- moodScore: the closest reasonable integer from 0 to 10, where 0 is lowest, 5 is neutral, and 10 is highest, or null.
+- Capture mood only when the user directly describes their own current mood, feeling, happiness, or emotional state. A qualitative statement such as "I'm doing well" may be approximated.
+- Do not infer mood merely because a positive or negative event happened.
+- If the transcript contains multiple current mood statements, use the latest clear self-report in transcript order.
+- Prior context can clarify the current transcript, but must not replace a newer mood stated in the current transcript.
+
 Return ONLY valid JSON matching the schema. No markdown, no explanations.
-If nothing meets the quality bar, return: {"items": []}`;
+If nothing meets the quality bar, return: {"items": [], "moodLabel": null, "moodScore": null}`;
 
 const INTENTION_SUGGESTION_SYSTEM_PROMPT = `Create at most one fully custom, measurable micro-intention from the user's repeated evidence and current context. There is no action catalog. Transform the underlying need into a useful next behavior instead of parroting the topic or the user's stated goal.
 
@@ -713,8 +724,10 @@ const LISTENING_SCHEMA: ServerOwnedChatRequest["response_format"]["json_schema"]
           additionalProperties: false,
         },
       },
+      moodLabel: { type: ["string", "null"] },
+      moodScore: { type: ["integer", "null"] },
     },
-    required: ["items"],
+    required: ["items", "moodLabel", "moodScore"],
     additionalProperties: false,
   },
 };

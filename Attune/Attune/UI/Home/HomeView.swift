@@ -81,6 +81,16 @@ private struct IntentionProgressRow: Identifiable {
     var id: String { intention.id }
 }
 
+/// Supplies the mood card's location to the root overlay so the feeling picker
+/// can stay right-aligned while taps anywhere behind it dismiss the picker.
+private struct FeelingPickerAnchorKey: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>?
+
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
+    }
+}
+
 /// Prevents opening and saving the manual editor from creating chart events for
 /// intentions whose totals were not actually changed.
 enum ManualProgressSavePolicy {
@@ -268,6 +278,34 @@ struct HomeView: View {
                 }
             }
         }
+        .overlayPreferenceValue(FeelingPickerAnchorKey.self) { anchor in
+            if showFeelingPicker, let anchor {
+                GeometryReader { proxy in
+                    let moodCardFrame = proxy[anchor]
+
+                    ZStack(alignment: .topLeading) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                showFeelingPicker = false
+                            }
+
+                        feelingPicker
+                            .position(
+                                x: moodCardFrame.maxX - 86,
+                                y: moodCardFrame.midY
+                            )
+                            .transition(
+                                reduceMotion
+                                    ? .opacity
+                                    : .scale(scale: 0.94, anchor: .center).combined(with: .opacity)
+                            )
+                    }
+                }
+            }
+        }
+        .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: showFeelingPicker)
         .navigationBarHidden(true)
         .onChange(of: state) { _, newState in
             scheduleTransientStateReset(for: newState)
@@ -278,7 +316,15 @@ struct HomeView: View {
             try? AppPaths.ensureDirectoriesExist()
             Task { await evaluateIntentionSuggestion() }
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            refreshAll()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            refreshAll()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .attuneListeningSessionDidFinishProcessing)) { _ in
+            refreshMoodAndStreak()
             Task { await evaluateIntentionSuggestion(shouldPresentToast: true) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .attuneReviewIntentionSuggestion)) { notification in
@@ -291,6 +337,10 @@ struct HomeView: View {
             guard let suggestionId = notification.object as? String,
                   intentionSuggestion?.id == suggestionId else { return }
             intentionSuggestion = nil
+        }
+        .onChange(of: appRouter.progressUpdateIntentionID) { _, intentionID in
+            guard intentionID != nil else { return }
+            openProgressUpdateFromReminder(intentionID: intentionID)
         }
         .sheet(isPresented: $showEditIntentions) {
             EditIntentionsView()
@@ -1322,6 +1372,17 @@ struct HomeView: View {
         isUpdateProgressMode = true // toggle mode on
         ManualProgressHaptics.editorOpened()
     }
+
+    private func openProgressUpdateFromReminder(intentionID: String?) {
+        refreshAll()
+        if let intentionID,
+           oneThingMode.isActive,
+           todaysProgress.contains(where: { $0.id == intentionID }) {
+            selectOneThing(intentionID)
+        }
+        enterUpdateProgressMode()
+        appRouter.consumeProgressUpdateRoute()
+    }
     
     /// Cancels update mode and restores original displayed totals without saving.
     private func cancelUpdateProgressMode() {
@@ -1531,15 +1592,8 @@ struct HomeView: View {
             }
         }
         .attuneCard()
-        .overlay(alignment: .trailing) {
-            if showFeelingPicker {
-                feelingPicker
-                    .transition(
-                        reduceMotion
-                            ? .opacity
-                            : .scale(scale: 0.94, anchor: .center).combined(with: .opacity)
-                    )
-            }
+        .anchorPreference(key: FeelingPickerAnchorKey.self, value: .bounds) {
+            $0
         }
         .zIndex(showFeelingPicker ? 30 : 0)
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: showFeelingPicker)
@@ -1663,19 +1717,19 @@ struct HomeView: View {
     }
 
     private var feelingPicker: some View {
-        VStack(spacing: 3) {
+        VStack(spacing: 1) {
             ForEach(MoodDisplayScale.feelingLabels, id: \.self) { feeling in
                 feelingOption(feeling)
             }
         }
-        .padding(7)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(6)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .background(
             Color(red: 0.035, green: 0.055, blue: 0.075).opacity(0.86),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(
                     LinearGradient(
                         colors: [AttuneTheme.accent.opacity(0.62), Color.white.opacity(0.12)],
@@ -1687,6 +1741,9 @@ struct HomeView: View {
         }
         .shadow(color: Color.black.opacity(0.48), radius: 22, y: 10)
         .accessibilityElement(children: .contain)
+        .accessibilityAction(.escape) {
+            showFeelingPicker = false
+        }
     }
 
     private func feelingOption(_ feeling: String) -> some View {
@@ -1705,6 +1762,7 @@ struct HomeView: View {
                 Text(feeling)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AttuneTheme.textPrimary)
+                    .lineLimit(1)
 
                 Spacer(minLength: 8)
 
@@ -1713,9 +1771,9 @@ struct HomeView: View {
                         .foregroundStyle(AttuneTheme.accent)
                 }
             }
-            .padding(.horizontal, 12)
-            .frame(width: 184)
-            .frame(minHeight: 39)
+            .padding(.horizontal, 10)
+            .frame(width: 160)
+            .frame(minHeight: 35)
             .background(
                 isSelected ? AttuneTheme.accent.opacity(0.13) : Color.clear,
                 in: RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -2858,7 +2916,8 @@ struct HomeView: View {
                         dateKey: dateKey,
                         moodLabel: result.moodLabel,
                         moodScore: result.moodScore,
-                        sourceCheckInId: checkInId
+                        sourceCheckInId: checkInId,
+                        observedAt: checkIn.createdAt
                     )
                 } catch {
                     AppLogger.log(AppLogger.ERR, "DailyMood save failed dateKey=\(dateKey) error=\"\(error.localizedDescription)\"")
@@ -2926,7 +2985,7 @@ private struct WeeklyMomentumDayTileStrip: View {
                     tiles
                 }
             } else {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     tiles
                 }
             }
@@ -2950,17 +3009,21 @@ private struct WeeklyMomentumDayTile: View {
     let day: DayMomentum
     let color: Color
 
+    private var presentation: WeeklyMomentumDayPresentation {
+        WeeklyMomentumDayPresentationPolicy.presentation(for: day)
+    }
+
     private var isToday: Bool {
         Calendar.current.isDateInToday(day.date)
     }
 
     private var visibleRatio: Double? {
-        guard !day.isFutureDay, day.hasData, let ratio = day.completionRatio else { return nil }
-        return min(1, max(0, ratio))
+        guard case .progress(let ratio) = presentation else { return nil }
+        return ratio
     }
 
     private var isMissedDay: Bool {
-        !day.isFutureDay && !day.hasData
+        presentation == .missed
     }
 
     private var percentageText: String {
@@ -2972,7 +3035,11 @@ private struct WeeklyMomentumDayTile: View {
         GeometryReader { geometry in
             ZStack {
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(isMissedDay ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.white.opacity(0.055)))
+                    .fill(.ultraThinMaterial)
+
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(isMissedDay ? 0.025 : 0.045))
+                    .padding(1)
 
                 if isMissedDay {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
@@ -3031,19 +3098,7 @@ private struct WeeklyMomentumDayTile: View {
                 .padding(.bottom, 7)
 
                 if isMissedDay {
-                    Path { path in
-                        path.move(to: CGPoint(x: geometry.size.width * 0.17, y: geometry.size.height * 0.62))
-                        path.addLine(to: CGPoint(x: geometry.size.width * 0.83, y: geometry.size.height * 0.38))
-                    }
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.red.opacity(0.34), Color.white.opacity(0.66), Color.red.opacity(0.34)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
-                    )
-                    .shadow(color: Color.red.opacity(0.32), radius: 4)
+                    MissedDaySlash(size: geometry.size)
                 }
             }
             .overlay {
@@ -3055,7 +3110,7 @@ private struct WeeklyMomentumDayTile: View {
                         lineWidth: isToday ? 1.4 : 0.7
                     )
             }
-            .opacity(day.isFutureDay ? 0.42 : 1)
+            .opacity(day.isFutureDay ? 0.54 : 1)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
@@ -3063,9 +3118,73 @@ private struct WeeklyMomentumDayTile: View {
 
     private var accessibilityText: String {
         let prefix = isToday ? "Today, " : ""
-        if day.isFutureDay { return "\(prefix)\(day.weekdayLetter), future day" }
-        guard visibleRatio != nil else { return "\(prefix)\(day.weekdayLetter), no progress entry" }
+        if presentation == .open {
+            return "\(prefix)\(day.weekdayLetter), \(isToday ? "day still open" : "future day")"
+        }
+        if isMissedDay { return "\(prefix)\(day.weekdayLetter), day ended with no intention progress" }
         return "\(prefix)\(day.weekdayLetter), \(percentageText) intention progress"
+    }
+}
+
+enum WeeklyMomentumDayPresentation: Equatable {
+    case open
+    case missed
+    case progress(Double)
+}
+
+enum WeeklyMomentumDayPresentationPolicy {
+    static func presentation(
+        for day: DayMomentum,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> WeeklyMomentumDayPresentation {
+        if day.hasData, let ratio = day.completionRatio {
+            return .progress(min(1, max(0, ratio)))
+        }
+        if day.isFutureDay || calendar.isDate(day.date, inSameDayAs: now) {
+            return .open
+        }
+        return .missed
+    }
+}
+
+private struct MissedDaySlash: View {
+    let size: CGSize
+
+    private var slash: Path {
+        Path { path in
+            path.move(to: CGPoint(x: size.width * 0.79, y: size.height * 0.37))
+            path.addLine(to: CGPoint(x: size.width * 0.21, y: size.height * 0.63))
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            slash
+                .stroke(
+                    Color(red: 0.92, green: 0.05, blue: 0.13).opacity(0.40),
+                    style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                )
+                .blur(radius: 4)
+
+            slash
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.68, green: 0.02, blue: 0.08).opacity(0.48),
+                            Color(red: 1.00, green: 0.27, blue: 0.31).opacity(0.92),
+                            Color.white.opacity(0.70),
+                            Color(red: 0.82, green: 0.03, blue: 0.12).opacity(0.58)
+                        ],
+                        startPoint: .topTrailing,
+                        endPoint: .bottomLeading
+                    ),
+                    style: StrokeStyle(lineWidth: 2.1, lineCap: .round)
+                )
+                .shadow(color: Color.red.opacity(0.42), radius: 3)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -3077,10 +3196,10 @@ private struct DayProgressBarSilhouette: View {
     let isFuture: Bool
     let isMissed: Bool
 
-    private let heights: [CGFloat] = [16, 24, 33]
+    private let heights: [CGFloat] = [17, 25, 34]
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 3) {
+        HStack(alignment: .bottom, spacing: 2.5) {
             ForEach(Array(heights.enumerated()), id: \.offset) { _, height in
                 ZStack(alignment: .bottom) {
                     RoundedRectangle(cornerRadius: 2.5, style: .continuous)
@@ -3106,7 +3225,7 @@ private struct DayProgressBarSilhouette: View {
                             .shadow(color: color.opacity(0.30), radius: 3, y: 1)
                     }
                 }
-                .frame(width: 7, height: height)
+                .frame(width: 9, height: height)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
