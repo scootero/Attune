@@ -1,4 +1,4 @@
-# Attune Launch Steps — Handoff for Web AI Agent
+# Pondera: Intentions Launch Steps — Handoff for Web AI Agent
 
 > Historical long-form reference. Use `YOUR_REMAINING_STEPS.md` as the current
 > controlling manual checklist. Version 1.0 is $4.99/month with no introductory
@@ -7,7 +7,7 @@
 Use this document exactly. Do steps in order.
 
 Goal:
-- Launch Attune on the App Store
+- Launch Pondera: Intentions on the App Store
 - One subscription only: `$4.99 / month`
 - Keep OpenAI key off the iPhone app (Cloudflare Worker proxy)
 
@@ -23,9 +23,9 @@ Tech choice:
 ### App identity
 | Field | Exact value |
 |------|-------------|
-| App Store name | `Attune: Intentions Tracking` |
+| App Store name | `Pondera: Intentions` |
 | Subtitle | `Are you in tune?` |
-| Bundle ID | `com.scottoliver.Attune` |
+| Bundle ID | `com.scottoliver.Pondera.Intentions` |
 | Xcode project | `/Users/scott/Desktop/Attune/Attune/Attune/Attune.xcodeproj` |
 | Scheme | `Attune` |
 
@@ -57,12 +57,12 @@ Tech choice:
 ### Subscription product (App Store Connect)
 | Field | Exact value |
 |------|-------------|
-| Subscription Group Name | `Attune Premium` |
-| Subscription Reference Name | `Attune Pro Monthly` |
+| Subscription Group Name | `Pondera Premium` |
+| Subscription Reference Name | `Pondera Pro Monthly` |
 | Product ID | `com.scottoliver.Attune.monthly` |
 | Duration | `1 Month` |
 | Price | `$4.99` |
-| Display Name | `Attune Pro Monthly` |
+| Display Name | `Pondera Pro Monthly` |
 | Description | `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.` |
 
 ### URLs the human must visit
@@ -216,7 +216,7 @@ Required before Apple will sell the `$4.99` subscription.
 
 Go to:
 - https://appstoreconnect.apple.com
-- My Apps → `Attune`
+- My Apps → `Pondera: Intentions`
 - Monetization → Subscriptions
 
 Create:
@@ -227,12 +227,12 @@ Enter these exact values:
 
 | Field | Enter this |
 |------|-------------|
-| Subscription Group Name | `Attune Premium` |
-| Reference Name | `Attune Pro Monthly` |
+| Subscription Group Name | `Pondera Premium` |
+| Reference Name | `Pondera Pro Monthly` |
 | Product ID | `com.scottoliver.Attune.monthly` |
 | Duration | `1 Month` |
 | Price | `$4.99` |
-| Display Name | `Attune Pro Monthly` |
+| Display Name | `Pondera Pro Monthly` |
 | Description | `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.` |
 
 ---
@@ -264,7 +264,7 @@ Also paste into App Store Connect:
 ### STEP 9 — Fill App Privacy labels
 
 Go to:
-- App Store Connect → `Attune` → App Privacy
+- App Store Connect → `Pondera: Intentions` → App Privacy
 
 Disclose at least:
 - Audio Data
@@ -282,17 +282,17 @@ Upload screenshots for:
 - Paywall (after subscription UI exists)
 - iPhone required sizes
 
-Attune 1.0 is configured as an iPhone-only app, so native iPad screenshots are
+Pondera 1.0 is configured as an iPhone-only app, so native iPad screenshots are
 not required. Apple may still make an iPhone-only app available on iPad in
 compatibility mode.
 
 Review notes paste:
 
 ```
-Attune records voice only when the user starts a session or check-in.
+Pondera records voice only when the user starts a session or check-in.
 Background audio is only for an active user-started recording.
 Speech may use Apple cloud speech recognition.
-Transcripts are sent to OpenAI through Attune’s Cloudflare Worker proxy after the user accepts the in-app AI disclosure.
+Transcripts are sent to OpenAI through Pondera’s Cloudflare Worker proxy after the user accepts the in-app AI disclosure.
 Subscription product ID: com.scottoliver.Attune.monthly ($4.99/month).
 To demo: accept privacy sheet → start check-in/record → speak briefly → stop → wait for processing.
 Also test Subscribe and Restore Purchases on the paywall.

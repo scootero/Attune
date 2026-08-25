@@ -1,4 +1,4 @@
-# Attune App Store Purchase Setup
+# Pondera: Intentions App Store Purchase Setup
 
 > Reference only. The current controlling manual checklist is
 > `YOUR_REMAINING_STEPS.md`. The Worker deployment, app secrets wiring, In-App
@@ -6,7 +6,7 @@
 > Version 1.0 is $4.99/month with **no introductory offer or free trial**; do
 > not repeat completed deployment/key steps solely because they appear below.
 
-This is the full checklist to make Attune purchasable with one subscription.
+This is the full checklist to make Pondera purchasable with one subscription.
 
 ## What is already done in code
 
@@ -21,16 +21,16 @@ This is the full checklist to make Attune purchasable with one subscription.
 
 ## Fixed values (use exactly)
 
-- App Store name: `Attune: Intentions Tracking`
+- App Store name: `Pondera: Intentions`
 - Subtitle: `Are you in tune?`
-- Bundle ID: `com.scottoliver.Attune`
+- Bundle ID: `com.scottoliver.Pondera.Intentions`
 - Team ID: `BLAUCQ8H26`
-- Subscription Group: `Attune Premium`
-- Product Reference Name: `Attune Pro Monthly`
+- Subscription Group: `Pondera Premium`
+- Product Reference Name: `Pondera Pro Monthly`
 - Product ID: `com.scottoliver.Attune.monthly`
 - Duration: `1 Month`
 - Price: `$4.99`
-- Display Name: `Attune Pro Monthly`
+- Display Name: `Pondera Pro Monthly`
 - Description: `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.`
 
 ## Accounts you must have
@@ -49,14 +49,14 @@ This is the full checklist to make Attune purchasable with one subscription.
 - Complete tax forms
 
 ### 2) Create subscription product
-- App Store Connect → My Apps → Attune → Monetization → Subscriptions
-- Rename or create group: `Attune Premium`
+- App Store Connect → My Apps → Pondera: Intentions → Monetization → Subscriptions
+- Rename or confirm group: `Pondera Premium`
 - Create product:
-  - Reference Name: `Attune Pro Monthly`
+  - Reference Name: `Pondera Pro Monthly`
   - Product ID: `com.scottoliver.Attune.monthly`
   - Duration: `1 Month`
   - Price: `$4.99`
-  - Display Name: `Attune Pro Monthly`
+  - Display Name: `Pondera Pro Monthly`
   - Description: `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.`
 
 ### 3) Cloudflare/OpenAI proxy setup
