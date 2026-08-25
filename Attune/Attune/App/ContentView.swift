@@ -37,6 +37,7 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $showOnboarding, onDismiss: presentPrivacyDisclosureIfNeeded) {
                 OnboardingView {
                     AttuneOnboardingState.hasCompleted = true
+                    AttuneHaptics.saved()
                     showOnboarding = false
                 }
                 .interactiveDismissDisabled(true)
@@ -45,6 +46,7 @@ struct ContentView: View {
                 AIPrivacyDisclosureSheet {
                     // Persist acceptance so OpenAIClient may send transcripts.
                     AIPrivacyConsent.hasAccepted = true
+                    AttuneHaptics.saved()
                     showAIPrivacySheet = false
                 }
                 .interactiveDismissDisabled(true) // Require an explicit Accept tap.
@@ -60,6 +62,7 @@ struct ContentView: View {
     }
 
     private func finishLaunchIntro() {
+        AttuneHaptics.welcome()
         showLaunchIntro = false
 
         if !AttuneOnboardingState.hasCompleted {

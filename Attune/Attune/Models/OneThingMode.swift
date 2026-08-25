@@ -20,6 +20,19 @@ struct OneThingModeState: Codable, Equatable {
 }
 
 enum OneThingModePolicy {
+    /// Focus eligibility starts only once the current active intentions exist.
+    /// Using the newest creation date is conservative when intentions are added
+    /// over time and prevents onboarding days from counting as quiet days.
+    static func eligibilityStart(
+        intentionSetStartedAt: Date,
+        intentions: [Intention]
+    ) -> Date? {
+        guard let newestIntentionStartedAt = intentions.filter(\.isActive).map(\.createdAt).max() else {
+            return nil
+        }
+        return max(intentionSetStartedAt, newestIntentionStartedAt)
+    }
+
     static func shouldActivate(
         state: OneThingModeState,
         intentionSetStartedAt: Date,

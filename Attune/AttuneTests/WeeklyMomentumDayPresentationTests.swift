@@ -2,6 +2,72 @@ import XCTest
 @testable import Attune
 
 final class WeeklyMomentumDayPresentationTests: XCTestCase {
+    func testDayBeforeFirstIntentionIsNeutralAndUntracked() {
+        let calendar = fixedCalendar()
+        let day = DayMomentum(
+            date: date(day: 20, hour: 0, calendar: calendar),
+            weekdayLetter: "T",
+            completionRatio: nil,
+            tier: .neutral,
+            isFutureDay: false,
+            hasData: false,
+            isTrackingEligible: false
+        )
+
+        XCTAssertEqual(
+            WeeklyMomentumDayPresentationPolicy.presentation(
+                for: day,
+                now: date(day: 21, hour: 12, calendar: calendar),
+                calendar: calendar
+            ),
+            .untracked
+        )
+    }
+
+    func testFreshInstallWithoutIntentionsLeavesEntireWeekUntracked() {
+        let calendar = fixedCalendar()
+        let now = date(day: 18, hour: 12, calendar: calendar)
+        let week = WeekMomentumCalculator.compute(
+            today: now,
+            intentionSet: IntentionSet(startedAt: date(day: 18, hour: 6, calendar: calendar)),
+            intentions: [],
+            entriesForDate: { _ in [] },
+            overridesForDate: { _ in [:] }
+        )
+
+        XCTAssertEqual(week.days.count, 7)
+        XCTAssertTrue(week.days.allSatisfy { !$0.isTrackingEligible })
+        XCTAssertTrue(week.days.allSatisfy {
+            WeeklyMomentumDayPresentationPolicy.presentation(for: $0, now: now, calendar: calendar) == .untracked
+        })
+    }
+
+    func testTrackingBeginsOnFirstIntentionCreationDay() {
+        let calendar = fixedCalendar()
+        let now = date(day: 18, hour: 12, calendar: calendar)
+        let intention = Intention(
+            title: "Read",
+            targetValue: 10,
+            unit: "pages",
+            timeframe: "daily",
+            createdAt: date(day: 18, hour: 8, calendar: calendar)
+        )
+        let week = WeekMomentumCalculator.compute(
+            today: now,
+            intentionSet: IntentionSet(startedAt: date(day: 17, hour: 6, calendar: calendar), intentionIds: [intention.id]),
+            intentions: [intention],
+            entriesForDate: { _ in [] },
+            overridesForDate: { _ in [:] }
+        )
+
+        XCTAssertFalse(week.days[0].isTrackingEligible)
+        XCTAssertTrue(week.days[1].isTrackingEligible)
+        XCTAssertEqual(
+            WeeklyMomentumDayPresentationPolicy.presentation(for: week.days[1], now: now, calendar: calendar),
+            .open
+        )
+    }
+
     func testCurrentDayWithoutProgressStaysOpenUntilLocalMidnight() {
         let calendar = fixedCalendar()
         let now = date(day: 20, hour: 23, minute: 20, calendar: calendar)

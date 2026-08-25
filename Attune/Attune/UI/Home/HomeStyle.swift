@@ -295,66 +295,72 @@ private struct TodayIntentionsCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background {
-                ZStack {
-                    shape
-                        .fill(.ultraThinMaterial)
+                // GeometryReader adopts the content's exact bounds. Without it,
+                // the offset decorative circle below enlarged the background's
+                // drawing area and let the empty card appear to extend upward
+                // over the Quick Check-In card.
+                GeometryReader { _ in
+                    ZStack {
+                        shape
+                            .fill(.ultraThinMaterial)
 
-                    shape
-                        .fill(Color(red: 0.018, green: 0.018, blue: 0.060).opacity(0.89))
+                        shape
+                            .fill(Color(red: 0.018, green: 0.018, blue: 0.060).opacity(0.89))
 
-                    LinearGradient(
-                        colors: [
-                            neonPurple.opacity(0.20),
-                            neonPink.opacity(0.12),
-                            sunsetOrange.opacity(0.07),
-                            neonCyan.opacity(0.14)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-
-                    RadialGradient(
-                        colors: [neonPink.opacity(0.18), neonPurple.opacity(0.07), .clear],
-                        center: .topTrailing,
-                        startRadius: 4,
-                        endRadius: 250
-                    )
-
-                    RadialGradient(
-                        colors: [neonCyan.opacity(0.14), .clear],
-                        center: .bottomLeading,
-                        startRadius: 8,
-                        endRadius: 220
-                    )
-
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    sunsetOrange.opacity(0.20),
-                                    neonPink.opacity(0.12),
-                                    .clear
-                                ],
-                                center: .center,
-                                startRadius: 2,
-                                endRadius: 90
-                            )
+                        LinearGradient(
+                            colors: [
+                                neonPurple.opacity(0.20),
+                                neonPink.opacity(0.12),
+                                sunsetOrange.opacity(0.07),
+                                neonCyan.opacity(0.14)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
-                        .frame(width: 190, height: 190)
-                        .offset(x: 102, y: -54)
-                        .blur(radius: 3)
 
-                    FabricSpaceTexture()
-                        .opacity(0.52)
+                        RadialGradient(
+                            colors: [neonPink.opacity(0.18), neonPurple.opacity(0.07), .clear],
+                            center: .topTrailing,
+                            startRadius: 4,
+                            endRadius: 250
+                        )
 
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.07), .clear, Color.black.opacity(0.28)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+                        RadialGradient(
+                            colors: [neonCyan.opacity(0.14), .clear],
+                            center: .bottomLeading,
+                            startRadius: 8,
+                            endRadius: 220
+                        )
+
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        sunsetOrange.opacity(0.20),
+                                        neonPink.opacity(0.12),
+                                        .clear
+                                    ],
+                                    center: .center,
+                                    startRadius: 2,
+                                    endRadius: 90
+                                )
+                            )
+                            .frame(width: 190, height: 190)
+                            .offset(x: 102, y: -54)
+                            .blur(radius: 3)
+
+                        FabricSpaceTexture()
+                            .opacity(0.52)
+
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.07), .clear, Color.black.opacity(0.28)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    }
+                    .clipShape(shape)
+                    .allowsHitTesting(false)
                 }
-                .clipShape(shape)
-                .allowsHitTesting(false)
             }
             .overlay {
                 shape

@@ -5,6 +5,20 @@ import UIKit
 /// only after an operation has actually succeeded or failed.
 @MainActor
 enum AttuneHaptics {
+    /// A quiet pulse as the branded launch handoff reveals the app.
+    static func welcome() {
+        let generator = UIImpactFeedbackGenerator(style: .soft)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.6)
+    }
+
+    /// Lightweight feedback for changing pages, tabs, or opening app chrome.
+    static func selection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+    }
+
     static func action() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.prepare()

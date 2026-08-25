@@ -2504,6 +2504,16 @@ struct HomeView: View {
         }
         let intentions = IntentionStore.shared.loadIntentions(ids: intentionSet.intentionIds).filter(\.isActive)
         var state = OneThingModeStore.shared.load()
+        guard let focusEligibilityStart = OneThingModePolicy.eligibilityStart(
+            intentionSetStartedAt: intentionSet.startedAt,
+            intentions: intentions
+        ) else {
+            if state.isActive {
+                try? OneThingModeStore.shared.exit(now: now)
+            }
+            oneThingMode = .empty
+            return
+        }
         if state.isActive, !intentions.contains(where: { $0.id == state.focusedIntentionId }) {
             if let first = intentions.first {
                 try? OneThingModeStore.shared.select(first.id)
@@ -2517,7 +2527,7 @@ struct HomeView: View {
         let activityKeys = recentActivityDateKeys(days: 2, intentionSet: intentionSet, now: now)
         if OneThingModePolicy.shouldActivate(
             state: state,
-            intentionSetStartedAt: intentionSet.startedAt,
+            intentionSetStartedAt: focusEligibilityStart,
             activeIntentionCount: intentions.count,
             activityDateKeys: activityKeys,
             now: now
@@ -3248,7 +3258,7 @@ private struct WeeklyMomentumDayTile: View {
                         lineWidth: isToday ? 1.4 : 0.7
                     )
             }
-            .opacity(day.isFutureDay ? 0.54 : 1)
+            .opacity(day.isFutureDay || !day.isTrackingEligible ? 0.54 : 1)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
@@ -3256,6 +3266,9 @@ private struct WeeklyMomentumDayTile: View {
 
     private var accessibilityText: String {
         let prefix = isToday ? "Today, " : ""
+        if presentation == .untracked {
+            return "\(prefix)\(day.weekdayLetter), not tracked yet"
+        }
         if presentation == .open {
             return "\(prefix)\(day.weekdayLetter), \(isToday ? "day still open" : "future day")"
         }
@@ -3265,6 +3278,7 @@ private struct WeeklyMomentumDayTile: View {
 }
 
 enum WeeklyMomentumDayPresentation: Equatable {
+    case untracked
     case open
     case missed
     case progress(Double)
@@ -3276,6 +3290,9 @@ enum WeeklyMomentumDayPresentationPolicy {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> WeeklyMomentumDayPresentation {
+        if !day.isTrackingEligible {
+            return .untracked
+        }
         if day.hasData, let ratio = day.completionRatio {
             return .progress(min(1, max(0, ratio)))
         }

@@ -36,6 +36,28 @@ struct DayMomentum: Identifiable {
     
     /// True if there are intentions with progress data for this day.
     let hasData: Bool
+
+    /// False before the user had an active intention to track. These days are
+    /// neutral context, not missed days.
+    let isTrackingEligible: Bool
+
+    init(
+        date: Date,
+        weekdayLetter: String,
+        completionRatio: Double?,
+        tier: MomentumTier,
+        isFutureDay: Bool,
+        hasData: Bool,
+        isTrackingEligible: Bool = true
+    ) {
+        self.date = date
+        self.weekdayLetter = weekdayLetter
+        self.completionRatio = completionRatio
+        self.tier = tier
+        self.isFutureDay = isFutureDay
+        self.hasData = hasData
+        self.isTrackingEligible = isTrackingEligible
+    }
     
     var id: Date { date }
 }

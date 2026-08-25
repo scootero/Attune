@@ -35,12 +35,16 @@ struct WeekMomentumCalculator {
         guard let mondayDate = calendar.date(byAdding: .day, value: -daysFromMonday, to: startOfToday) else {
             return WeekMomentum(days: [])
         }
+
+        let activeIntentions = intentions.filter(\.isActive)
+        let trackingStart = activeIntentions.map(\.createdAt).min().map { calendar.startOfDay(for: $0) }
         
         var days: [DayMomentum] = []
         for offset in 0..<7 {
             guard let date = calendar.date(byAdding: .day, value: offset, to: mondayDate) else { continue }
             let dateKey = ProgressCalculator.dateKey(for: date)
             let weekdayLetter = WeekMomentumCalculator.weekdayLetters[offset]
+            let isTrackingEligible = trackingStart.map { date >= $0 } ?? false
             
             if date > startOfToday {
                 days.append(DayMomentum(
@@ -49,14 +53,27 @@ struct WeekMomentumCalculator {
                     completionRatio: nil,
                     tier: .neutral,
                     isFutureDay: true,
-                    hasData: false
+                    hasData: false,
+                    isTrackingEligible: isTrackingEligible
+                ))
+                continue
+            }
+
+            if !isTrackingEligible {
+                days.append(DayMomentum(
+                    date: date,
+                    weekdayLetter: weekdayLetter,
+                    completionRatio: nil,
+                    tier: .neutral,
+                    isFutureDay: false,
+                    hasData: false,
+                    isTrackingEligible: false
                 ))
                 continue
             }
             
             let entries = entriesForDate(dateKey)
             let overrides = overridesForDate(dateKey)
-            let activeIntentions = intentions.filter { $0.isActive }
             let n = activeIntentions.count
             
             if n == 0 {

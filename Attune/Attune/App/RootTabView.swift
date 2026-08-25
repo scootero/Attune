@@ -28,7 +28,7 @@ struct RootTabView: View {
             appHeader
                 .zIndex(1)
 
-            TabView(selection: $appRouter.selectedRootTab) {
+            TabView(selection: rootTabSelection) {
                 // Tab 1: Today — check-ins, intentions, mood, and weekly summary.
                 HomeView()
                     .tabItem {
@@ -162,6 +162,7 @@ struct RootTabView: View {
             Spacer(minLength: 0)
 
             Button {
+                AttuneHaptics.selection()
                 showSettings = true
             } label: {
                 Image(systemName: "gearshape")
@@ -195,6 +196,18 @@ struct RootTabView: View {
                 .offset(y: 8)
                 .ignoresSafeArea(edges: .top)
         }
+    }
+
+    /// Keeps direct router changes quiet while giving user-initiated tab taps feedback.
+    private var rootTabSelection: Binding<RootTab> {
+        Binding(
+            get: { appRouter.selectedRootTab },
+            set: { selectedTab in
+                guard selectedTab != appRouter.selectedRootTab else { return }
+                AttuneHaptics.selection()
+                appRouter.selectedRootTab = selectedTab
+            }
+        )
     }
     
     /// Performs recovery of incomplete sessions and segments on app launch.

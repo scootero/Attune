@@ -59,7 +59,7 @@ struct OnboardingView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 22)
 
-                TabView(selection: $selectedPage) {
+                TabView(selection: pageSelection) {
                     ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
                         onboardingPage(page)
                             .tag(index)
@@ -139,12 +139,25 @@ struct OnboardingView: View {
 
     private func advance() {
         if selectedPage < pages.count - 1 {
+            AttuneHaptics.selection()
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
                 selectedPage += 1
             }
         } else {
             onComplete()
         }
+    }
+
+    /// Adds the same light feedback when onboarding pages change by swiping.
+    private var pageSelection: Binding<Int> {
+        Binding(
+            get: { selectedPage },
+            set: { page in
+                guard page != selectedPage else { return }
+                AttuneHaptics.selection()
+                selectedPage = page
+            }
+        )
     }
 }
 

@@ -19,6 +19,36 @@ final class OneThingModePolicyTests: XCTestCase {
         ))
     }
 
+    func testEligibilityDoesNotBeginWithoutIntentionsAndUsesNewestActiveIntention() {
+        let setStart = date("2026-08-01T00:00:00Z")
+        XCTAssertNil(OneThingModePolicy.eligibilityStart(intentionSetStartedAt: setStart, intentions: []))
+
+        let first = Intention(
+            id: "first",
+            title: "First",
+            targetValue: 1,
+            unit: "times",
+            timeframe: "daily",
+            createdAt: date("2026-08-03T08:00:00Z")
+        )
+        let second = Intention(
+            id: "second",
+            title: "Second",
+            targetValue: 1,
+            unit: "times",
+            timeframe: "daily",
+            createdAt: date("2026-08-05T09:00:00Z")
+        )
+
+        XCTAssertEqual(
+            OneThingModePolicy.eligibilityStart(
+                intentionSetStartedAt: setStart,
+                intentions: [first, second]
+            ),
+            second.createdAt
+        )
+    }
+
     func testDoesNotActivateWithActivityOnEitherDayOrOnlyOneIntention() {
         for key in ["2026-08-03", "2026-08-04"] {
             XCTAssertFalse(OneThingModePolicy.shouldActivate(
