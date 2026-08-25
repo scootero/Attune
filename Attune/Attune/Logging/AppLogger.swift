@@ -51,7 +51,7 @@ struct AppLogger {
     private static let maxLogFileSize: UInt64 = 5 * 1024 * 1024
     
     /// Serial queue for thread-safe log operations
-    private static let logQueue = DispatchQueue(label: "com.attune.logger", qos: .utility)
+    private static let logQueue = DispatchQueue(label: "com.pondera.logger", qos: .utility)
     
     /// Logs directory: Documents/Attune/Logs/
     private static var logsDir: URL {

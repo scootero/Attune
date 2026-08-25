@@ -2,7 +2,7 @@
 //  SubscriptionConfig.swift
 //  Attune
 //
-//  Fixed product IDs and free-tier limits for Attune Pro.
+//  Fixed product IDs and free-tier limits for Pondera Pro.
 //
 
 import Foundation
@@ -10,7 +10,7 @@ import Foundation
 /// Subscription product IDs and simple free vs paid rules.
 enum SubscriptionConfig {
     /// Must match App Store Connect Product ID exactly.
-    static let monthlyProductID = "com.scottoliver.Attune.monthly"
+    static let monthlyProductID = "com.scottoliver.Pondera.Intentions.monthly"
 
     /// Free users can start this many check-ins per calendar day.
     static let freeCheckInsPerDay = 1

@@ -57,9 +57,9 @@ Tech choice:
 ### Subscription product (App Store Connect)
 | Field | Exact value |
 |------|-------------|
-| Subscription Group Name | `Pondera Premium` |
+| Subscription Group Name | `Pondera Pro` |
 | Subscription Reference Name | `Pondera Pro Monthly` |
-| Product ID | `com.scottoliver.Attune.monthly` |
+| Product ID | `com.scottoliver.Pondera.Intentions.monthly` |
 | Duration | `1 Month` |
 | Price | `$4.99` |
 | Display Name | `Pondera Pro Monthly` |
@@ -227,9 +227,9 @@ Enter these exact values:
 
 | Field | Enter this |
 |------|-------------|
-| Subscription Group Name | `Pondera Premium` |
+| Subscription Group Name | `Pondera Pro` |
 | Reference Name | `Pondera Pro Monthly` |
-| Product ID | `com.scottoliver.Attune.monthly` |
+| Product ID | `com.scottoliver.Pondera.Intentions.monthly` |
 | Duration | `1 Month` |
 | Price | `$4.99` |
 | Display Name | `Pondera Pro Monthly` |
@@ -293,7 +293,7 @@ Pondera records voice only when the user starts a session or check-in.
 Background audio is only for an active user-started recording.
 Speech may use Apple cloud speech recognition.
 Transcripts are sent to OpenAI through Pondera’s Cloudflare Worker proxy after the user accepts the in-app AI disclosure.
-Subscription product ID: com.scottoliver.Attune.monthly ($4.99/month).
+Subscription product ID: com.scottoliver.Pondera.Intentions.monthly ($4.99/month).
 To demo: accept privacy sheet → start check-in/record → speak briefly → stop → wait for processing.
 Also test Subscribe and Restore Purchases on the paywall.
 ```
@@ -321,7 +321,7 @@ In Xcode:
 These are not implemented yet and must be added before selling the subscription:
 
 1. StoreKit 2 support
-2. Load product `com.scottoliver.Attune.monthly`
+2. Load product `com.scottoliver.Pondera.Intentions.monthly`
 3. Paywall screen
 4. Subscribe button
 5. Restore Purchases button
@@ -330,7 +330,7 @@ These are not implemented yet and must be added before selling the subscription:
 
 Recommended free vs paid (simple):
 - Free: limited check-ins
-- Paid (`com.scottoliver.Attune.monthly`): unlimited check-ins, recording, AI insights
+- Paid (`com.scottoliver.Pondera.Intentions.monthly`): unlimited check-ins, recording, AI insights
 
 ---
 
@@ -341,7 +341,7 @@ The coding agent can confidently do:
 - Build paywall UI
 - Add purchase + restore
 - Gate features behind subscription
-- Wire product ID `com.scottoliver.Attune.monthly`
+- Wire product ID `com.scottoliver.Pondera.Intentions.monthly`
 - Update docs/checklists
 - Verify the Xcode project builds
 
@@ -359,5 +359,5 @@ The coding agent cannot do for you:
 
 1. Human/web agent: STEPS 1–5 (OpenAI + Cloudflare + Secrets.swift)
 2. Human/web agent: STEPS 6–8 (Apple agreements + subscription product + legal URLs)
-3. Coding agent: implement StoreKit paywall using product ID `com.scottoliver.Attune.monthly`
+3. Coding agent: implement StoreKit paywall using product ID `com.scottoliver.Pondera.Intentions.monthly`
 4. Human/web agent: STEPS 9–11 (privacy labels, screenshots, archive, TestFlight, submit)

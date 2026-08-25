@@ -8,7 +8,7 @@
 
 import Foundation
 
-/// Stores first-launch acceptance of AI processing (Apple Speech + OpenAI via Attune proxy).
+/// Stores first-launch acceptance of AI processing (Apple Speech + OpenAI via the Pondera proxy).
 enum AIPrivacyConsent {
     /// UserDefaults key for whether the user accepted the AI disclosure.
     private static let acceptedKey = "attune.aiPrivacy.accepted"

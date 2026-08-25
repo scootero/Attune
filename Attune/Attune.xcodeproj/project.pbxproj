@@ -247,7 +247,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.scottoliver.AttuneTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scottoliver.Pondera.IntentionsTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_VERSION = 5.0;
@@ -270,7 +270,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.scottoliver.AttuneTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scottoliver.Pondera.IntentionsTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_VERSION = 5.0;

@@ -13,9 +13,9 @@ in `ATTUNE_REMAINING_WORK.md`.
 | App Store name | `Pondera: Intentions` |
 | Subtitle | `Are you in tune?` |
 | Bundle ID | `com.scottoliver.Pondera.Intentions` |
-| Subscription group | `Pondera Premium` |
+| Subscription group | `Pondera Pro` |
 | Reference name | `Pondera Pro Monthly` |
-| Product ID | `com.scottoliver.Attune.monthly` |
+| Product ID | `com.scottoliver.Pondera.Intentions.monthly` |
 | Duration | `1 Month` |
 | United States price | `$4.99/month` |
 | Introductory trial | **None for version 1.0** |
@@ -33,7 +33,7 @@ product trial.
 - [x] In-App Purchase capability and local StoreKit configuration added.
 - [x] Subscribe, Restore Purchases, entitlement tracking, Free/Pro gates, and
   Debug Free/Pro/System testing implemented.
-- [x] Local product uses `com.scottoliver.Attune.monthly`, $4.99/month, with no trial.
+- [x] Local product uses `com.scottoliver.Pondera.Intentions.monthly`, $4.99/month, with no trial.
 - [x] Phase 1 automated tests passed 16/16; Debug and Release builds passed.
 - [x] GitHub Pages-ready landing, Privacy, Support, and Terms files exist under `/docs`.
 - [x] App legal links point at the intended GitHub Pages locations.
@@ -114,25 +114,24 @@ Recommended choices and checks:
 - Codex can update the prepared pages and verify them. Scott must approve the
   public email, checkpoint commit/push, and publication decision.
 
-### C. Create the subscription in App Store Connect
+### C. Finalize the subscription in App Store Connect
 
-- [ ] My Apps > Pondera: Intentions > Monetization > Subscriptions.
-- [ ] Rename or confirm subscription group `Pondera Premium`.
-- [ ] Create one monthly product using the fixed values above.
-- [ ] Set the United States price to $4.99/month.
+- [x] My Apps > Pondera: Intentions > Monetization > Subscriptions.
+- [x] Confirm subscription group `Pondera Pro`.
+- [x] Create one monthly product using the fixed values above.
+- [x] Set the United States price to $4.99/month.
 - [ ] Add the required localization, description, and review screenshot.
 - [ ] Do **not** configure an introductory offer or free trial.
 - [ ] Confirm the product is in the correct readiness state for Sandbox/TestFlight testing.
 
-How to enter it:
+Confirmed values and remaining steps:
 
 1. App Store Connect > **My Apps** > **Pondera: Intentions** > **Monetization** >
    **Subscriptions**.
-2. Rename or confirm the group `Pondera Premium`.
-3. Create one auto-renewable subscription using the fixed values at the top of
-   this document. Carefully enter the immutable product ID
-   `com.scottoliver.Attune.monthly` exactly as shown.
-4. Select a one-month duration and the United States $4.99 price point.
+2. Confirm the group `Pondera Pro`.
+3. The confirmed auto-renewable subscription uses the immutable Product ID
+   `com.scottoliver.Pondera.Intentions.monthly` exactly as shown.
+4. Its confirmed duration is one month and its United States price is $4.99.
 5. Add at least the primary English localization, customer-visible display
    name and description, review notes if requested, and an App Review screenshot
    that clearly shows Pondera's paywall and what is being purchased.
@@ -268,7 +267,7 @@ First determine whether the existing key belongs to a dedicated Attune OpenAI
 project or a shared/default project.
 
 - [ ] In <https://platform.openai.com>, select the project used by the Worker.
-- [ ] If it is dedicated to Attune, open **Settings** > **Limits** > **Spend** >
+- [ ] If it is dedicated to Pondera, open **Settings** > **Limits** > **Spend** >
   **Edit spend limit**.
 - [ ] During Sandbox/TestFlight, consider a conservative `$25/month` hard limit
   with alerts at 50%, 75%, and 90%; revisit it after measuring real usage.
@@ -276,8 +275,8 @@ project or a shared/default project.
   continuing indefinitely. Understand that enforcement may allow a small
   propagation overage and that hitting the cap makes Pondera AI temporarily unavailable.
 - [ ] If the current project is shared with other applications, do not impose an
-  Attune-sized limit on the shared project. The Phase 3 plan should decide
-  whether to create a dedicated Attune project and then replace only the
+  Pondera-sized limit on the shared project. The Phase 3 plan should decide
+  whether to create a dedicated Pondera project and then replace only the
   Worker's `OPENAI_API_KEY` secret.
 
 The dollar value is a starting recommendation for controlled testing, not the

@@ -457,7 +457,7 @@ Do not build a document system, tags, folders, backlinks, or a new search index 
   - Benefits: more intentions, Voice Check-Ins, Talk it out with Insights, full Momentum history, voice setup/data export.
   - Also emphasizes a monthly AI processing allowance.
 - `App/SubscriptionConfig.swift`
-  - Monthly product ID remains `com.scottoliver.Attune.monthly`.
+  - Monthly product ID is `com.scottoliver.Pondera.Intentions.monthly`.
   - Free: one Check-In/day and one active intention.
   - Maximum active intentions: ten.
 - `App/SubscriptionAccessPolicy.swift`
@@ -475,7 +475,7 @@ The paywall has already moved beyond “more recordings.” Its best language is
 
 Position Pro as continuity:
 
-> Attune Pro keeps the full picture—more of what you are working on, what you have said, and how it changes over time.
+> Pondera Pro keeps the full picture—more of what you are working on, what you have said, and how it changes over time.
 
 Suggested grouping using existing entitlements:
 
@@ -484,7 +484,7 @@ Suggested grouping using existing entitlements:
 
 Daily brief should not be marketed as valuable only because it uses AI; the deterministic form does not require an AI call. A basic daily status is valuable for Free activation and demonstrates the core loop. A richer cross-session weekly brief logically fits Pro because its source data (Talk it out/Insights/history) is already Pro-gated.
 
-Do not change product ID, price, StoreKit configuration, or entitlement logic during copy work. Internal `Attune` storage paths and product identifiers do not need renaming for product clarity and should remain stable.
+Do not change product ID, price, StoreKit configuration, or entitlement logic during copy-only work. Internal `Attune` storage paths remain stable; the final StoreKit Product ID is `com.scottoliver.Pondera.Intentions.monthly`.
 
 ---
 

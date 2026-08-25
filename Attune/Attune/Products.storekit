@@ -23,7 +23,7 @@
       "localizations" : [
 
       ],
-      "name" : "Pondera Premium",
+      "name" : "Pondera Pro",
       "subscriptions" : [
         {
           "adHocOffers" : [
@@ -43,7 +43,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.scottoliver.Attune.monthly",
+          "productID" : "com.scottoliver.Pondera.Intentions.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Pondera Pro Monthly",
           "type" : "RecurringSubscription"

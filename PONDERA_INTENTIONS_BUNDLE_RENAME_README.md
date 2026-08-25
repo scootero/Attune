@@ -43,7 +43,7 @@ Stop if the tree contains important uncommitted work or the local/remote checkpo
 - Use **Pondera** under the app icon and throughout ordinary UI. Reserve **Pondera: Intentions** for the App Store name and formal first references.
 - Replace the baked-in Attune launch video with a restrained code-native SwiftUI Pondera intro that reuses the header's existing circular mark.
 - Preserve working GitHub Pages and issue URLs containing `/Attune`; change their visible labels and surrounding copy only.
-- Keep the internal Xcode project, target, scheme, executable/module, test target, test Bundle ID, source types, and directories named Attune.
+- Keep the internal Xcode project, target, scheme, executable/module, test target, source types, and directories named Attune; use a Pondera test Bundle ID.
 
 ## Completed Targeted Audit
 
@@ -62,27 +62,26 @@ Stop if the tree contains important uncommitted work or the local/remote checkpo
 | Change to Pondera | Retain for compatibility/history |
 | --- | --- |
 | App Bundle ID in Debug and Release | Xcode project, target, scheme, module, executable, and test names |
-| Home-screen name and all customer-facing app copy | `com.scottoliver.Attune.monthly` |
+| Home-screen name, customer-facing copy, and StoreKit product configuration | Persisted storage and deployed backend/API identifiers |
 | Permission descriptions and local-notification titles | `Documents/Attune` storage hierarchy |
 | StoreKit group/reference/display branding | `attune.*` defaults and notification identifiers |
 | Current About, Privacy, Terms, Support, and public-page copy | `X-Attune-*`, Worker/D1 names, and proxy URL |
 | Launch intro presentation | `ATTUNE_DEMO_`, internal type names, historical docs, and retained `/Attune` URLs |
 
-## Apple Configuration Baseline
+## Final Apple Configuration
 
-The following is supplied migration context and must be confirmed in Apple Developer and App Store Connect when web-side work is performed:
+The following was confirmed in Apple Developer and App Store Connect on August 24, 2026:
 
 - Reuse the existing App Store Connect record and Apple ID.
 - Keep the internal SKU `attune`.
 - No build has been uploaded.
-- No provisioning profiles currently exist; existing certificates are reusable.
-- Current capabilities are In-App Purchase and StoreKit External Purchases or Offers.
+- Current capability is In-App Purchase; StoreKit External Purchases or Offers is disabled.
 - No App Groups, iCloud/CloudKit, Push Notifications, Sign in with Apple, or Game Center are configured.
-- Existing subscription group: `Attune Premium`.
-- Existing subscription: `Attune Pro Monthly`, $4.99/month, Family Sharing enabled.
-- Preserve the permanent Product ID `com.scottoliver.Attune.monthly` unless a verified technical incompatibility requires otherwise.
+- Subscription group: `Pondera Pro`.
+- Subscription: `Pondera Pro Monthly`, $4.99/month, one-month duration, Family Sharing enabled.
+- Product ID: `com.scottoliver.Pondera.Intentions.monthly`.
 
-Do not create a replacement subscription merely to remove `Attune` from its internal Product ID.
+The old unused Attune subscription/group may remain in App Store Connect, but the app and repository must not request its Product ID.
 
 ## Migration Sequence
 
@@ -127,7 +126,6 @@ Preserve URLs containing `attune` unless a tested redirect or renamed destinatio
 
 Do not blindly purge every `Attune` string. Retain old values when changing them could break upgrades, purchases, storage, or historical continuity. Likely examples include:
 
-- StoreKit Product IDs
 - UserDefaults and Keychain keys
 - database or storage names
 - migration and serialized identifiers
@@ -149,7 +147,7 @@ Audit classification:
 - **Optional later:** App Attest/DeviceCheck hardening; App Intents/Siri.
 - **Unnecessary now:** StoreKit External Purchases or Offers, Push Notifications, App Groups, iCloud, Sign in with Apple, and Game Center.
 
-Remove StoreKit External Purchases or Offers Apple-side after confirming no external-purchase program is intentionally planned.
+StoreKit External Purchases or Offers is confirmed disabled Apple-side.
 
 ## Verification Gate
 
@@ -158,7 +156,7 @@ Before declaring the migration complete:
 1. Search case-insensitively for `attune` and review every remaining occurrence.
 2. Categorize each as retained internal identifier, compatibility/history, ordinary English usage, or missed branding.
 3. Build the app and run relevant tests.
-4. Confirm StoreKit still requests `com.scottoliver.Attune.monthly`.
+4. Confirm StoreKit requests `com.scottoliver.Pondera.Intentions.monthly`.
 5. Confirm backend configuration agrees with the new Bundle ID.
 6. Verify signing and Bundle-ID configuration as far as the available Apple setup permits.
 7. Clearly separate automated build/test results from anything still requiring a physical iPhone or Apple web verification.
@@ -185,7 +183,7 @@ The final migration report must cover:
 - **Completed:** major technical and branding changes
 - **Bundle Identity:** use of `com.scottoliver.Pondera.Intentions` and dependent changes
 - **Pondera Branding:** where short and full product names are used
-- **StoreKit:** retained Product ID and renamed customer-facing tier
+- **StoreKit:** final Pondera Product ID, group, subscription, and local/sandbox loading result
 - **Remaining Attune References:** retained occurrences and reasons
 - **Apple Web Work:** remaining Developer or App Store Connect actions
 - **Capabilities:** Required / Recommended / Optional / Unnecessary
@@ -209,7 +207,7 @@ The finish line is a clean, working **Pondera: Intentions** app built from the e
 - Debug and Release use `com.scottoliver.Pondera.Intentions`.
 - The built Debug and Release plists report `CFBundleDisplayName = Pondera`.
 - Permission descriptions identify Pondera.
-- The internal project, target, scheme, executable/module, test target, and `com.scottoliver.AttuneTests` remain unchanged intentionally.
+- The internal project, target, scheme, executable/module, and test target names remain unchanged intentionally; the test Bundle ID is `com.scottoliver.Pondera.IntentionsTests`.
 - Simulator inspection confirmed the old Attune and new Pondera Bundle IDs have separate data containers.
 
 ### Pondera Branding
@@ -220,31 +218,32 @@ The finish line is a clean, working **Pondera: Intentions** app built from the e
 
 ### StoreKit
 
-- Permanent Product ID `com.scottoliver.Attune.monthly` is unchanged and covered by a regression test.
-- Local group/reference/display metadata now uses `Pondera Premium` and `Pondera Pro Monthly`.
-- Local Family Sharing configuration is enabled to match the supplied Apple configuration.
-- App Store Connect must still verify the existing subscription's association after the app record switches to the new Bundle ID.
+- Product ID `com.scottoliver.Pondera.Intentions.monthly` is used by production code, local StoreKit configuration, documentation, and a regression test.
+- Local group/reference/display metadata uses `Pondera Pro` and `Pondera Pro Monthly`.
+- Local Family Sharing configuration is enabled to match App Store Connect.
+- The old unused Attune subscription/group may remain in App Store Connect, but the app no longer requests it.
 
 ### Remaining Attune References
 
 The final case-insensitive search was reviewed by category. No remaining occurrence is current customer-facing branding.
 
-- **Internal Xcode/Swift identity:** project, target, scheme, executable/module, test bundle, `AttuneApp`, `AttuneTheme`, internal types, file headers, and `@testable import Attune`.
+- **Internal Xcode/Swift identity:** project, target, scheme, executable/module, `AttuneApp`, `AttuneTheme`, internal types, file headers, and `@testable import Attune`.
 - **Persistence and local compatibility:** `Documents/Attune`, `attune.*` UserDefaults keys, local notification IDs, log filenames, and `ATTUNE_DEMO_` records.
 - **Backend/API compatibility:** `X-Attune-*` headers, `attune-openai-proxy`, `attune-ai-usage`, proxy URLs, and related tests/docs.
-- **Commerce compatibility:** `com.scottoliver.Attune.monthly`.
 - **Retained destinations:** GitHub Pages and issue URLs under `/Attune`.
 - **History:** older implementation summaries, handoffs, source paths, and the pre-migration portions of this runbook.
 - **Asset filename only:** `Attune-Icon-1.png`; the icon itself contains no Attune text.
 
-### Apple Web Work
+### Final Apple Configuration — Confirmed August 24, 2026
 
-1. Register the explicit App ID `com.scottoliver.Pondera.Intentions`.
-2. Change the existing, never-uploaded App Store Connect record to that Bundle ID before uploading a build.
-3. Confirm the existing SKU `attune`, Apple ID, subscription, and permanent Product ID remain attached.
-4. Rename Apple-side subscription presentation to Pondera and verify Family Sharing remains enabled.
-5. Remove StoreKit External Purchases or Offers after confirming no external-purchase program is intended.
-6. Verify automatic signing/provisioning and sandbox product loading with the new App ID.
+- App Store name: `Pondera: Intentions`.
+- Bundle ID: `com.scottoliver.Pondera.Intentions`.
+- In-App Purchase is enabled.
+- StoreKit External Purchases or Offers is disabled.
+- Subscription group: `Pondera Pro`.
+- Subscription: `Pondera Pro Monthly`, one month, $4.99/month, Family Sharing enabled.
+- Product ID: `com.scottoliver.Pondera.Intentions.monthly`.
+- No production build has been archived or uploaded by this migration.
 
 ### Capability Recommendations
 
@@ -256,17 +255,19 @@ The final case-insensitive search was reviewed by category. No remaining occurre
 ### Verification Evidence
 
 - `git diff --check`: passed.
-- iOS Debug simulator tests: 84 passed, 0 failed, 0 skipped on iPhone 17 Pro / iOS 26.5.
+- iOS Debug simulator tests: 85 passed, 0 failed, 0 skipped on iPhone 17 Pro / iOS 26.5.
 - Worker `npm run check`: TypeScript passed; 36 tests passed across 3 files.
 - Release simulator build with store validation: passed.
 - Built Debug and Release identity: `com.scottoliver.Pondera.Intentions` / `Pondera`.
-- Product ID regression: passed for `com.scottoliver.Attune.monthly`.
+- Local StoreKit verification: `SKTestSession` loaded `Products.storekit`; StoreKit 2 returned `com.scottoliver.Pondera.Intentions.monthly` at `$4.99`.
 - Simulator visual QA: Pondera intro and first onboarding screen rendered correctly; the transition completed.
 - Built app asset check: no `AttuneLaunchIntro` resource remains.
+- Automatic signing: passed with `iOS Team Provisioning Profile: com.scottoliver.Pondera.Intentions`.
+- Physical-iPhone installation: passed on the connected iPhone; the device reports the installed app as Pondera with Bundle ID `com.scottoliver.Pondera.Intentions`.
+- Physical-iPhone launch: blocked because the device was locked, so onboarding, recording, backend calls, and sandbox paywall behavior were not re-verified on-device.
 
-### Still Requires Manual Verification
+### Verification Still Required After the Apple-Side Update
 
-- Apple Developer/App Store Connect work listed above was not performed by this code migration.
-- Physical-iPhone signing, display name, microphone/speech permissions, background recording, local notification actions, Reduce Motion feel, purchase, and restore remain unverified.
-- Live/sandbox StoreKit product availability under the new App ID remains unverified. Xcode CLI continues to emit the pre-existing `_storeKitConfigurationFileReference` scheme warning even though builds and tests pass and the scheme still references `Products.storekit`.
+- Unlock the connected iPhone and re-run launch/onboarding, microphone/speech, background recording, backend-call, and paywall checks.
+- When the App Store Connect product is sandbox-ready, verify live sandbox product loading and purchase/restore behavior on the iPhone.
 - The public pages were updated in the repository but were not deployed separately.

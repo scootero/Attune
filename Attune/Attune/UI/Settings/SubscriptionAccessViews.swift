@@ -60,7 +60,7 @@ struct ProLockedFeatureView: View {
 }
 
 /// Free users can see only today's Momentum. Historical navigation, Week,
-/// Month, and progress history remain behind Attune Pro.
+/// Month, and progress history remain behind Pondera Pro.
 struct FreeMomentumTodayView: View {
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
 

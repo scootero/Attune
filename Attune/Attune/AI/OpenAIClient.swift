@@ -220,7 +220,7 @@ struct OpenAIClient {
         // Log high-level request summary
         AppLogger.log(AppLogger.AI, "request_start model=\(model) user_chars=\(userChars) schema=\(schemaName)")
         
-        // Build request through Attune proxy (never call api.openai.com from the device)
+        // Build request through the Pondera proxy (never call api.openai.com from the device)
         let url = URL(string: "\(baseURL)/v1/chat/completions")!
         var request = URLRequest(url: url, timeoutInterval: timeoutInterval)
         request.httpMethod = "POST"
@@ -329,7 +329,7 @@ struct OpenAIClient {
         // Log high-level request summary
         AppLogger.log(AppLogger.AI, "request_start model=\(model) system_chars=\(systemChars) user_chars=\(userChars) schema=\(schemaName)")
         
-        // Build request through Attune proxy (never call api.openai.com from the device)
+        // Build request through the Pondera proxy (never call api.openai.com from the device)
         let url = URL(string: "\(baseURL)/v1/chat/completions")!
         var request = URLRequest(url: url, timeoutInterval: timeoutInterval)
         request.httpMethod = "POST"

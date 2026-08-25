@@ -1,3 +1,5 @@
+import StoreKit
+import StoreKitTest
 import XCTest
 @testable import Attune
 
@@ -7,8 +9,19 @@ final class BrandMigrationTests: XCTestCase {
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String, "Pondera")
     }
 
-    func testPermanentSubscriptionProductIDIsRetained() {
-        XCTAssertEqual(SubscriptionConfig.monthlyProductID, "com.scottoliver.Attune.monthly")
+    func testSubscriptionUsesPonderaProductID() {
+        XCTAssertEqual(SubscriptionConfig.monthlyProductID, "com.scottoliver.Pondera.Intentions.monthly")
         XCTAssertEqual(SubscriptionConfig.displayName, "Pondera Pro")
+    }
+
+    func testLocalStoreKitConfigurationLoadsPonderaProduct() async throws {
+        let session = try SKTestSession(configurationFileNamed: "Products")
+        session.disableDialogs = true
+        session.clearTransactions()
+
+        let products = try await Product.products(for: [SubscriptionConfig.monthlyProductID])
+
+        XCTAssertEqual(products.map(\.id), [SubscriptionConfig.monthlyProductID])
+        XCTAssertEqual(products.first?.displayPrice, "$4.99")
     }
 }

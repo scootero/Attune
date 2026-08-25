@@ -2,7 +2,7 @@
 //  PaywallView.swift
 //  Attune
 //
-//  Consumer Attune Pro paywall backed by the existing monthly StoreKit product.
+//  Consumer Pondera Pro paywall backed by the existing monthly StoreKit product.
 //
 
 import SwiftUI

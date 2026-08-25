@@ -111,7 +111,7 @@ Acceptance: app builds; all four tabs work; Settings opens and closes; Home-to-M
 - [x] Add readable microphone, speech-recognition, and notification permission status plus an iOS Settings entry point.
 - [x] Replace export `training purposes` language with backup and personal-record language.
 - [x] Add short benefit-led onboarding followed by the existing AI/privacy disclosure.
-- [x] Brand and validate the Attune Pro paywall and StoreKit loading/unavailable/error states.
+- [x] Brand and validate the Pondera Pro paywall and StoreKit loading/unavailable/error states.
 - [x] Polish About, support, legal, and data-request entry points.
 - [ ] Finalize provider-specific AI disclosure after the approved Cloudflare/OpenAI gateway rollout is complete.
 
@@ -229,7 +229,7 @@ After the approved changes reach the default branch, open GitHub repository **Se
 ### 2026-08-05 — Phase 6
 
 - Reorganized Settings around Membership, Notifications, Privacy & Data, and Support while preserving Debug-only diagnostics and Momentum cleanup controls.
-- Replaced Attune Monthly marketing with Attune Pro and removed consumer-facing “background listening” sales language.
+- Replaced the old monthly marketing with Pondera Pro and removed consumer-facing “background listening” sales language.
 - Built a branded paywall and then aligned the real feature gates to the approved plan: Free has one active intention, one Voice Check-In per day, today's Momentum only, and the daily reminder; Pro adds more intentions, unlimited check-ins, Listening Sessions, Insights, historical/Week/Month Momentum, voice intention setup, and data export.
 - Explained that Listening Sessions organize clear intentions, commitments, events, and states and group repeated ideas into themes; event-like captures do not currently create calendar appointments or event reminders.
 - Added first-run benefit onboarding before the existing mandatory processing disclosure.

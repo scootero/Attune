@@ -36,7 +36,7 @@ This is the concise tracker for the work remaining after completion of UI Phases
 - [x] Replace the confusing export wording about “training purposes.”
 - [x] Add a short, benefit-focused first-run onboarding flow.
 - [ ] Clearly disclose AI processing and privacy without overwhelming the user.
-- [x] Professionally brand the Attune Pro subscription/paywall screen.
+- [x] Professionally brand the Pondera Pro subscription/paywall screen.
 - [x] Polish StoreKit unavailable, loading, and error states.
 - [x] Polish About, Support, Privacy, Terms, and data-request entry points.
 
@@ -46,7 +46,7 @@ Debug AI paths are currently opted into their server-owned `/v2` routes.
 
 ## Decisions needed before Phase 7
 
-- [x] Approve hardening the existing Cloudflare Worker as Attune's production AI gateway.
+- [x] Approve hardening the existing Cloudflare Worker as Pondera's production AI gateway.
 - [x] Free/Pro limits approved and implemented as described above.
 - [ ] Approve final provider-specific privacy wording after the gateway design is settled.
 
@@ -115,7 +115,7 @@ migration has been made yet.
   automatically to the idle control. Offline transport recovery still needs a
   real-device/network test.
 - Local StoreKit configuration was rechecked at
-  `com.scottoliver.Attune.monthly`, $4.99/month, with no introductory trial.
+  `com.scottoliver.Pondera.Intentions.monthly`, $4.99/month, with no introductory trial.
   App Store Connect/Sandbox configuration is still external and unverified.
 - Current-source generic-device Debug and Release builds passed after the QA
   fixes. Re-run both after Listening `/v2`, security, and TestFlight changes;
@@ -132,14 +132,14 @@ These flows are implemented but cannot be completely proven in the iOS Simulator
 
 - [ ] In a Debug build, open Settings > Developer and select `Free`.
 - [ ] With zero active intentions, create the first intention and confirm it saves.
-- [ ] With one active intention, tap Add and confirm the Attune Pro paywall opens.
+- [ ] With one active intention, tap Add and confirm the Pondera Pro paywall opens.
 - [ ] Remove the active intention, save, reopen Intentions, and confirm a replacement can be created.
 - [ ] Confirm reaching 100% daily or weekly progress does not free the active-intention slot.
 - [ ] On the Record tab, confirm Free shows the Listening Sessions lock and its CTA opens the paywall.
 - [ ] Select `Pro`; confirm another intention can be created and Listening Sessions can start after permissions.
 - [ ] Create multiple intentions in Pro, switch to `Free`, and confirm all existing data remains readable/editable while Add is blocked until the active set is within the Free limit.
 - [ ] Select `System`; use an Apple Sandbox account to verify purchase, cancellation, pending/interrupted purchase, restore, expiration, reinstall, and entitlement recovery.
-- [ ] Confirm the Apple purchase sheet shows `com.scottoliver.Attune.monthly` at the localized equivalent of $4.99/month with no introductory trial.
+- [ ] Confirm the Apple purchase sheet shows `com.scottoliver.Pondera.Intentions.monthly` at the localized equivalent of $4.99/month with no introductory trial.
 
 Automated Phase 1 coverage passed 16/16 tests on the iPhone 17 Pro simulator.
 Generic Debug simulator and unsigned Release-device builds passed. These local
@@ -226,7 +226,7 @@ The detailed, ordered manual checklist is maintained in
 - [ ] Verify the landing, Privacy, Support, and Terms URLs.
 - [ ] Enter the Privacy URL in App Store Connect.
 - [ ] Complete the App Privacy answers in App Store Connect.
-- [ ] Match `com.scottoliver.Attune.monthly` to $4.99/month with no introductory offer in App Store Connect.
+- [ ] Confirm `com.scottoliver.Pondera.Intentions.monthly` is $4.99/month with no introductory offer in App Store Connect.
 - [ ] Create an approved checkpoint commit when the UI is accepted.
 - [ ] Prepare and upload a TestFlight build with Scott's approval.
 - [ ] Submit to the App Store only with Scott's approval.
