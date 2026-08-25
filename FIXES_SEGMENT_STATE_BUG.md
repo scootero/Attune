@@ -19,8 +19,8 @@ Segments were being transcribed successfully but showing "failed" status in the 
 ### Fix 1: Idempotent Recovery Logic ✅
 
 **Files Modified:**
-- `Attune/Attune/Audio/TranscriptionQueue.swift`
-- `Attune/Attune/Storage/SessionStore.swift`
+- `Pondera/Pondera/Audio/TranscriptionQueue.swift`
+- `Pondera/Pondera/Storage/SessionStore.swift`
 
 **Changes:**
 
@@ -67,8 +67,8 @@ if segment.status == "transcribing" {
 ### Fix 2: Decouple "No Speech" from "Failed" ✅
 
 **Files Modified:**
-- `Attune/Attune/UI/Library/SessionListView.swift` (StatusBadge)
-- `Attune/Attune/Audio/TranscriptionQueue.swift` (logging)
+- `Pondera/Pondera/UI/Library/SessionListView.swift` (StatusBadge)
+- `Pondera/Pondera/Audio/TranscriptionQueue.swift` (logging)
 
 **Changes:**
 
@@ -93,7 +93,7 @@ if segment.status == "transcribing" {
 ### Fix 3: Hard Transition on Stop ✅
 
 **Files Modified:**
-- `Attune/Attune/Audio/RecorderService.swift`
+- `Pondera/Pondera/Audio/RecorderService.swift`
 
 **Changes:**
 
@@ -202,11 +202,11 @@ currentSession = nil
 
 ## Files Modified
 
-1. `Attune/Attune/Audio/TranscriptionQueue.swift` - Idempotent recovery + logging
-2. `Attune/Attune/Storage/SessionStore.swift` - Idempotent recovery
-3. `Attune/Attune/Audio/RecorderService.swift` - Hard stop transition + segment duration constant
-4. `Attune/Attune/UI/Library/SessionListView.swift` - StatusBadge UI fix
-5. `Attune/Attune/UI/Library/SessionDetailView.swift` - Debug function docs
+1. `Pondera/Pondera/Audio/TranscriptionQueue.swift` - Idempotent recovery + logging
+2. `Pondera/Pondera/Storage/SessionStore.swift` - Idempotent recovery
+3. `Pondera/Pondera/Audio/RecorderService.swift` - Hard stop transition + segment duration constant
+4. `Pondera/Pondera/UI/Library/SessionListView.swift` - StatusBadge UI fix
+5. `Pondera/Pondera/UI/Library/SessionDetailView.swift` - Debug function docs
 
 ## Commit Message
 

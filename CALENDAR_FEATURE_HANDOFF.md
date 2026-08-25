@@ -22,7 +22,7 @@ For full source removal:
 1. Remove the `if CalendarFeature.isEnabled { calendarSection }` hook and its two helpers from `LibraryView.swift`.
 2. Remove the two `CalendarFeature.isEnabled` schedule blocks and their helpers/state from `InsightDetailView.swift`.
 3. Remove `CalendarScheduleCorrection` and `ItemCorrection.calendarSchedule` from `ItemCorrection.swift`.
-4. Delete `Attune/Attune/UI/Calendar/` and this handoff file.
+4. Delete `Pondera/Pondera/UI/Calendar/` and this handoff file.
 
 No recording or transcription migration needs to be reversed. Existing correction JSON safely ignores the removed optional scheduling key. Temporal extraction context can remain independently or be removed from `ExtractorService`, `ExtractionQueue`, `TranscriptionQueue`, and the optional Worker Listening fields.
 

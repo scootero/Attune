@@ -5,7 +5,7 @@ Last updated: August 6, 2026
 Four sequential enhancement phases. **Run each in its own Codex chat.** Do not
 start one until the previous enhancement phase is verified on a physical iPhone.
 Each is additive and independently revertable. These labels are intentionally
-separate from the release/security phase numbers in `ATTUNE_REMAINING_WORK.md`.
+separate from the release/security phase numbers in `PONDERA_REMAINING_WORK.md`.
 
 Product principle behind all four enhancement phases:
 
@@ -54,7 +54,7 @@ GROUND RULES FOR THIS TASK
 
 5. Flags and Release graduation. New BEHAVIORAL features must sit behind an
    independent DEBUG-on / RELEASE-off flag following the existing pattern in
-   Attune/UI/Calendar/CalendarFeature.swift, until physical-device verification
+   Pondera/UI/Calendar/CalendarFeature.swift, until physical-device verification
    is complete. Approved copy-only changes do not require a flag and may ship
    directly. After physical verification, report which flags need to be enabled
    for Release and wait for my explicit approval — never enable a Release flag
@@ -80,7 +80,7 @@ GROUND RULES FOR THIS TASK
 
 **Risk: very low. No data model changes. Copy and layout only.**
 
-**Prerequisite:** the current `ATTUNE_REMAINING_WORK.md` records physical-device
+**Prerequisite:** the current `PONDERA_REMAINING_WORK.md` records physical-device
 verification as passed for Voice Check-In and Listening extraction. Confirm that
 is still true in the active checkout before starting, but do not repeat a gate
 that is already recorded complete.
@@ -92,11 +92,11 @@ natural context.
 
 ```
 Read first:
-- Attune/App/RootTabView.swift  (tab labels, around line 46)
-- Attune/App/DailyReminderNotificationService.swift
-- Attune/App/ReminderPreferences.swift
-- Attune/UI/Home/HomeView.swift  (header area, around line 130)
-- Attune/UI/Home/HomeRecordView.swift
+- Pondera/App/RootTabView.swift  (tab labels, around line 46)
+- Pondera/App/DailyReminderNotificationService.swift
+- Pondera/App/ReminderPreferences.swift
+- Pondera/UI/Home/HomeView.swift  (header area, around line 130)
+- Pondera/UI/Home/HomeRecordView.swift
 - Onboarding, PaywallView, AboutView, PrivacyDataView, LibraryView,
   SessionListView, SessionDetailView  (all carry "Listening Session" copy)
 
@@ -205,18 +205,18 @@ other people.
 
 ```
 Read first:
-- Attune/Models/ExtractedItem.swift
-- Attune/Models/TopicAggregate.swift
-- Attune/Storage/TopicAggregateStore.swift  (loadTopics, update(with:))
-- Attune/Storage/ExtractionStore.swift
-- Attune/Storage/CorrectionsStore.swift
-- Attune/Storage/ItemResolver.swift
-- Attune/Storage/SessionStore.swift
-- Attune/Models/ItemCorrection.swift
-- Attune/UI/Home/HomeRecordView.swift
-- Attune/UI/Library/SessionDetailView.swift
-- Attune/UI/Library/InsightsListView.swift and InsightDetailView.swift
-- Attune/Understanding/ExtractionQueue.swift  (to find where extraction
+- Pondera/Models/ExtractedItem.swift
+- Pondera/Models/TopicAggregate.swift
+- Pondera/Storage/TopicAggregateStore.swift  (loadTopics, update(with:))
+- Pondera/Storage/ExtractionStore.swift
+- Pondera/Storage/CorrectionsStore.swift
+- Pondera/Storage/ItemResolver.swift
+- Pondera/Storage/SessionStore.swift
+- Pondera/Models/ItemCorrection.swift
+- Pondera/UI/Home/HomeRecordView.swift
+- Pondera/UI/Library/SessionDetailView.swift
+- Pondera/UI/Library/InsightsListView.swift and InsightDetailView.swift
+- Pondera/Understanding/ExtractionQueue.swift  (to find where extraction
   completes — do not change its behavior)
 
 TASK — Session Recap screen
@@ -292,15 +292,15 @@ changes would make Momentum move for reasons the user cannot see.
 
 ```
 Read first:
-- Attune/AI/CheckInExtractorService.swift  (reference its input/output semantics;
+- Pondera/AI/CheckInExtractorService.swift  (reference its input/output semantics;
   it is a network-backed AI extractor, not a reusable pure matcher)
-- Attune/AI/OpenAIClient.swift and backend/openai-proxy/V2_API.md
-- Attune/Models/CheckInUpdate.swift
-- Attune/Models/Intention.swift
-- Attune/Storage/IntentionStore.swift, IntentionSetStore.swift
-- Attune/Storage/ProgressStore.swift
-- Attune/Understanding/ProgressCalculator.swift
-- Attune/Storage/ItemResolver.swift
+- Pondera/AI/OpenAIClient.swift and backend/openai-proxy/V2_API.md
+- Pondera/Models/CheckInUpdate.swift
+- Pondera/Models/Intention.swift
+- Pondera/Storage/IntentionStore.swift, IntentionSetStore.swift
+- Pondera/Storage/ProgressStore.swift
+- Pondera/Understanding/ProgressCalculator.swift
+- Pondera/Storage/ItemResolver.swift
 - The Enhancement Phase 2 Session Recap you just built
 
 TASK — Detect progress mentions, surface them, write only on confirmation
@@ -430,15 +430,15 @@ solves the cold start. Adjustments I'd make:
 
 ```
 Read first:
-- Attune/Models/TopicAggregate.swift
-- Attune/Storage/TopicAggregateStore.swift
-- Attune/Storage/ItemResolver.swift, CorrectionsStore.swift, SessionStore.swift
-- Attune/Understanding/Canonicalizer.swift, TopicKeyBuilder.swift
-- Attune/Models/Intention.swift, IntentionSet.swift
-- Attune/Storage/IntentionStore.swift, IntentionSetStore.swift
-- Attune/UI/Home/AddEditIntentionView.swift, EditIntentionsView.swift
-- Attune/App/SubscriptionAccessPolicy.swift, SubscriptionConfig.swift
-- Attune/UI/Home/HomeView.swift
+- Pondera/Models/TopicAggregate.swift
+- Pondera/Storage/TopicAggregateStore.swift
+- Pondera/Storage/ItemResolver.swift, CorrectionsStore.swift, SessionStore.swift
+- Pondera/Understanding/Canonicalizer.swift, TopicKeyBuilder.swift
+- Pondera/Models/Intention.swift, IntentionSet.swift
+- Pondera/Storage/IntentionStore.swift, IntentionSetStore.swift
+- Pondera/UI/Home/AddEditIntentionView.swift, EditIntentionsView.swift
+- Pondera/App/SubscriptionAccessPolicy.swift, SubscriptionConfig.swift
+- Pondera/UI/Home/HomeView.swift
 
 TASK 4A — Suggestion engine (pure logic, own file, fully unit-tested)
 

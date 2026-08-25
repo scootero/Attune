@@ -4,7 +4,7 @@ Last updated: August 6, 2026
 
 This is the controlling checklist for work Scott must do personally in Apple,
 GitHub, Cloudflare, or on a physical iPhone. Code and engineering status remain
-in `ATTUNE_REMAINING_WORK.md`.
+in `PONDERA_REMAINING_WORK.md`.
 
 ## Fixed release values
 
@@ -326,7 +326,7 @@ tested in Apple's appropriate environments.
 
 ## Exact prompt for the next chat — Phase 2 plus Phase 3 planning
 
-> Continue Pondera from `ATTUNE_REMAINING_WORK.md` and
+> Continue Pondera from `PONDERA_REMAINING_WORK.md` and
 > `YOUR_REMAINING_STEPS.md`. Inspect Git status first and preserve every
 > concurrent change. Complete Phase 2 first: verify the existing StoreKit and
 > legal-link configuration, confirm current official Apple requirements, prepare

@@ -11,8 +11,8 @@ All three phases have been successfully implemented and integrated into the Attu
 **Status:** Fully implemented and integrated
 
 **Files:**
-- ✅ `Attune/Understanding/NormalizationRules.swift` (created)
-- ✅ `Attune/Understanding/TopicKeyBuilder.swift` (modified)
+- ✅ `Pondera/Understanding/NormalizationRules.swift` (created)
+- ✅ `Pondera/Understanding/TopicKeyBuilder.swift` (modified)
 
 **Functionality:**
 - ✅ Phrase map (9 seed examples)
@@ -34,8 +34,8 @@ All three phases have been successfully implemented and integrated into the Attu
 **Status:** Fully implemented and integrated
 
 **Files:**
-- ✅ `Attune/Understanding/StrengthScorer.swift` (created)
-- ✅ `Attune/Understanding/ExtractorService.swift` (modified)
+- ✅ `Pondera/Understanding/StrengthScorer.swift` (created)
+- ✅ `Pondera/Understanding/ExtractorService.swift` (modified)
 
 **Functionality:**
 - ✅ Heuristic rubric (5 pattern categories)
@@ -61,7 +61,7 @@ All three phases have been successfully implemented and integrated into the Attu
 **Status:** Fully implemented
 
 **Files:**
-- ✅ `Attune/Understanding/ExtractorService.swift` (modified)
+- ✅ `Pondera/Understanding/ExtractorService.swift` (modified)
 
 **Changes:**
 - ✅ Confidence guidance clarified (extraction correctness only)

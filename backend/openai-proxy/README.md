@@ -76,5 +76,5 @@ Create a gitignored `.dev.vars` with local test values, then run
 
 ## iOS Secrets
 
-Copy `Attune/AI/Secrets.swift.example` to `Attune/AI/Secrets.swift` (gitignored)
+Copy `Pondera/AI/Secrets.swift.example` to `Pondera/AI/Secrets.swift` (gitignored)
 and fill in `proxyBaseURL` and `appProxyToken`.

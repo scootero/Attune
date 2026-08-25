@@ -166,9 +166,9 @@ Automated gates:
 ```bash
 git diff --check
 git grep -I -i -n attune
-xcodebuild -project Attune/Attune.xcodeproj -scheme Attune -configuration Debug \
+xcodebuild -project Pondera/Pondera.xcodeproj -scheme Pondera -configuration Debug \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' test
-xcodebuild -project Attune/Attune.xcodeproj -scheme Attune -configuration Release \
+xcodebuild -project Pondera/Pondera.xcodeproj -scheme Pondera -configuration Release \
   -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
   CODE_SIGNING_ALLOWED=NO build
 (cd backend/openai-proxy && npm run check)
@@ -207,7 +207,7 @@ The finish line is a clean, working **Pondera: Intentions** app built from the e
 - Debug and Release use `com.scottoliver.Pondera.Intentions`.
 - The built Debug and Release plists report `CFBundleDisplayName = Pondera`.
 - Permission descriptions identify Pondera.
-- The internal project, target, scheme, executable/module, and test target names remain unchanged intentionally; the test Bundle ID is `com.scottoliver.Pondera.IntentionsTests`.
+- The internal project, target, scheme, executable/module, source group, and test target use Pondera names; the test Bundle ID is `com.scottoliver.Pondera.IntentionsTests`.
 - Simulator inspection confirmed the old Attune and new Pondera Bundle IDs have separate data containers.
 
 ### Pondera Branding
@@ -227,12 +227,12 @@ The finish line is a clean, working **Pondera: Intentions** app built from the e
 
 The final case-insensitive search was reviewed by category. No remaining occurrence is current customer-facing branding.
 
-- **Internal Xcode/Swift identity:** project, target, scheme, executable/module, `AttuneApp`, `AttuneTheme`, internal types, file headers, and `@testable import Attune`.
+- **Internal Swift symbols pending Stage 2:** `AttuneApp`, `AttuneTheme`, and other active Attune-prefixed type names.
 - **Persistence and local compatibility:** `Documents/Attune`, `attune.*` UserDefaults keys, local notification IDs, log filenames, and `ATTUNE_DEMO_` records.
 - **Backend/API compatibility:** `X-Attune-*` headers, `attune-openai-proxy`, `attune-ai-usage`, proxy URLs, and related tests/docs.
 - **Retained destinations:** GitHub Pages and issue URLs under `/Attune`.
 - **History:** older implementation summaries, handoffs, source paths, and the pre-migration portions of this runbook.
-- **Asset filename only:** `Attune-Icon-1.png`; the icon itself contains no Attune text.
+- **Asset:** the text-free icon is stored as `Pondera-Icon-1.png`.
 
 ### Final Apple Configuration — Confirmed August 24, 2026
 

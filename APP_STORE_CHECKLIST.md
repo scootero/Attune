@@ -54,7 +54,7 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 - [ ] Set app name to `Pondera: Intentions`
 - [ ] Set subtitle to `Are you in tune?`
 - [ ] Host Privacy Policy + Terms + Support pages
-- [ ] Paste live URLs into `LegalLinks.swift` (`Attune/App/LegalLinks.swift`)
+- [ ] Paste live URLs into `LegalLinks.swift` (`Pondera/App/LegalLinks.swift`)
 - [ ] Fill App Privacy nutrition labels (Audio, User Content, OpenAI third party)
 - [ ] Screenshots (iPhone; iPad if keeping iPad)
 - [ ] App Review notes (background audio, demo recording, AI disclosure)
@@ -63,7 +63,7 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 
 Current release values are $4.99/month with no introductory trial.
 Free includes one active intention and one Voice Check-In per day; use
-`ATTUNE_REMAINING_WORK.md` as the controlling release tracker.
+`PONDERA_REMAINING_WORK.md` as the controlling release tracker.
 
 ### Suggested App Review notes (copy/paste draft)
 

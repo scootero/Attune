@@ -1,0 +1,1040 @@
+//
+//  MomentumView.swift
+//  Pondera
+//
+//  Consumer-facing progress history derived from tracked intentions and check-ins.
+//
+
+import SwiftUI
+
+struct WeekIntentionBar: Identifiable {
+    let intentionId: String
+    let intentionTitle: String
+    let colorIndex: Int
+    let percent: Double
+
+    var id: String { intentionId }
+}
+
+struct WeekDayChartData: Identifiable {
+    let date: Date
+    let weekdayLetter: String
+    let bars: [WeekIntentionBar]
+
+    var id: Date { date }
+}
+
+struct MonthDayBar: Identifiable {
+    let date: Date
+    let ratio: Double?
+    let tier: MomentumTier?
+    let isFutureDay: Bool
+
+    var id: Date { date }
+}
+
+/// Models retained for the pre-Aug. 5 weekly chart.
+struct LegacyWeekIntentionBar: Identifiable {
+    let id = UUID()
+    let intentionId: String
+    let intentionTitle: String
+    let colorIndex: Int
+    let percent: Double
+    let slot: Double
+}
+
+struct LegacyWeekDayChartData: Identifiable {
+    let id = UUID()
+    let date: Date
+    let weekdayLetter: String
+    let bars: [LegacyWeekIntentionBar]
+}
+
+private enum MomentumViewMode: String, CaseIterable {
+    case day = "Day"
+    case week = "Week"
+    case month = "Month"
+
+    var symbolName: String {
+        switch self {
+        case .day: return "sun.max.fill"
+        case .week: return "calendar"
+        case .month: return "calendar.badge.clock"
+        }
+    }
+
+    var tintColor: Color {
+        switch self {
+        case .day: return AttuneTheme.accent
+        case .week: return AttuneTheme.accentSecondary
+        case .month: return AttuneTheme.warning
+        }
+    }
+}
+
+struct MomentumView: View {
+    @EnvironmentObject private var appRouter: AppRouter
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var selectedDate: Date
+    @State private var viewMode: MomentumViewMode = .day
+    @State private var weekDays: [WeekDayItem] = []
+    @State private var points: [MomentumPoint] = []
+    @State private var yAxisMax: Double = 100
+    @State private var weekDaysChart: [WeekDayChartData] = []
+    @State private var weekYAxisMax: Double = 100
+    @State private var monthBars: [MonthDayBar] = []
+
+    @State private var legacyPoints: [MomentumPoint] = []
+    @State private var legacyYAxisMax: Double = 100
+    @State private var legacyWeekDaysChart: [LegacyWeekDayChartData] = []
+    @State private var legacyWeekYAxisMax: Double = 100
+    @State private var legacyMonthBars: [MonthDayBar] = []
+
+    @State private var dayOverallRatio: Double = 0
+    @State private var dayIntentionCount = 0
+    @State private var dayCheckInCount = 0
+
+    init(selectedDate: Date = Date()) {
+        _selectedDate = State(initialValue: selectedDate)
+    }
+
+    var body: some View {
+        ZStack {
+            AttuneScreenBackground()
+            MomentumProgressAtmosphere(progress: momentumAtmosphereProgress)
+                .animation(
+                    reduceMotion ? nil : .easeInOut(duration: 0.7),
+                    value: momentumAtmosphereProgress
+                )
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: viewMode == .day ? 8 : 16) {
+                    header
+                    momentumGuideCard
+                    modeSelector
+                    periodNavigation
+                    modeContent
+                }
+                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.bottom, 112)
+            }
+        }
+        .onAppear(perform: loadAllData)
+        .onChange(of: selectedDate) { _, _ in loadAllData() }
+        .onChange(of: viewMode) { _, _ in loadAllData() }
+        .onChange(of: appRouter.momentumSelectedDate) { _, newValue in
+            if let newValue {
+                selectedDate = newValue
+                viewMode = .day
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Momentum")
+                    .font(.title.bold())
+                    .foregroundStyle(AttuneTheme.textPrimary)
+
+                Text("Progress recorded through your check-ins.")
+                    .font(.subheadline)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+            }
+
+            Spacer(minLength: 4)
+
+            NavigationLink {
+                MomentumHistoryView()
+            } label: {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AttuneTheme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(AttuneTheme.surface, in: Circle())
+                    .overlay(Circle().stroke(AttuneTheme.border, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Progress history")
+            .accessibilityHint("Shows daily totals and progress by intention")
+        }
+        .padding(.top, viewMode == .day ? 2 : 8)
+    }
+
+    private var modeSelector: some View {
+        HStack(spacing: 6) {
+            ForEach(MomentumViewMode.allCases, id: \.self) { mode in
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                        viewMode = mode
+                    }
+                } label: {
+                    Label(mode.rawValue, systemImage: mode.symbolName)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .foregroundStyle(viewMode == mode ? Color.white : mode.tintColor.opacity(0.9))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(
+                            mode.tintColor.opacity(viewMode == mode ? 0.28 : 0.055),
+                            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                .stroke(mode.tintColor.opacity(viewMode == mode ? 0.72 : 0.15), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(viewMode == mode ? .isSelected : [])
+            }
+        }
+        .padding(5)
+        .background {
+            MomentumTintedCardBackground(
+                tint: AttuneTheme.accentSecondary,
+                cornerRadius: AttuneTheme.controlRadius + 3,
+                strength: 0.6
+            )
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Time period")
+        .accessibilityHint("Changes the momentum chart period")
+    }
+
+    /// A quiet orientation card for people arriving from Home. The neutral,
+    /// fading texture keeps it distinct from the period-specific data colors.
+    private var momentumGuideCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("YOUR PROGRESS, OVER TIME")
+                .font(.caption.weight(.bold))
+                .tracking(1.1)
+                .foregroundStyle(AttuneTheme.textPrimary)
+
+            VStack(alignment: .leading, spacing: 5) {
+                momentumGuidePoint("Each check-in adds progress to your day.")
+                momentumGuidePoint("Switch Day, Week, or Month to spot patterns.")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
+        .background {
+            MomentumGuideCardBackground()
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func momentumGuidePoint(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Circle()
+                .fill(Color.white.opacity(0.48))
+                .frame(width: 4, height: 4)
+
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(AttuneTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var periodNavigation: some View {
+        VStack(spacing: viewMode == .day ? 2 : 0) {
+            HStack {
+                periodButton(systemImage: "chevron.left", label: "Previous period") {
+                    shiftPeriod(backward: true)
+                }
+
+                Spacer()
+
+                Text(periodLabel)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AttuneTheme.textPrimary)
+
+                Spacer()
+
+                periodButton(systemImage: "chevron.right", label: "Next period") {
+                    shiftPeriod(backward: false)
+                }
+                .disabled(!canMoveForward)
+                .opacity(canMoveForward ? 1 : 0.35)
+            }
+
+            if viewMode == .day {
+                WeekdayPicker(days: weekDays, selectedDate: $selectedDate)
+            }
+        }
+        .padding(viewMode == .day ? 6 : 12)
+        .background {
+            MomentumTintedCardBackground(
+                tint: viewMode.tintColor,
+                cornerRadius: AttuneTheme.controlRadius,
+                strength: 0.82
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var modeContent: some View {
+        switch viewMode {
+        case .day:
+            dayContent
+        case .week:
+            weekContent
+        case .month:
+            monthContent
+        }
+    }
+
+    private var dayContent: some View {
+        VStack(spacing: 8) {
+            summaryCard(items: [
+                SummaryItem(value: percentText(dayOverallRatio), label: "overall"),
+                SummaryItem(value: "\(dayIntentionCount)", label: dayIntentionCount == 1 ? "intention" : "intentions"),
+                SummaryItem(value: "\(dayCheckInCount)", label: dayCheckInCount == 1 ? "check-in" : "check-ins")
+            ])
+
+            LegacyMomentumChartView(
+                points: legacyPoints,
+                yAxisMax: legacyYAxisMax,
+                selectedDate: selectedDate
+            )
+            .momentumSectionOutline(tint: viewMode.tintColor)
+
+            NavigationLink {
+                DayDetailView(dateKey: ProgressCalculator.dateKey(for: selectedDate))
+            } label: {
+                HStack {
+                    Label("View daily details", systemImage: "list.bullet.rectangle")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AttuneTheme.textTertiary)
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AttuneTheme.textPrimary)
+                .padding(16)
+            }
+            .buttonStyle(.plain)
+            .background {
+                MomentumTintedCardBackground(tint: viewMode.tintColor, strength: 0.52)
+            }
+        }
+    }
+
+    private var weekContent: some View {
+        let recordedDays = weekDaysChart.filter { !$0.bars.isEmpty }.count
+        let allBars = weekDaysChart.flatMap(\.bars)
+        let average = allBars.isEmpty ? 0 : allBars.map(\.percent).reduce(0, +) / Double(allBars.count) / 100
+        let intentionCount = Set(allBars.map(\.intentionId)).count
+
+        return VStack(spacing: 14) {
+            summaryCard(items: [
+                SummaryItem(value: "\(recordedDays)", label: recordedDays == 1 ? "recorded day" : "recorded days"),
+                SummaryItem(value: percentText(average), label: "avg. progress"),
+                SummaryItem(value: "\(intentionCount)", label: intentionCount == 1 ? "intention" : "intentions")
+            ])
+
+            LegacyMomentumWeekChartView(days: legacyWeekDaysChart, yAxisMax: legacyWeekYAxisMax)
+                .momentumSectionOutline(tint: viewMode.tintColor)
+
+            if !allBars.isEmpty {
+                intentionLegend(items: uniqueWeekIntentions)
+            }
+        }
+    }
+
+    private var monthContent: some View {
+        let recorded = monthBars.compactMap(\.ratio)
+        let average = recorded.isEmpty ? 0 : recorded.reduce(0, +) / Double(recorded.count)
+
+        return VStack(spacing: 14) {
+            summaryCard(items: [
+                SummaryItem(value: "\(recorded.count)", label: recorded.count == 1 ? "recorded day" : "recorded days"),
+                SummaryItem(value: percentText(average), label: "avg. momentum")
+            ])
+
+            LegacyMomentumMonthChartView(bars: monthBars)
+                .momentumSectionOutline(tint: viewMode.tintColor)
+        }
+    }
+
+    private struct SummaryItem {
+        let value: String
+        let label: String
+    }
+
+    private func summaryCard(items: [SummaryItem]) -> some View {
+        HStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                VStack(spacing: 3) {
+                    Text(item.value)
+                        .font(.title3.bold().monospacedDigit())
+                        .foregroundStyle(index == 0 ? viewMode.tintColor : AttuneTheme.textPrimary)
+                    Text(item.label)
+                        .font(.caption)
+                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .frame(maxWidth: .infinity)
+
+                if index < items.count - 1 {
+                    Divider().overlay(viewMode.tintColor.opacity(0.2))
+                        .frame(height: 34)
+                }
+            }
+        }
+        .padding(.vertical, viewMode == .day ? 8 : 14)
+        .background {
+            MomentumTintedCardBackground(tint: viewMode.tintColor, strength: 0.68)
+        }
+    }
+
+    private func intentionLegend(items: [(id: String, title: String, colorIndex: Int)]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(items, id: \.id) { item in
+                    Label {
+                        Text(item.title).lineLimit(1)
+                    } icon: {
+                        Image(systemName: MomentumIdentity.symbol(forIndex: item.colorIndex))
+                            .foregroundStyle(MomentumPalette.color(forIndex: item.colorIndex))
+                    }
+                    .font(.caption)
+                    .foregroundStyle(AttuneTheme.textSecondary)
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            MomentumTintedCardBackground(tint: viewMode.tintColor, strength: 0.42)
+        }
+    }
+
+    private func periodButton(systemImage: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(viewMode.tintColor)
+        .accessibilityLabel(label)
+    }
+
+    private var periodLabel: String {
+        switch viewMode {
+        case .day:
+            return selectedDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        case .week:
+            let days = MomentumPointAdapter.weekDays(containing: selectedDate)
+            guard let first = days.first, let last = days.last else { return "" }
+            return "\(first.formatted(.dateTime.month(.abbreviated).day())) – \(last.formatted(.dateTime.month(.abbreviated).day()))"
+        case .month:
+            return selectedDate.formatted(.dateTime.month(.wide).year())
+        }
+    }
+
+    private var canMoveForward: Bool {
+        let calendar = Calendar.current
+        switch viewMode {
+        case .day, .week:
+            let selectedWeek = MomentumPointAdapter.weekDays(containing: selectedDate)
+            let currentWeek = MomentumPointAdapter.weekDays(containing: Date())
+            return selectedWeek.first.map { selected in
+                currentWeek.first.map { selected < $0 } ?? false
+            } ?? false
+        case .month:
+            let selected = calendar.dateComponents([.year, .month], from: selectedDate)
+            let current = calendar.dateComponents([.year, .month], from: Date())
+            return (selected.year ?? 0, selected.month ?? 0) < (current.year ?? 0, current.month ?? 0)
+        }
+    }
+
+    /// Drives only the page atmosphere. No recorded data stays neutral rather
+    /// than presenting an empty period as poor performance.
+    private var momentumAtmosphereProgress: Double? {
+        switch viewMode {
+        case .day:
+            guard dayIntentionCount > 0 else { return nil }
+            return dayOverallRatio
+        case .week:
+            let bars = weekDaysChart.flatMap(\.bars)
+            guard !bars.isEmpty else { return nil }
+            return bars.map(\.percent).reduce(0, +) / Double(bars.count) / 100
+        case .month:
+            let recorded = monthBars.compactMap(\.ratio)
+            guard !recorded.isEmpty else { return nil }
+            return recorded.reduce(0, +) / Double(recorded.count)
+        }
+    }
+
+    private var uniqueWeekIntentions: [(id: String, title: String, colorIndex: Int)] {
+        var seen = Set<String>()
+        return weekDaysChart.flatMap(\.bars).compactMap { bar in
+            guard seen.insert(bar.intentionId).inserted else { return nil }
+            return (bar.intentionId, bar.intentionTitle, bar.colorIndex)
+        }
+    }
+
+    private func shiftPeriod(backward: Bool) {
+        let amount = backward ? -1 : 1
+        let component: Calendar.Component = viewMode == .month ? .month : .weekOfYear
+        if let next = Calendar.current.date(byAdding: component, value: amount, to: selectedDate) {
+            selectedDate = next
+        }
+    }
+
+    private func percentText(_ ratio: Double) -> String {
+        "\(Int((ratio * 100).rounded()))%"
+    }
+
+    private func loadAllData() {
+        loadWeekDays()
+        loadDayData()
+        loadWeekData()
+        loadMonthData()
+        loadLegacyDayData()
+        loadLegacyWeekData()
+        loadLegacyMonthData()
+    }
+
+    /// Loads the original daily chart input, including its today-only current-set fallback.
+    private func loadLegacyDayData() {
+        let dateKey = ProgressCalculator.dateKey(for: selectedDate)
+        let sets = IntentionSetStore.shared.loadAllIntentionSets()
+        var set = StreakCalculator.intentionSetActive(on: dateKey, from: sets)
+
+        if set == nil,
+           dateKey == ProgressCalculator.dateKey(for: Date()),
+           let current = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() {
+            set = current
+        }
+
+        guard let set else {
+            legacyPoints = []
+            legacyYAxisMax = 100
+            return
+        }
+
+        let checkIns = CheckInStore.shared.loadCheckIns(intentionSetId: set.id, dateKey: dateKey)
+        let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: set.id)
+        let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
+        legacyPoints = MomentumPointAdapter.buildPoints(
+            dateKey: dateKey,
+            intentionSet: set,
+            intentions: intentions,
+            checkIns: checkIns,
+            entries: entries,
+            overrides: OverrideStore.shared.loadOverrideRecordsForDate(dateKey: dateKey)
+        )
+        legacyYAxisMax = MomentumPointAdapter.yAxisMax(for: legacyPoints)
+    }
+
+    /// Recreates the original weekly data shape: every active intention gets a bar,
+    /// including zero-height bars on days without a numeric progress entry.
+    private func loadLegacyWeekData() {
+        let days = MomentumPointAdapter.weekDays(containing: selectedDate)
+        guard let monday = days.first else {
+            legacyWeekDaysChart = []
+            legacyWeekYAxisMax = 100
+            return
+        }
+
+        let dateKey = ProgressCalculator.dateKey(for: monday)
+        let sets = IntentionSetStore.shared.loadAllIntentionSets()
+        guard let set = StreakCalculator.intentionSetActive(on: dateKey, from: sets) else {
+            legacyWeekDaysChart = []
+            legacyWeekYAxisMax = 100
+            return
+        }
+
+        let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
+        var maxPercent = 0.0
+
+        legacyWeekDaysChart = days.map { day in
+            let dayKey = ProgressCalculator.dateKey(for: day)
+            let checkIns = CheckInStore.shared.loadCheckIns(intentionSetId: set.id, dateKey: dayKey)
+            let entries = ProgressStore.shared.loadEntries(dateKey: dayKey, intentionSetId: set.id)
+            let dayPoints = MomentumPointAdapter.buildPoints(
+                dateKey: dayKey,
+                intentionSet: set,
+                intentions: intentions,
+                checkIns: checkIns,
+                entries: entries
+            )
+
+            let bars = intentions.enumerated().map { index, intention in
+                let lastPoint = dayPoints
+                    .filter { $0.intentionId == intention.id }
+                    .max { $0.date < $1.date }
+                let percent = lastPoint?.percent ?? 0
+                maxPercent = max(maxPercent, percent)
+                return LegacyWeekIntentionBar(
+                    intentionId: intention.id,
+                    intentionTitle: intention.title,
+                    colorIndex: index,
+                    percent: percent,
+                    slot: legacySlot(for: lastPoint, intentionIndex: index, totalIntentions: intentions.count, day: day)
+                )
+            }
+
+            return LegacyWeekDayChartData(
+                date: day,
+                weekdayLetter: weekdayLetter(for: day),
+                bars: bars
+            )
+        }
+
+        legacyWeekYAxisMax = maxPercent > 100 ? 150 : 100
+    }
+
+    private func legacySlot(
+        for point: MomentumPoint?,
+        intentionIndex: Int,
+        totalIntentions: Int,
+        day: Date
+    ) -> Double {
+        guard let point else {
+            if totalIntentions <= 1 { return 0.5 }
+            let fraction = Double(intentionIndex) / Double(max(totalIntentions - 1, 1))
+            return 0.2 + (0.6 * fraction)
+        }
+        let seconds = point.date.timeIntervalSince(Calendar.current.startOfDay(for: day))
+        let ratio = seconds / 86_400
+        if ratio < 0.33 { return 0.25 }
+        if ratio < 0.66 { return 0.5 }
+        return 0.75
+    }
+
+    /// Recreates the original month behavior, which keeps the full calendar scaffold
+    /// and calculates a zero/partial/full bucket for every non-future active day.
+    private func loadLegacyMonthData() {
+        let calendar = Calendar.current
+        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedDate)),
+              let range = calendar.range(of: .day, in: .month, for: monthStart) else {
+            legacyMonthBars = []
+            return
+        }
+
+        let today = calendar.startOfDay(for: Date())
+        let sets = IntentionSetStore.shared.loadAllIntentionSets()
+
+        legacyMonthBars = range.compactMap { day in
+            guard let date = calendar.date(byAdding: .day, value: day - 1, to: monthStart) else { return nil }
+            let isFuture = date > today
+            let dateKey = ProgressCalculator.dateKey(for: date)
+            guard let set = StreakCalculator.intentionSetActive(on: dateKey, from: sets) else {
+                return MonthDayBar(date: date, ratio: nil, tier: nil, isFutureDay: isFuture)
+            }
+            if isFuture {
+                return MonthDayBar(date: date, ratio: nil, tier: nil, isFutureDay: true)
+            }
+
+            let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
+            let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: set.id)
+            let overrides = OverrideStore.shared.loadOverridesForDate(dateKey: dateKey)
+            let count = max(intentions.count, 1)
+            let score = intentions.reduce(0.0) { partial, intention in
+                let total = ProgressCalculator.totalForIntention(
+                    entries: entries,
+                    dateKey: dateKey,
+                    intentionId: intention.id,
+                    intentionSetId: set.id,
+                    overrideAmount: overrides[intention.id]
+                )
+                let percent = ProgressCalculator.percentComplete(
+                    total: total,
+                    targetValue: intention.targetValue,
+                    timeframe: intention.timeframe
+                )
+                return partial + (percent >= 1 ? 1 : percent > 0 ? 0.5 : 0)
+            }
+            let ratio = score / Double(count)
+            return MonthDayBar(date: date, ratio: ratio, tier: tier(for: ratio), isFutureDay: false)
+        }
+    }
+
+    private func loadWeekDays() {
+        let today = Calendar.current.startOfDay(for: Date())
+        weekDays = MomentumPointAdapter.weekDays(containing: selectedDate).map { date in
+            WeekDayItem(
+                id: date,
+                date: date,
+                weekdayLetter: weekdayLetter(for: date),
+                isFutureDay: date > today
+            )
+        }
+    }
+
+    private func loadDayData() {
+        let dateKey = ProgressCalculator.dateKey(for: selectedDate)
+        let detail = ProgressDataHelper.loadDayDetail(dateKey: dateKey)
+        dayOverallRatio = detail.overallPercent
+        dayIntentionCount = detail.intentions.count
+        dayCheckInCount = detail.checkIns.count
+
+        guard let set = detail.intentionSet else {
+            points = []
+            yAxisMax = 100
+            return
+        }
+
+        let entries = detail.entriesByIntentionId.values.flatMap { $0 }
+        points = MomentumPointAdapter.buildPoints(
+            dateKey: dateKey,
+            intentionSet: set,
+            intentions: detail.intentions,
+            checkIns: detail.checkIns,
+            entries: entries,
+            overrides: OverrideStore.shared.loadOverrideRecordsForDate(dateKey: dateKey)
+        ).map { point in
+            MomentumPoint(
+                id: point.id,
+                date: point.date,
+                intentionId: point.intentionId,
+                intentionTitle: point.intentionTitle,
+                colorIndex: MomentumIdentity.index(for: point.intentionId),
+                recordingId: point.recordingId,
+                percent: point.percent,
+                timeOffsetSeconds: point.timeOffsetSeconds
+            )
+        }
+        yAxisMax = MomentumPointAdapter.yAxisMax(for: points)
+    }
+
+    private func loadWeekData() {
+        let sets = IntentionSetStore.shared.loadAllIntentionSets()
+        var maxPercent = 0.0
+
+        weekDaysChart = MomentumPointAdapter.weekDays(containing: selectedDate).map { day in
+            let dateKey = ProgressCalculator.dateKey(for: day)
+            guard let set = StreakCalculator.intentionSetActive(on: dateKey, from: sets) else {
+                return WeekDayChartData(date: day, weekdayLetter: weekdayLetter(for: day), bars: [])
+            }
+
+            let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
+            let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: set.id)
+            let overrides = OverrideStore.shared.loadOverridesForDate(dateKey: dateKey)
+
+            let bars = intentions.compactMap { intention -> WeekIntentionBar? in
+                let hasRecordedValue = entries.contains { $0.intentionId == intention.id } || overrides[intention.id] != nil
+                guard hasRecordedValue else { return nil }
+                let total = ProgressCalculator.totalForIntention(
+                    entries: entries,
+                    dateKey: dateKey,
+                    intentionId: intention.id,
+                    intentionSetId: set.id,
+                    overrideAmount: overrides[intention.id]
+                )
+                let target = intention.timeframe.lowercased() == "weekly"
+                    ? intention.targetValue / 7
+                    : intention.targetValue
+                let percent = target > 0 ? max(0, total / target * 100) : 0
+                maxPercent = max(maxPercent, percent)
+                return WeekIntentionBar(
+                    intentionId: intention.id,
+                    intentionTitle: intention.title,
+                    colorIndex: MomentumIdentity.index(for: intention.id),
+                    percent: percent
+                )
+            }
+
+            return WeekDayChartData(date: day, weekdayLetter: weekdayLetter(for: day), bars: bars)
+        }
+
+        weekYAxisMax = maxPercent > 100 ? 150 : 100
+    }
+
+    private func loadMonthData() {
+        let calendar = Calendar.current
+        guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedDate)),
+              let range = calendar.range(of: .day, in: .month, for: monthStart) else {
+            monthBars = []
+            return
+        }
+
+        let today = calendar.startOfDay(for: Date())
+        let sets = IntentionSetStore.shared.loadAllIntentionSets()
+
+        monthBars = range.compactMap { day -> MonthDayBar? in
+            guard let date = calendar.date(byAdding: .day, value: day - 1, to: monthStart) else { return nil }
+            let isFuture = date > today
+            let dateKey = ProgressCalculator.dateKey(for: date)
+            guard !isFuture,
+                  let set = StreakCalculator.intentionSetActive(on: dateKey, from: sets) else {
+                return MonthDayBar(date: date, ratio: nil, tier: nil, isFutureDay: isFuture)
+            }
+
+            let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
+            let entries = ProgressStore.shared.loadEntries(dateKey: dateKey, intentionSetId: set.id)
+            let overrides = OverrideStore.shared.loadOverridesForDate(dateKey: dateKey)
+            guard !intentions.isEmpty, !entries.isEmpty || !overrides.isEmpty else {
+                return MonthDayBar(date: date, ratio: nil, tier: nil, isFutureDay: false)
+            }
+
+            let totals = Dictionary(uniqueKeysWithValues: intentions.map { intention in
+                let total = ProgressCalculator.totalForIntention(
+                    entries: entries,
+                    dateKey: dateKey,
+                    intentionId: intention.id,
+                    intentionSetId: set.id,
+                    overrideAmount: overrides[intention.id]
+                )
+                return (intention.id, total)
+            })
+            let ratio = ProgressCalculator.overallPercentComplete(intentions: intentions, totalsByIntentionId: totals)
+            return MonthDayBar(date: date, ratio: ratio, tier: tier(for: ratio), isFutureDay: false)
+        }
+    }
+
+    private func weekdayLetter(for date: Date) -> String {
+        let letters = ["S", "M", "T", "W", "T", "F", "S"]
+        return letters[Calendar.current.component(.weekday, from: date) - 1]
+    }
+
+    private func tier(for ratio: Double) -> MomentumTier {
+        switch ratio {
+        case ..<0.25: return .veryLow
+        case 0.25..<0.5: return .low
+        case 0.5..<0.75: return .neutral
+        case 0.75..<1: return .good
+        default: return .great
+        }
+    }
+}
+
+/// Faint etched lines sit inside clear glass and disappear toward the lower
+/// edge. The neutral treatment lets functional section colors carry meaning.
+private struct MomentumGuideCardBackground: View {
+    private let shape = RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+
+    var body: some View {
+        ZStack {
+            shape
+                .fill(.ultraThinMaterial)
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.055),
+                    Color.white.opacity(0.018),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            Canvas { context, size in
+                for index in 0..<5 {
+                    let inset = CGFloat(index) * 18
+                    var line = Path()
+                    line.move(to: CGPoint(x: size.width * 0.42 + inset, y: -8))
+                    line.addCurve(
+                        to: CGPoint(x: size.width + 14, y: size.height * 0.72 + inset * 0.18),
+                        control1: CGPoint(x: size.width * 0.66 + inset, y: size.height * 0.06),
+                        control2: CGPoint(x: size.width * 0.80 + inset, y: size.height * 0.50)
+                    )
+                    context.stroke(
+                        line,
+                        with: .linearGradient(
+                            Gradient(colors: [Color.white.opacity(0.12), Color.clear]),
+                            startPoint: CGPoint(x: size.width * 0.55, y: 0),
+                            endPoint: CGPoint(x: size.width, y: size.height)
+                        ),
+                        lineWidth: 0.55
+                    )
+                }
+            }
+            .opacity(0.52)
+
+            LinearGradient(
+                colors: [Color.clear, Color.black.opacity(0.13), Color.clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .clipShape(shape)
+        .overlay {
+            shape.strokeBorder(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.18), Color.white.opacity(0.055), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.8
+            )
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// A deliberately quiet, progress-driven wash behind the Momentum page. The
+/// hue travels from warm orange to a muted avocado green, while no-data periods
+/// retain the app's neutral violet atmosphere.
+private struct MomentumProgressAtmosphere: View {
+    let progress: Double?
+
+    private var normalizedProgress: Double? {
+        progress.map { min(max($0, 0), 1) }
+    }
+
+    private var tint: Color {
+        guard let normalizedProgress else {
+            return AttuneTheme.accentSecondary
+        }
+
+        let hue = 0.075 + (normalizedProgress * 0.205)
+        return Color(
+            hue: hue,
+            saturation: 0.72 - (normalizedProgress * 0.08),
+            brightness: 0.92 - (normalizedProgress * 0.08)
+        )
+    }
+
+    private var textureOpacity: Double {
+        normalizedProgress == nil ? 0.42 : 0.72
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                RadialGradient(
+                    colors: [tint.opacity(0.13), tint.opacity(0.045), Color.clear],
+                    center: .topTrailing,
+                    startRadius: 12,
+                    endRadius: geometry.size.height * 0.54
+                )
+
+                RadialGradient(
+                    colors: [tint.opacity(0.075), Color.clear],
+                    center: .bottomLeading,
+                    startRadius: 24,
+                    endRadius: geometry.size.width * 1.05
+                )
+
+                Canvas { context, size in
+                    let ringCenter = CGPoint(x: size.width * 1.02, y: size.height * 0.2)
+
+                    // Offset contour rings create a soft, screen-printed 1970s
+                    // texture without reading as another data visualization.
+                    for index in 0..<8 {
+                        let radius = CGFloat(58 + index * 30)
+                        let rect = CGRect(
+                            x: ringCenter.x - radius,
+                            y: ringCenter.y - radius * 0.7,
+                            width: radius * 2,
+                            height: radius * 1.4
+                        )
+                        context.stroke(
+                            Path(ellipseIn: rect),
+                            with: .color(tint.opacity(0.026 + Double(index) * 0.002)),
+                            style: StrokeStyle(lineWidth: 0.7, lineCap: .round)
+                        )
+                    }
+
+                    // Sparse halftone points keep the lower wash tactile but
+                    // remain nearly invisible behind cards and chart content.
+                    for row in 0..<9 {
+                        for column in 0..<8 {
+                            let x = CGFloat(column) * 34 + (row.isMultiple(of: 2) ? 7 : 22)
+                            let y = size.height * 0.68 + CGFloat(row) * 31
+                            let diameter: CGFloat = (column + row).isMultiple(of: 3) ? 1.5 : 1
+                            let dot = CGRect(x: x, y: y, width: diameter, height: diameter)
+                            context.fill(Path(ellipseIn: dot), with: .color(tint.opacity(0.055)))
+                        }
+                    }
+                }
+                .opacity(textureOpacity)
+            }
+        }
+        .blendMode(.screen)
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A period-aware glass surface. The tint provides hierarchy while material,
+/// restrained opacity, and a shared silhouette keep the screen cohesive.
+private struct MomentumTintedCardBackground: View {
+    let tint: Color
+    var cornerRadius: CGFloat = AttuneTheme.cardRadius
+    var strength: Double = 0.6
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
+
+    var body: some View {
+        ZStack {
+            shape.fill(.ultraThinMaterial)
+            shape.fill(AttuneTheme.surface)
+
+            LinearGradient(
+                colors: [
+                    tint.opacity(0.22 * strength),
+                    tint.opacity(0.07 * strength),
+                    Color.clear
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .clipShape(shape)
+        .overlay {
+            shape.strokeBorder(
+                LinearGradient(
+                    colors: [tint.opacity(0.58 * strength), AttuneTheme.border, tint.opacity(0.12 * strength)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+        }
+        .shadow(color: tint.opacity(0.1 * strength), radius: 14, x: 0, y: 7)
+        .allowsHitTesting(false)
+    }
+}
+
+private struct MomentumSectionOutlineModifier: ViewModifier {
+    let tint: Color
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [tint.opacity(0.42), tint.opacity(0.08), Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: tint.opacity(0.08), radius: 14, x: 0, y: 7)
+    }
+}
+
+private extension View {
+    func momentumSectionOutline(tint: Color) -> some View {
+        modifier(MomentumSectionOutlineModifier(tint: tint))
+    }
+}
+
+enum MomentumIdentity {
+    private static let symbols = ["circle.fill", "square.fill", "triangle.fill", "diamond.fill", "pentagon.fill", "hexagon.fill"]
+
+    static func index(for id: String) -> Int {
+        id.utf8.reduce(0) { (($0 &* 31) &+ Int($1)) % MomentumPalette.intentionColors.count }
+    }
+
+    static func symbol(forIndex index: Int) -> String {
+        symbols[abs(index) % symbols.count]
+    }
+}

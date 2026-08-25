@@ -26,13 +26,13 @@ Tech choice:
 | App Store name | `Pondera: Intentions` |
 | Subtitle | `Are you in tune?` |
 | Bundle ID | `com.scottoliver.Pondera.Intentions` |
-| Xcode project | `/Users/scott/Desktop/Attune/Attune/Attune/Attune.xcodeproj` |
+| Xcode project | `/Users/scott/Desktop/Pondera/Pondera/Pondera/Pondera.xcodeproj` |
 | Scheme | `Attune` |
 
 ### Cloudflare Worker
 | Field | Exact value |
 |------|-------------|
-| Worker folder | `/Users/scott/Desktop/Attune/Attune/backend/openai-proxy` |
+| Worker folder | `/Users/scott/Desktop/Pondera/Pondera/backend/openai-proxy` |
 | Worker name | `attune-openai-proxy` |
 | Secret name 1 | `OPENAI_API_KEY` |
 | Secret name 2 | `APP_PROXY_TOKEN` |
@@ -40,15 +40,15 @@ Tech choice:
 ### iOS Secrets file
 | Field | Exact value |
 |------|-------------|
-| File to edit | `/Users/scott/Desktop/Attune/Attune/Attune/Attune/AI/Secrets.swift` |
-| Template file | `/Users/scott/Desktop/Attune/Attune/Attune/Attune/AI/Secrets.swift.example` |
+| File to edit | `/Users/scott/Desktop/Pondera/Pondera/Pondera/Pondera/AI/Secrets.swift` |
+| Template file | `/Users/scott/Desktop/Pondera/Pondera/Pondera/Pondera/AI/Secrets.swift.example` |
 | Field 1 name | `proxyBaseURL` |
 | Field 2 name | `appProxyToken` |
 
 ### Legal links file
 | Field | Exact value |
 |------|-------------|
-| File to edit | `/Users/scott/Desktop/Attune/Attune/Attune/Attune/App/LegalLinks.swift` |
+| File to edit | `/Users/scott/Desktop/Pondera/Pondera/Pondera/Pondera/App/LegalLinks.swift` |
 | Field 1 | `privacyPolicy` |
 | Field 2 | `termsOfUse` |
 | Field 3 | `support` |
@@ -115,7 +115,7 @@ Go to:
 Then run in Terminal:
 
 ```bash
-cd /Users/scott/Desktop/Attune/Attune/backend/openai-proxy
+cd /Users/scott/Desktop/Pondera/Pondera/backend/openai-proxy
 npx wrangler login
 ```
 
@@ -128,7 +128,7 @@ Approve login in browser.
 Run in Terminal:
 
 ```bash
-cd /Users/scott/Desktop/Attune/Attune/backend/openai-proxy
+cd /Users/scott/Desktop/Pondera/Pondera/backend/openai-proxy
 npx wrangler deploy
 ```
 
@@ -146,7 +146,7 @@ Save that URL as:
 Run:
 
 ```bash
-cd /Users/scott/Desktop/Attune/Attune/backend/openai-proxy
+cd /Users/scott/Desktop/Pondera/Pondera/backend/openai-proxy
 npx wrangler secret put OPENAI_API_KEY
 ```
 
@@ -178,10 +178,10 @@ Save that hex string as:
 ### STEP 5 — Fill iOS Secrets.swift
 
 Open file:
-- `/Users/scott/Desktop/Attune/Attune/Attune/Attune/AI/Secrets.swift`
+- `/Users/scott/Desktop/Pondera/Pondera/Pondera/Pondera/AI/Secrets.swift`
 
 If missing, copy from:
-- `/Users/scott/Desktop/Attune/Attune/Attune/Attune/AI/Secrets.swift.example`
+- `/Users/scott/Desktop/Pondera/Pondera/Pondera/Pondera/AI/Secrets.swift.example`
 
 Enter exactly:
 
@@ -245,7 +245,7 @@ Host 3 public HTTPS pages:
 - Support
 
 Then open:
-- `/Users/scott/Desktop/Attune/Attune/Attune/Attune/App/LegalLinks.swift`
+- `/Users/scott/Desktop/Pondera/Pondera/Pondera/Pondera/App/LegalLinks.swift`
 
 Replace:
 
@@ -303,7 +303,7 @@ Also test Subscribe and Restore Purchases on the paywall.
 ### STEP 11 — Archive, TestFlight, submit
 
 In Xcode:
-1. Open `/Users/scott/Desktop/Attune/Attune/Attune/Attune.xcodeproj`
+1. Open `/Users/scott/Desktop/Pondera/Pondera/Pondera/Pondera.xcodeproj`
 2. Scheme: `Attune`
 3. Destination: `Any iOS Device`
 4. Product → Archive

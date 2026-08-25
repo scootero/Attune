@@ -63,7 +63,7 @@ This is the full checklist to make Pondera purchasable with one subscription.
 - Deploy worker:
 
 ```bash
-cd /Users/scott/Desktop/Attune/Attune/backend/openai-proxy
+cd /Users/scott/Desktop/Pondera/Pondera/backend/openai-proxy
 npx wrangler login
 npx wrangler deploy
 npx wrangler secret put OPENAI_API_KEY
@@ -71,7 +71,7 @@ openssl rand -hex 32
 npx wrangler secret put APP_PROXY_TOKEN
 ```
 
-- Fill local secrets file: `/Users/scott/Desktop/Attune/Attune/Attune/Attune/AI/Secrets.swift`
+- Fill local secrets file: `/Users/scott/Desktop/Pondera/Pondera/Pondera/Pondera/AI/Secrets.swift`
 
 ```swift
 static let proxyBaseURL = "https://YOUR_WORKER.workers.dev"
@@ -80,7 +80,7 @@ static let appProxyToken = "YOUR_HEX_TOKEN"
 
 ### 4) Legal URLs
 - Host Privacy Policy, Terms, Support pages
-- Put links in `/Users/scott/Desktop/Attune/Attune/Attune/Attune/App/LegalLinks.swift`
+- Put links in `/Users/scott/Desktop/Pondera/Pondera/Pondera/Pondera/App/LegalLinks.swift`
 - Put Privacy + Support URLs in App Store Connect App Information
 
 ### 5) Privacy + listing
