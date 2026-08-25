@@ -24,12 +24,12 @@ struct SessionListView: View {
                     NavigationLink(destination: SessionDetailView(sessionId: session.id)) {
                         sessionRow(session)
                     }
-                    .listRowBackground(AttuneTheme.backgroundRaised)
+                    .listRowBackground(PonderaTheme.backgroundRaised)
                 }
                 .scrollContentBackground(.hidden)
             }
         }
-        .background(AttuneScreenBackground())
+        .background(PonderaScreenBackground())
         .navigationTitle("Past sessions")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -41,12 +41,12 @@ struct SessionListView: View {
             HStack {
                 Text(session.startedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Spacer()
                 if let state = activeState(session.status) {
                     Text(state)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.accent)
+                        .foregroundStyle(PonderaTheme.accent)
                 }
             }
 
@@ -57,7 +57,7 @@ struct SessionListView: View {
                 Label("\(capturedCount) captured", systemImage: "sparkles")
             }
             .font(.caption)
-            .foregroundStyle(AttuneTheme.textSecondary)
+            .foregroundStyle(PonderaTheme.textSecondary)
         }
         .padding(.vertical, 5)
     }

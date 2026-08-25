@@ -16,10 +16,10 @@ struct MomentumMonthChartView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Monthly consistency")
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text("Overall tracked progress on days with recorded updates")
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
 
             if recordedBars.isEmpty {
@@ -38,20 +38,20 @@ struct MomentumMonthChartView: View {
                 .chartYScale(domain: 0...100)
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .day, count: 5)) { value in
-                        AxisGridLine().foregroundStyle(AttuneTheme.border.opacity(0.6))
+                        AxisGridLine().foregroundStyle(PonderaTheme.border.opacity(0.6))
                         AxisValueLabel(format: .dateTime.day())
-                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .foregroundStyle(PonderaTheme.textSecondary)
                     }
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading, values: [0, 25, 50, 75, 100]) { value in
-                        AxisGridLine().foregroundStyle(AttuneTheme.border)
+                        AxisGridLine().foregroundStyle(PonderaTheme.border)
                         AxisValueLabel {
                             if let number = value.as(Int.self) {
                                 Text("\(number)%")
                             }
                         }
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                     }
                 }
                 .frame(height: 245)
@@ -59,7 +59,7 @@ struct MomentumMonthChartView: View {
             }
         }
         .padding(16)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var recordedBars: [MonthDayBar] {
@@ -70,13 +70,13 @@ struct MomentumMonthChartView: View {
         VStack(spacing: 10) {
             Image(systemName: "calendar")
                 .font(.system(size: 30, weight: .medium))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
             Text("No recorded progress this month")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
             Text("Days appear here after a check-in or a manual progress adjustment.")
                 .font(.caption)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -86,12 +86,12 @@ struct MomentumMonthChartView: View {
 
     private func color(for tier: MomentumTier?) -> Color {
         switch tier {
-        case .veryLow: return AttuneTheme.recording
-        case .low: return AttuneTheme.warning
+        case .veryLow: return PonderaTheme.recording
+        case .low: return PonderaTheme.warning
         case .neutral: return Color(red: 0.90, green: 0.76, blue: 0.32)
-        case .good: return AttuneTheme.success
-        case .great: return AttuneTheme.accent
-        case nil: return AttuneTheme.textTertiary
+        case .good: return PonderaTheme.success
+        case .great: return PonderaTheme.accent
+        case nil: return PonderaTheme.textTertiary
         }
     }
 }
@@ -99,5 +99,5 @@ struct MomentumMonthChartView: View {
 #Preview {
     MomentumMonthChartView(bars: [])
         .padding()
-        .background(AttuneScreenBackground())
+        .background(PonderaScreenBackground())
 }

@@ -9,7 +9,7 @@
 import SwiftUI
 
 extension Notification.Name {
-    static let attuneListeningSessionDidFinishProcessing = Notification.Name("attune.listening.session.didFinishProcessing")
+    static let ponderaListeningSessionDidFinishProcessing = Notification.Name("attune.listening.session.didFinishProcessing")
 }
 import UIKit
 
@@ -51,7 +51,7 @@ struct HomeRecordView: View {
 
     var body: some View {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -59,7 +59,7 @@ struct HomeRecordView: View {
                     sessionHero
                     historyCard
                 }
-                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.top, 12)
                 .padding(.bottom, 104)
             }
@@ -72,7 +72,7 @@ struct HomeRecordView: View {
                     SessionRecapPreviewCard(recap: recapPreview.recap)
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.bottom, 88)
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .transition(
@@ -94,7 +94,7 @@ struct HomeRecordView: View {
                     onReview: { reviewSuggestionFromTalk(suggestion) },
                     onDismiss: { declineSuggestionFromTalk(suggestion) }
                 )
-                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.top, 8)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .transition(suggestionToastTransition(edge: .top))
@@ -106,7 +106,7 @@ struct HomeRecordView: View {
 
             if showsTalkingPrompt && recorder.isRecording {
                 talkingPromptCard
-                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.horizontal, PonderaTheme.horizontalPadding)
                     .padding(.bottom, 88)
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .transition(
@@ -163,10 +163,10 @@ struct HomeRecordView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text("Talk it out")
                 .font(.title.bold())
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
             Text("Think out loud, clear your head, and notice what keeps coming up.")
                 .font(.subheadline)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -176,7 +176,7 @@ struct HomeRecordView: View {
             Label("TALK IT OUT", systemImage: "waveform.badge.mic")
                 .font(.caption.weight(.bold))
                 .tracking(1.1)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
 
             if recorder.isRecording {
                 recordingContent
@@ -194,12 +194,12 @@ struct HomeRecordView: View {
         .background {
             if recorder.isRecording {
                 RecordingSessionAtmosphere(level: recorder.audioLevel)
-                    .clipShape(RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous))
                     .transition(.opacity)
                     .allowsHitTesting(false)
             }
         }
-        .attuneCard()
+        .ponderaCard()
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: recorder.isRecording)
     }
 
@@ -208,22 +208,22 @@ struct HomeRecordView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Say what’s on your mind")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text("Talk naturally. Pondera will organize the useful parts and notice what keeps coming up.")
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             Text("Recording starts only when you tap. Nothing is added without your tap.")
                 .font(.footnote.weight(.medium))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let startErrorMessage {
                 Label(startErrorMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.warning)
+                    .foregroundStyle(PonderaTheme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -235,7 +235,7 @@ struct HomeRecordView: View {
                     Label("Start talking", systemImage: "record.circle")
                 }
             }
-            .buttonStyle(AttunePrimaryButtonStyle())
+            .buttonStyle(PonderaPrimaryButtonStyle())
             .disabled(isCheckingAIUsage)
             .accessibilityHint("Starts recording so Pondera can organize captured ideas and themes")
         }
@@ -245,18 +245,18 @@ struct HomeRecordView: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "quote.bubble.fill")
                 .font(.title3)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
                 .frame(width: 30, height: 30)
-                .background(AttuneTheme.accent.opacity(0.14), in: Circle())
+                .background(PonderaTheme.accent.opacity(0.14), in: Circle())
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text("A few ways in")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text("Think through a decision · Empty your mind · Talk through your day")
                     .font(.footnote)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -265,11 +265,11 @@ struct HomeRecordView: View {
         .padding(14)
         .background(
             .ultraThinMaterial,
-            in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous)
+            in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous)
-                .stroke(AttuneTheme.accent.opacity(0.30), lineWidth: 1)
+            RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous)
+                .stroke(PonderaTheme.accent.opacity(0.30), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.20), radius: 14, y: 7)
         .accessibilityElement(children: .combine)
@@ -280,17 +280,17 @@ struct HomeRecordView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
                 Circle()
-                    .fill(AttuneTheme.recording)
+                    .fill(PonderaTheme.recording)
                     .frame(width: 11, height: 11)
-                    .shadow(color: AttuneTheme.recording.opacity(0.75), radius: 7)
+                    .shadow(color: PonderaTheme.recording.opacity(0.75), radius: 7)
                     .accessibilityHidden(true)
                 Text("You’re talking it out")
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Spacer()
                 Text(formattedDuration)
                     .font(.title3.bold().monospacedDigit())
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("You’re talking it out")
@@ -298,7 +298,7 @@ struct HomeRecordView: View {
 
             Text("Keep talking naturally. Repeated ideas are grouped into recurring themes in Insights.")
                 .font(.subheadline)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             LiveVoiceWaveform(level: recorder.audioLevel)
@@ -311,18 +311,18 @@ struct HomeRecordView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .foregroundStyle(.white)
-                    .background(AttuneTheme.recording, in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
+                    .background(PonderaTheme.recording, in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityHint("Stops recording and begins processing the captured audio")
         }
         .padding(14)
-        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
+        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous)
                 .stroke(
                     LinearGradient(
-                        colors: [AttuneTheme.accent.opacity(0.58), AttuneTheme.recording.opacity(0.46)],
+                        colors: [PonderaTheme.accent.opacity(0.58), PonderaTheme.recording.opacity(0.46)],
                         startPoint: .leading,
                         endPoint: .trailing
                     ),
@@ -336,7 +336,7 @@ struct HomeRecordView: View {
             icon: "sparkles",
             title: "Organizing what you said…",
             detail: "Pondera is transcribing and grouping captured intentions and themes.",
-            color: AttuneTheme.accentSecondary,
+            color: PonderaTheme.accentSecondary,
             showsProgress: true
         )
     }
@@ -346,7 +346,7 @@ struct HomeRecordView: View {
             icon: "mic.badge.plus",
             title: "Getting ready…",
             detail: "Waiting for microphone and speech access.",
-            color: AttuneTheme.accent,
+            color: PonderaTheme.accent,
             showsProgress: true
         )
     }
@@ -357,14 +357,14 @@ struct HomeRecordView: View {
                 icon: "mic.slash.fill",
                 title: "Recording access is off",
                 detail: "Allow Microphone and Speech Recognition in Settings to use Talk it out.",
-                color: AttuneTheme.warning
+                color: PonderaTheme.warning
             )
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     openURL(url)
                 }
             }
-            .buttonStyle(AttunePrimaryButtonStyle())
+            .buttonStyle(PonderaPrimaryButtonStyle())
         }
     }
 
@@ -373,7 +373,7 @@ struct HomeRecordView: View {
             HStack {
                 Text("Today")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Spacer()
                 HStack(spacing: 4) {
                     Text("\(todaySessionsCount) \(todaySessionsCount == 1 ? "session" : "sessions")")
@@ -382,7 +382,7 @@ struct HomeRecordView: View {
                 }
                     .font(.caption)
                     .fontWeight(showsRecentSessionCompletion ? .semibold : .regular)
-                    .foregroundStyle(showsRecentSessionCompletion ? AttuneTheme.success : AttuneTheme.textSecondary)
+                    .foregroundStyle(showsRecentSessionCompletion ? PonderaTheme.success : PonderaTheme.textSecondary)
             }
 
             HStack(spacing: 10) {
@@ -402,16 +402,16 @@ struct HomeRecordView: View {
             }
         }
         .padding(14)
-        .attuneCard()
+        .ponderaCard()
         .overlay(
-            RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
                 .stroke(
-                    showsRecentSessionCompletion ? AttuneTheme.success.opacity(0.72) : Color.clear,
+                    showsRecentSessionCompletion ? PonderaTheme.success.opacity(0.72) : Color.clear,
                     lineWidth: 1.5
                 )
         )
         .shadow(
-            color: showsRecentSessionCompletion ? AttuneTheme.success.opacity(0.22) : .clear,
+            color: showsRecentSessionCompletion ? PonderaTheme.success.opacity(0.22) : .clear,
             radius: 12
         )
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: showsRecentSessionCompletion)
@@ -442,22 +442,22 @@ struct HomeRecordView: View {
                         .monospacedDigit()
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(AttuneTheme.success.opacity(0.22), in: Capsule())
+                        .background(PonderaTheme.success.opacity(0.22), in: Capsule())
                 }
             }
             .frame(maxWidth: .infinity)
             .frame(minHeight: 44)
             .background(
-                isHighlighted ? AttuneTheme.success.opacity(0.15) : AttuneTheme.surfaceStrong,
+                isHighlighted ? PonderaTheme.success.opacity(0.15) : PonderaTheme.surfaceStrong,
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isHighlighted ? AttuneTheme.success.opacity(0.60) : AttuneTheme.border)
+                    .stroke(isHighlighted ? PonderaTheme.success.opacity(0.60) : PonderaTheme.border)
             )
         }
         .buttonStyle(.plain)
-        .foregroundStyle(isHighlighted ? AttuneTheme.success : AttuneTheme.textPrimary)
+        .foregroundStyle(isHighlighted ? PonderaTheme.success : PonderaTheme.textPrimary)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: isHighlighted)
     }
 
@@ -482,17 +482,17 @@ struct HomeRecordView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text(detail)
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous).stroke(color.opacity(0.26)))
+        .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous).stroke(color.opacity(0.26)))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
         .accessibilityValue(detail)
@@ -709,7 +709,7 @@ struct HomeRecordView: View {
             }
         }
         NotificationCenter.default.post(
-            name: .attuneListeningSessionDidFinishProcessing,
+            name: .ponderaListeningSessionDidFinishProcessing,
             object: nil,
             userInfo: ["sessionId": sessionId]
         )
@@ -722,11 +722,11 @@ struct HomeRecordView: View {
             showsRecentSessionCompletion = true
         }
         if completedSession?.status == "error" {
-            AttuneHaptics.error()
+            PonderaHaptics.error()
         } else if recentInsightsAddedCount > 0 {
-            AttuneHaptics.reward()
+            PonderaHaptics.reward()
         } else {
-            AttuneHaptics.saved()
+            PonderaHaptics.saved()
         }
 
         Task { @MainActor in
@@ -785,7 +785,7 @@ struct HomeRecordView: View {
         Task { @MainActor in
             await Task.yield()
             NotificationCenter.default.post(
-                name: .attuneReviewIntentionSuggestion,
+                name: .ponderaReviewIntentionSuggestion,
                 object: suggestion
             )
         }
@@ -798,7 +798,7 @@ struct HomeRecordView: View {
                 suggestionToastCenter.resolveSuggestion(id: suggestion.id)
             }
             NotificationCenter.default.post(
-                name: .attuneIntentionSuggestionDidResolve,
+                name: .ponderaIntentionSuggestionDidResolve,
                 object: suggestion.id
             )
         } catch {
@@ -903,16 +903,16 @@ private struct LiveVoiceWaveform: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        AttuneTheme.accent.opacity(0.72),
+                                        PonderaTheme.accent.opacity(0.72),
                                         Color.white.opacity(0.92),
-                                        AttuneTheme.recording.opacity(0.78)
+                                        PonderaTheme.recording.opacity(0.78)
                                     ],
                                     startPoint: .bottom,
                                     endPoint: .top
                                 )
                             )
                             .frame(width: barWidth, height: barHeight(index: index, time: time))
-                            .shadow(color: AttuneTheme.accent.opacity(0.38), radius: 3)
+                            .shadow(color: PonderaTheme.accent.opacity(0.38), radius: 3)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)

@@ -175,7 +175,7 @@ settings control must remain fully tappable, VoiceOver order must stay sensible,
 and nothing may collide at the largest Dynamic Type sizes.
 
 Do NOT apply a metallic or high-gloss gradient. Preserve the current typography
-and AttuneTheme colors; this task is alignment and collision-safety only. Show a
+and PonderaTheme colors; this task is alignment and collision-safety only. Show a
 simulator screenshot if the environment permits it, and otherwise report that
 visual verification remains for the physical-device gate.
 

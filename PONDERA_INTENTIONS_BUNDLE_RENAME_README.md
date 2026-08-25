@@ -192,7 +192,7 @@ The final migration report must cover:
 
 The finish line is a clean, working **Pondera: Intentions** app built from the existing codebase, with compatibility-sensitive identifiers preserved intentionally.
 
-## Migration Completion Record — August 24, 2026
+## Migration Completion Record — August 25, 2026
 
 ### Completed
 
@@ -201,6 +201,8 @@ The finish line is a clean, working **Pondera: Intentions** app built from the e
 - Migrated current legal, support, public-page, and actionable App Store setup copy at commit `15506d3`.
 - Replaced the baked-in launch video with a code-native Pondera intro that shares the header mark and respects Reduce Motion.
 - Removed `AttuneLaunchIntro.mp4`; the existing app icon is text-free and remains suitable.
+- Renamed the internal Xcode development identity in dedicated Stage 1 commit `87962d3`.
+- Renamed active Attune-prefixed Swift symbols to Pondera equivalents in the dedicated Stage 2 commit.
 
 ### Bundle Identity
 
@@ -227,14 +229,15 @@ The finish line is a clean, working **Pondera: Intentions** app built from the e
 
 The final case-insensitive search was reviewed by category. No remaining occurrence is current customer-facing branding.
 
-- **Internal Swift symbols pending Stage 2:** `AttuneApp`, `AttuneTheme`, and other active Attune-prefixed type names.
-- **Persistence and local compatibility:** `Documents/Attune`, `attune.*` UserDefaults keys, local notification IDs, log filenames, and `ATTUNE_DEMO_` records.
+- **Persistence and local compatibility:** `Documents/Attune`, `attune.*` UserDefaults keys and notification values, and `ATTUNE_DEMO_` records.
 - **Backend/API compatibility:** `X-Attune-*` headers, `attune-openai-proxy`, `attune-ai-usage`, proxy URLs, and related tests/docs.
 - **Retained destinations:** GitHub Pages and issue URLs under `/Attune`.
 - **History:** older implementation summaries, handoffs, source paths, and the pre-migration portions of this runbook.
 - **Asset:** the text-free icon is stored as `Pondera-Icon-1.png`.
 
-### Final Apple Configuration — Confirmed August 24, 2026
+No active filename or Attune-prefixed Swift development symbol remains.
+
+### Final Apple Configuration — Confirmed August 25, 2026
 
 - App Store name: `Pondera: Intentions`.
 - Bundle ID: `com.scottoliver.Pondera.Intentions`.
@@ -255,7 +258,7 @@ The final case-insensitive search was reviewed by category. No remaining occurre
 ### Verification Evidence
 
 - `git diff --check`: passed.
-- iOS Debug simulator tests: 85 passed, 0 failed, 0 skipped on iPhone 17 Pro / iOS 26.5.
+- iOS Debug simulator tests: 89 passed, 0 failed, 0 skipped on iPhone 17 Pro / iOS 26.5.
 - Worker `npm run check`: TypeScript passed; 36 tests passed across 3 files.
 - Release simulator build with store validation: passed.
 - Built Debug and Release identity: `com.scottoliver.Pondera.Intentions` / `Pondera`.
@@ -263,11 +266,11 @@ The final case-insensitive search was reviewed by category. No remaining occurre
 - Simulator visual QA: Pondera intro and first onboarding screen rendered correctly; the transition completed.
 - Built app asset check: no `AttuneLaunchIntro` resource remains.
 - Automatic signing: passed with `iOS Team Provisioning Profile: com.scottoliver.Pondera.Intentions`.
-- Physical-iPhone installation: passed on the connected iPhone; the device reports the installed app as Pondera with Bundle ID `com.scottoliver.Pondera.Intentions`.
+- Physical-iPhone installation attempt: not completed; the paired iPhone disconnected immediately after the development services tunnel opened.
 - Physical-iPhone launch: blocked because the device was locked, so onboarding, recording, backend calls, and sandbox paywall behavior were not re-verified on-device.
 
-### Verification Still Required After the Apple-Side Update
+### Remaining Device Verification
 
 - Unlock the connected iPhone and re-run launch/onboarding, microphone/speech, background recording, backend-call, and paywall checks.
-- When the App Store Connect product is sandbox-ready, verify live sandbox product loading and purchase/restore behavior on the iPhone.
+- Verify live sandbox product loading and purchase/restore behavior on the unlocked iPhone.
 - The public pages were updated in the repository but were not deployed separately.

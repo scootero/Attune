@@ -9,8 +9,8 @@ import SwiftUI
 import SwiftData
 
 @main
-struct AttuneApp: App {
-    @UIApplicationDelegateAdaptor(AttuneNotificationDelegate.self) private var notificationDelegate
+struct PonderaApp: App {
+    @UIApplicationDelegateAdaptor(PonderaNotificationDelegate.self) private var notificationDelegate
     @Environment(\.scenePhase) private var scenePhase // Observe foreground/background transitions to refresh reminder scheduling.
     
     var sharedModelContainer: ModelContainer = {

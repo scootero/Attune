@@ -4,7 +4,7 @@ import UIKit
 /// Persistence code remains independent from haptics; callers trigger feedback
 /// only after an operation has actually succeeded or failed.
 @MainActor
-enum AttuneHaptics {
+enum PonderaHaptics {
     /// A quiet pulse as the branded launch handoff reveals the app.
     static func welcome() {
         let generator = UIImpactFeedbackGenerator(style: .soft)

@@ -51,7 +51,7 @@ The desired example result—proposal finished, website deadline, exercise inten
 
 - `Pondera/Pondera/App/ContentView.swift`
   - Runs the branded launch intro.
-  - Presents onboarding once using `AttuneOnboardingState`.
+  - Presents onboarding once using `PonderaOnboardingState`.
   - Presents the separate, required AI/privacy disclosure after onboarding.
 - `Pondera/Pondera/UI/OnboardingView.swift`
   - Three benefit-led pages: Voice Check-Ins, Talk it out, and Momentum.
@@ -693,7 +693,7 @@ Only after usability evidence:
 
 - A session can be recording, queued, transcribing, extracting, complete, or failed/recovering.
 - Briefs should use only persisted facts; omit incomplete extraction rather than display transient model output.
-- Refresh after `.attuneListeningSessionDidFinishProcessing`, successful Check-In persistence, scene foreground, and local day changes.
+- Refresh after `.ponderaListeningSessionDidFinishProcessing`, successful Check-In persistence, scene foreground, and local day changes.
 - Use snapshot-based pure builders off the rendering hot path. Avoid repeated full disk scans during each SwiftUI body evaluation.
 - Tokenize/cancel delayed UI resets so old dismissal or refresh tasks cannot clear new state, following existing Home feedback patterns.
 

@@ -71,20 +71,20 @@ struct WeekdayPicker: View {
 
     private func foregroundColor(day: WeekDayItem, isSelected: Bool) -> Color {
         if day.isFutureDay {
-            return AttuneTheme.textTertiary.opacity(0.55)
+            return PonderaTheme.textTertiary.opacity(0.55)
         }
         if isSelected {
-            return AttuneTheme.textPrimary
+            return PonderaTheme.textPrimary
         }
-        return AttuneTheme.textSecondary
+        return PonderaTheme.textSecondary
     }
 
     private func backgroundColor(day: WeekDayItem, isSelected: Bool) -> Color {
         if day.isFutureDay {
-            return AttuneTheme.surface.opacity(0.5)
+            return PonderaTheme.surface.opacity(0.5)
         }
         if isSelected {
-            return AttuneTheme.accent.opacity(0.28)
+            return PonderaTheme.accent.opacity(0.28)
         }
         return Color.clear
     }

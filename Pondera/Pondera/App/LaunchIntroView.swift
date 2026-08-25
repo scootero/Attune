@@ -18,7 +18,7 @@ struct LaunchIntroView: View {
 
     var body: some View {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
 
             VStack(spacing: 18) {
                 PonderaBrandMark()
@@ -29,7 +29,7 @@ struct LaunchIntroView: View {
                     .tracking(1.4)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [AttuneTheme.textPrimary, AttuneTheme.accent.opacity(0.94)],
+                            colors: [PonderaTheme.textPrimary, PonderaTheme.accent.opacity(0.94)],
                             startPoint: .leading,
                             endPoint: .trailing
                         )

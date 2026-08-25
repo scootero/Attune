@@ -129,10 +129,10 @@ struct EditIntentionsView: View {
                                     systemImage: "arrow.triangle.swap"
                                 )
                                 .font(.footnote.weight(.medium))
-                                .foregroundStyle(AttuneTheme.warning)
+                                .foregroundStyle(PonderaTheme.warning)
                                 .padding(12)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(AttuneTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .background(PonderaTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
@@ -141,10 +141,10 @@ struct EditIntentionsView: View {
                             if hasValidationIssue {
                                 Label("Each intention needs a name and a target greater than zero.", systemImage: "exclamationmark.circle.fill")
                                     .font(.footnote)
-                                    .foregroundStyle(AttuneTheme.warning)
+                                    .foregroundStyle(PonderaTheme.warning)
                                     .padding(12)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(AttuneTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .background(PonderaTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                                     .listRowSeparator(.hidden)
                                     .listRowBackground(Color.clear)
@@ -214,7 +214,7 @@ struct EditIntentionsView: View {
                                                 .frame(maxWidth: .infinity)
                                         }
                                         .buttonStyle(.bordered)
-                                        .tint(AttuneTheme.recording)
+                                        .tint(PonderaTheme.recording)
                                     }
                                 }
                                 .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // spacing for glass cards
@@ -321,21 +321,21 @@ struct EditIntentionsView: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "target")
                 .font(.title3)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
                 .frame(width: 36, height: 36)
-                .background(AttuneTheme.accent.opacity(0.14), in: Circle())
+                .background(PonderaTheme.accent.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 4) {
                 Text("What do you want to move forward?")
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text(intentionLimitDescription)
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(16)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var intentionLimitDescription: String {
@@ -562,11 +562,11 @@ struct EditIntentionsView: View {
             isAddExpanded = false // collapse add card post-save
             expandedEditId = nil // collapse edits post-save
 
-            AttuneHaptics.saved()
+            PonderaHaptics.saved()
             dismiss()
         } catch {
             AppLogger.log(AppLogger.ERR, "EditIntentions save failed error=\"\(error.localizedDescription)\"")
-            AttuneHaptics.error()
+            PonderaHaptics.error()
         }
     }
 }
@@ -657,7 +657,7 @@ private struct InlineIntentionEditor: View {
         VStack(alignment: .leading, spacing: 10) { // compact stack keeps controls closer for quicker scanning/editing
             Text("Intention")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
             TextField("Title", text: $draft.title) // title input
                 .textFieldStyle(.plain) // plain style for glass aesthetic
                 .foregroundColor(.white) // white text for dark bg
@@ -679,11 +679,11 @@ private struct InlineIntentionEditor: View {
                 HStack {
                     Text("Target")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                     Spacer()
                     Text("\(Self.displayString(for: draft.targetValue)) \(displayUnitAbbreviation) \(targetPeriodText)")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.accent)
+                        .foregroundStyle(PonderaTheme.accent)
                 }
                 HStack(spacing: 10) { // tighter horizontal spacing keeps related controls visually grouped
                     Slider(
@@ -731,14 +731,14 @@ private struct InlineIntentionEditor: View {
                 if draft.targetValue <= 0 {
                     Label("Enter a target greater than zero", systemImage: "exclamationmark.circle")
                         .font(.caption)
-                        .foregroundStyle(AttuneTheme.warning)
+                        .foregroundStyle(PonderaTheme.warning)
                 }
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Measure in")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                 Picker("Unit", selection: $draft.unit) { // unit picker
                     ForEach(DraftIntention.unitOptions, id: \.self) { unit in
                         Text(unit.capitalized).tag(unit) // unit option
@@ -752,7 +752,7 @@ private struct InlineIntentionEditor: View {
 
                 Text("Target period")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                 Picker("Timeframe", selection: $draft.timeframe) { // timeframe picker
                     Text("Daily").tag("daily") // daily option
                     Text("Weekly").tag("weekly") // weekly option
@@ -764,7 +764,7 @@ private struct InlineIntentionEditor: View {
 
                 Text(draft.timeframe.lowercased() == "weekly" ? "This target is measured across the full week." : "This target starts fresh each day.")
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textTertiary)
+                    .foregroundStyle(PonderaTheme.textTertiary)
             }
         }
         .padding(12) // compact internal padding keeps edit panel dense and fast to read

@@ -292,11 +292,11 @@ struct LegacyMomentumChartView: View {
                 } label: {
                     Text(style.rawValue)
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(chartStyle == style ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
+                        .foregroundStyle(chartStyle == style ? PonderaTheme.textPrimary : PonderaTheme.textSecondary)
                         .padding(.horizontal, 11)
                         .frame(minHeight: 44)
                         .background(
-                            chartStyle == style ? AttuneTheme.surfaceStrong : Color.clear,
+                            chartStyle == style ? PonderaTheme.surfaceStrong : Color.clear,
                             in: Capsule()
                         )
                 }
@@ -305,8 +305,8 @@ struct LegacyMomentumChartView: View {
             }
         }
         .padding(2)
-        .background(AttuneTheme.surface, in: Capsule())
-        .overlay(Capsule().stroke(AttuneTheme.border, lineWidth: 1))
+        .background(PonderaTheme.surface, in: Capsule())
+        .overlay(Capsule().stroke(PonderaTheme.border, lineWidth: 1))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Chart style")
     }
@@ -343,13 +343,13 @@ struct LegacyMomentumChartView: View {
                     .lineLimit(1)
             }
             .font(.caption2.weight(.medium))
-            .foregroundStyle(isSelected ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
+            .foregroundStyle(isSelected ? PonderaTheme.textPrimary : PonderaTheme.textSecondary)
             .padding(.horizontal, 8)
             .frame(minHeight: 44)
-            .background(isSelected ? AttuneTheme.surfaceStrong : AttuneTheme.surface, in: Capsule())
+            .background(isSelected ? PonderaTheme.surfaceStrong : PonderaTheme.surface, in: Capsule())
             .overlay(
                 Capsule()
-                    .stroke(isSelected ? AttuneTheme.accent.opacity(0.75) : AttuneTheme.border, lineWidth: 1)
+                    .stroke(isSelected ? PonderaTheme.accent.opacity(0.75) : PonderaTheme.border, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -432,7 +432,7 @@ struct LegacyMomentumChartView: View {
         return Chart {
             if yAxisMax > 100 {
                 RuleMark(y: .value("Target", 100))
-                    .foregroundStyle(AttuneTheme.success.opacity(0.55))
+                    .foregroundStyle(PonderaTheme.success.opacity(0.55))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
             }
 
@@ -464,26 +464,26 @@ struct LegacyMomentumChartView: View {
         .chartYScale(domain: 0...yAxisMax)
         .chartXAxis {
             AxisMarks(values: domain.tickDates) { value in
-                AxisGridLine().foregroundStyle(AttuneTheme.border)
+                AxisGridLine().foregroundStyle(PonderaTheme.border)
                 AxisValueLabel {
                     if let date = value.as(Date.self) {
                         let hasActivity = isActivityHour(date)
                         Text(compactAxisLabel(for: date, showsOmission: domain.omitsMidnight && date == domain.start))
                             .font(.system(size: hasActivity ? 9 : 8, weight: hasActivity ? .bold : .regular))
-                            .foregroundStyle(hasActivity ? AttuneTheme.accent : AttuneTheme.textSecondary)
+                            .foregroundStyle(hasActivity ? PonderaTheme.accent : PonderaTheme.textSecondary)
                     }
                 }
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading, values: .stride(by: 25)) { value in
-                AxisGridLine().foregroundStyle(AttuneTheme.border)
+                AxisGridLine().foregroundStyle(PonderaTheme.border)
                 AxisValueLabel {
                     if let number = value.as(Double.self) {
                         Text("\(Int(number))%")
                     }
                 }
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
             }
         }
         .frame(height: 180)
@@ -611,13 +611,13 @@ struct LegacyMomentumChartView: View {
             // Draw time label below chart
             var textContext = context
             if hasActivity {
-                textContext.addFilter(.shadow(color: AttuneTheme.accent.opacity(0.75), radius: 3))
+                textContext.addFilter(.shadow(color: PonderaTheme.accent.opacity(0.75), radius: 3))
             }
             textContext.translateBy(x: xPos, y: chartHeight + 20)
             textContext.draw(
                 Text(label)
                     .font(.system(size: hasActivity ? 8 : 7, weight: hasActivity ? .bold : .regular))
-                    .foregroundStyle(hasActivity ? AttuneTheme.accent : Color.gray.opacity(0.82)),
+                    .foregroundStyle(hasActivity ? PonderaTheme.accent : Color.gray.opacity(0.82)),
                 at: .zero,
                 anchor: anchor
             )
@@ -628,7 +628,7 @@ struct LegacyMomentumChartView: View {
         let baselineY = chartHeight + 9
         let sunCenter = CGPoint(x: leftPadding + 2, y: baselineY)
         let moonCenter = CGPoint(x: leftPadding + chartWidth - 2, y: baselineY)
-        let symbolColor = AttuneTheme.accent.opacity(0.35)
+        let symbolColor = PonderaTheme.accent.opacity(0.35)
 
         var sun = Path()
         sun.addEllipse(in: CGRect(x: sunCenter.x - 2.5, y: sunCenter.y - 2.5, width: 5, height: 5))

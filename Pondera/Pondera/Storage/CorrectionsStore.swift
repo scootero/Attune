@@ -10,7 +10,7 @@
 import Foundation
 
 extension Notification.Name {
-    static let attuneCorrectionsDidChange = Notification.Name("attune.corrections.didChange")
+    static let ponderaCorrectionsDidChange = Notification.Name("attune.corrections.didChange")
 }
 
 /// Manages loading and saving of ItemCorrection objects to disk using JSON.
@@ -86,7 +86,7 @@ final class CorrectionsStore {
         
         // Save to disk
         try saveCorrections(corrections)
-        NotificationCenter.default.post(name: .attuneCorrectionsDidChange, object: nil)
+        NotificationCenter.default.post(name: .ponderaCorrectionsDidChange, object: nil)
         
         AppLogger.log(
             AppLogger.STORE,
@@ -107,7 +107,7 @@ final class CorrectionsStore {
         corrections.removeValue(forKey: itemId)
         
         try saveCorrections(corrections)
-        NotificationCenter.default.post(name: .attuneCorrectionsDidChange, object: nil)
+        NotificationCenter.default.post(name: .ponderaCorrectionsDidChange, object: nil)
         
         AppLogger.log(
             AppLogger.STORE,

@@ -2,7 +2,7 @@
 //  OpenAIClient.swift
 //  Pondera
 //
-//  Minimal client for OpenAI Chat Completions via Attune's Cloudflare proxy.
+//  Minimal client for OpenAI Chat Completions via Pondera's Cloudflare proxy.
 //  POSTs to /v1/chat/completions with json_schema response format.
 //
 
@@ -68,7 +68,7 @@ struct OpenAIChatResponse: Codable {
     }
 }
 
-/// Minimal client for OpenAI Chat Completions via Attune's Cloudflare proxy.
+/// Minimal client for OpenAI Chat Completions via Pondera's Cloudflare proxy.
 /// The real OpenAI key stays on the server; the app only sends appProxyToken.
 struct OpenAIClient {
 

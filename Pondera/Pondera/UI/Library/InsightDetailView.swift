@@ -18,7 +18,7 @@ struct InsightDetailView: View {
 
     var body: some View {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -40,7 +40,7 @@ struct InsightDetailView: View {
 
                     trackingClarification
                 }
-                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.top, 12)
                 .padding(.bottom, 96)
             }
@@ -69,13 +69,13 @@ struct InsightDetailView: View {
                 if corrected.isMarkedIncorrect {
                     Label("Hidden", systemImage: "eye.slash")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textTertiary)
+                        .foregroundStyle(PonderaTheme.textTertiary)
                 }
             }
 
             Text(corrected.displayTitle)
                 .font(.title2.bold())
-                .foregroundStyle(corrected.isMarkedIncorrect ? AttuneTheme.textSecondary : AttuneTheme.textPrimary)
+                .foregroundStyle(corrected.isMarkedIncorrect ? PonderaTheme.textSecondary : PonderaTheme.textPrimary)
 
             HStack {
                 Text(InsightDisplay.fullDate(item.createdAt))
@@ -85,25 +85,25 @@ struct InsightDetailView: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(AttuneTheme.textSecondary)
+            .foregroundStyle(PonderaTheme.textSecondary)
         }
         .padding(16)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text("What Pondera captured")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
             Text(item.summary.isEmpty ? corrected.displayTitle : item.summary)
                 .font(.body)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var scheduleCard: some View {
@@ -111,27 +111,27 @@ struct InsightDetailView: View {
         return VStack(alignment: .leading, spacing: 8) {
             Label("Calendar", systemImage: "calendar")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
 
             if let capture {
                 Text(capture.start.formatted(.dateTime.weekday(.wide).month(.wide).day().year()))
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text(scheduleTimeLabel(capture))
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             } else {
                 Text("Needs a date and time")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.warning)
+                    .foregroundStyle(PonderaTheme.warning)
                 Text("Tap Review to schedule this capture.")
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private func scheduleTimeLabel(_ capture: CalendarCapture) -> String {
@@ -145,30 +145,30 @@ struct InsightDetailView: View {
         VStack(alignment: .leading, spacing: 7) {
             Text("From your words")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
             Text("“\(item.sourceQuote)”")
                 .font(.body)
                 .italic()
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private func noteCard(_ note: String) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Text("Your note")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
             Text(note)
                 .font(.body)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var trackingClarification: some View {
@@ -180,7 +180,7 @@ struct InsightDetailView: View {
             Image(systemName: "info.circle")
         }
         .font(.caption)
-        .foregroundStyle(AttuneTheme.textTertiary)
+        .foregroundStyle(PonderaTheme.textTertiary)
         .padding(.horizontal, 4)
     }
 }
@@ -361,19 +361,19 @@ struct CaptureReviewSheet: View {
             do {
                 try CorrectionsStore.shared.setCorrection(updated)
                 correction = updated
-                AttuneHaptics.saved()
+                PonderaHaptics.saved()
             } catch {
                 AppLogger.log(AppLogger.ERR, "Capture correction save failed item=\(AppLogger.shortId(item.id))")
-                AttuneHaptics.error()
+                PonderaHaptics.error()
             }
         } else if correction != nil {
             do {
                 try CorrectionsStore.shared.deleteCorrection(itemId: item.id)
                 correction = nil
-                AttuneHaptics.saved()
+                PonderaHaptics.saved()
             } catch {
                 AppLogger.log(AppLogger.ERR, "Capture correction delete failed item=\(AppLogger.shortId(item.id))")
-                AttuneHaptics.error()
+                PonderaHaptics.error()
             }
         }
     }

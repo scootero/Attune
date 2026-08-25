@@ -1,7 +1,7 @@
 import UIKit
 @preconcurrency import UserNotifications
 
-final class AttuneNotificationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+final class PonderaNotificationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil

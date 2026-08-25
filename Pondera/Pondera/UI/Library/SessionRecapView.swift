@@ -23,25 +23,25 @@ struct SessionRecapView: View {
             Label("SESSION RECAP", systemImage: "sparkles")
                 .font(.caption.weight(.bold))
                 .tracking(1.0)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
 
             Text(recap.headline)
                 .font(.title2.bold())
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let quote = recap.quote {
                 Text("You said: “\(quote)”")
                     .font(.body)
                     .italic()
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
             }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .attuneCard()
+        .ponderaCard()
         .accessibilityElement(children: .combine)
     }
 }
@@ -65,11 +65,11 @@ struct SessionRecapPreviewCard: View {
                     .font(.caption.weight(.semibold))
                     .opacity(0.8)
             }
-            .foregroundStyle(AttuneTheme.accent)
+            .foregroundStyle(PonderaTheme.accent)
 
             Text(recap.headline)
                 .font(.title3.weight(.bold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -77,7 +77,7 @@ struct SessionRecapPreviewCard: View {
                 Text("“\(quote)”")
                     .font(.subheadline)
                     .italic()
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .lineLimit(1)
             }
 
@@ -96,7 +96,7 @@ struct SessionRecapPreviewCard: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(
                     LinearGradient(
-                        colors: [AttuneTheme.accent.opacity(0.9), AttuneTheme.accentSecondary.opacity(0.75), Color.pink.opacity(0.45)],
+                        colors: [PonderaTheme.accent.opacity(0.9), PonderaTheme.accentSecondary.opacity(0.75), Color.pink.opacity(0.45)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
@@ -104,8 +104,8 @@ struct SessionRecapPreviewCard: View {
                 )
                 .allowsHitTesting(false)
         }
-        .shadow(color: AttuneTheme.accent.opacity(0.22), radius: 18, x: -5, y: 6)
-        .shadow(color: AttuneTheme.accentSecondary.opacity(0.20), radius: 20, x: 8, y: 10)
+        .shadow(color: PonderaTheme.accent.opacity(0.22), radius: 18, x: -5, y: 6)
+        .shadow(color: PonderaTheme.accentSecondary.opacity(0.20), radius: 20, x: 8, y: 10)
         .accessibilityElement(children: .combine)
     }
 }
@@ -124,7 +124,7 @@ private struct SessionRecapPreviewBackground: View {
             )
 
             RadialGradient(
-                colors: [AttuneTheme.accent.opacity(0.34), .clear],
+                colors: [PonderaTheme.accent.opacity(0.34), .clear],
                 center: .topLeading,
                 startRadius: 0,
                 endRadius: 230

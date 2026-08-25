@@ -146,4 +146,4 @@ Library:
 - Swift 5 only
 - Minimal diffs, no refactors unless required
 - No new files unless explicitly allowed in the slice
-- Single @main entry point remains AttuneApp (no alternate app shells)
+- Single @main entry point remains PonderaApp (no alternate app shells)

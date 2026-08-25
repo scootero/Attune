@@ -8,7 +8,7 @@
 import SwiftUI
 import UIKit
 
-enum AttuneTheme {
+enum PonderaTheme {
     static let background = Color(red: 0.045, green: 0.055, blue: 0.075)
     static let backgroundRaised = Color(red: 0.075, green: 0.095, blue: 0.115)
     static let surface = Color.white.opacity(0.085)
@@ -68,7 +68,7 @@ struct PonderaBrandMark: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color.white.opacity(0.95), AttuneTheme.accent.opacity(0.88), .clear],
+                        colors: [Color.white.opacity(0.95), PonderaTheme.accent.opacity(0.88), .clear],
                         center: UnitPoint(x: 0.36, y: 0.30),
                         startRadius: 0,
                         endRadius: 12
@@ -81,8 +81,8 @@ struct PonderaBrandMark: View {
                     AngularGradient(
                         colors: [
                             Color.white.opacity(0.78),
-                            AttuneTheme.accent.opacity(0.34),
-                            AttuneTheme.accentSecondary.opacity(0.58),
+                            PonderaTheme.accent.opacity(0.34),
+                            PonderaTheme.accentSecondary.opacity(0.58),
                             Color.white.opacity(0.78)
                         ],
                         center: .center
@@ -96,17 +96,17 @@ struct PonderaBrandMark: View {
                 .frame(width: 12, height: 12)
                 .rotationEffect(.degrees(-18))
         }
-        .shadow(color: AttuneTheme.accent.opacity(0.28), radius: 7)
+        .shadow(color: PonderaTheme.accent.opacity(0.28), radius: 7)
     }
 }
 
-struct AttuneScreenBackground: View {
+struct PonderaScreenBackground: View {
     var body: some View {
         ZStack {
-            AttuneTheme.backgroundGradient
+            PonderaTheme.backgroundGradient
 
             RadialGradient(
-                colors: [AttuneTheme.accent.opacity(0.14), .clear],
+                colors: [PonderaTheme.accent.opacity(0.14), .clear],
                 center: .topLeading,
                 startRadius: 20,
                 endRadius: 420
@@ -116,17 +116,17 @@ struct AttuneScreenBackground: View {
     }
 }
 
-struct AttuneCardModifier: ViewModifier {
+struct PonderaCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous))
             .background(
-                AttuneTheme.surface,
-                in: RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+                PonderaTheme.surface,
+                in: RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
-                    .stroke(AttuneTheme.border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
+                    .stroke(PonderaTheme.border, lineWidth: 1)
                     .allowsHitTesting(false)
             )
             .shadow(color: Color.black.opacity(0.24), radius: 12, x: 0, y: 7)
@@ -137,27 +137,27 @@ struct InsightCaptureCardModifier: ViewModifier {
     let isHighlighted: Bool
 
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
 
         content
             .background(
                 isHighlighted
-                    ? AttuneTheme.accentSecondary.opacity(0.28)
+                    ? PonderaTheme.accentSecondary.opacity(0.28)
                     : Color.clear,
                 in: shape
             )
             .background(.ultraThinMaterial, in: shape)
-            .background(AttuneTheme.surface, in: shape)
+            .background(PonderaTheme.surface, in: shape)
             .overlay(
                 shape
                     .stroke(
-                        isHighlighted ? AttuneTheme.accentSecondary.opacity(0.72) : AttuneTheme.border,
+                        isHighlighted ? PonderaTheme.accentSecondary.opacity(0.72) : PonderaTheme.border,
                         lineWidth: isHighlighted ? 1.5 : 1
                     )
                     .allowsHitTesting(false)
             )
             .shadow(
-                color: isHighlighted ? AttuneTheme.accentSecondary.opacity(0.24) : Color.black.opacity(0.24),
+                color: isHighlighted ? PonderaTheme.accentSecondary.opacity(0.24) : Color.black.opacity(0.24),
                 radius: isHighlighted ? 16 : 12,
                 x: 0,
                 y: 7
@@ -165,7 +165,7 @@ struct InsightCaptureCardModifier: ViewModifier {
     }
 }
 
-struct AttunePrimaryButtonStyle: ButtonStyle {
+struct PonderaPrimaryButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
@@ -176,11 +176,11 @@ struct AttunePrimaryButtonStyle: ButtonStyle {
             .padding(.vertical, 15)
             .background(
                 LinearGradient(
-                    colors: [AttuneTheme.accent, Color(red: 0.35, green: 0.68, blue: 0.96)],
+                    colors: [PonderaTheme.accent, Color(red: 0.35, green: 0.68, blue: 0.96)],
                     startPoint: .leading,
                     endPoint: .trailing
                 ),
-                in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous)
+                in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous)
             )
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
             .opacity(configuration.isPressed ? 0.86 : 1)
@@ -189,8 +189,8 @@ struct AttunePrimaryButtonStyle: ButtonStyle {
 }
 
 extension View {
-    func attuneCard() -> some View {
-        modifier(AttuneCardModifier())
+    func ponderaCard() -> some View {
+        modifier(PonderaCardModifier())
     }
 
     func insightCaptureCard(isHighlighted: Bool) -> some View {

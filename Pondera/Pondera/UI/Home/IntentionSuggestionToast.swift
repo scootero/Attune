@@ -2,8 +2,8 @@ import Combine
 import SwiftUI
 
 extension Notification.Name {
-    static let attuneReviewIntentionSuggestion = Notification.Name("attune.intentionSuggestion.review")
-    static let attuneIntentionSuggestionDidResolve = Notification.Name("attune.intentionSuggestion.didResolve")
+    static let ponderaReviewIntentionSuggestion = Notification.Name("attune.intentionSuggestion.review")
+    static let ponderaIntentionSuggestionDidResolve = Notification.Name("attune.intentionSuggestion.didResolve")
 }
 
 /// Process-local presentation state for the brief suggestion surfaces. The
@@ -56,19 +56,19 @@ struct IntentionSuggestionToast: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: "sparkles")
-                    .foregroundStyle(AttuneTheme.accent)
+                    .foregroundStyle(PonderaTheme.accent)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Suggested intention")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                     Text(suggestion.title)
                         .font(.headline)
-                        .foregroundStyle(AttuneTheme.textPrimary)
+                        .foregroundStyle(PonderaTheme.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                     Text("\(suggestion.targetValue.formatted()) \(suggestion.unit) · \(suggestion.timeframe)")
                         .font(.subheadline)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                 }
 
                 Spacer(minLength: 4)
@@ -80,7 +80,7 @@ struct IntentionSuggestionToast: View {
                 Spacer(minLength: 4)
                 Button("Review", action: onReview)
                     .buttonStyle(.borderedProminent)
-                    .tint(AttuneTheme.accent)
+                    .tint(PonderaTheme.accent)
             }
             .font(.subheadline.weight(.semibold))
         }
@@ -91,7 +91,7 @@ struct IntentionSuggestionToast: View {
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
         )
         .background(
-            AttuneTheme.backgroundRaised.opacity(0.48),
+            PonderaTheme.backgroundRaised.opacity(0.48),
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
         )
         .overlay {

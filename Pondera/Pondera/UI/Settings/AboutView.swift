@@ -89,7 +89,7 @@ struct AboutView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-        .background(AttuneScreenBackground())
+        .background(PonderaScreenBackground())
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -97,7 +97,7 @@ struct AboutView: View {
     private func aboutPoint(icon: String, title: String, detail: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
                 .frame(width: 26, height: 26)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)

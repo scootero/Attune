@@ -23,19 +23,19 @@ struct MomentumChartView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Check-in progress")
                         .font(.headline)
-                        .foregroundStyle(AttuneTheme.textPrimary)
+                        .foregroundStyle(PonderaTheme.textPrimary)
                     Text("Cumulative progress when each update was recorded")
                         .font(.caption)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                 }
                 Spacer()
                 if yAxisMax > 100 {
                     Text("Above target")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.success)
+                        .foregroundStyle(PonderaTheme.success)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
-                        .background(AttuneTheme.success.opacity(0.12), in: Capsule())
+                        .background(PonderaTheme.success.opacity(0.12), in: Capsule())
                 }
             }
 
@@ -47,24 +47,24 @@ struct MomentumChartView: View {
             }
         }
         .padding(16)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: hasIntentions ? "chart.xyaxis.line" : "target")
                 .font(.system(size: 30, weight: .medium))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
 
             Text(hasIntentions ? "No check-in progress yet" : "No tracked intentions")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
 
             Text(hasIntentions
                  ? "Record a check-in with a number, such as “I finished 2 miles,” to add progress here."
                  : "Add an intention on Today, then use check-ins to record progress.")
                 .font(.caption)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -77,12 +77,12 @@ struct MomentumChartView: View {
         Chart {
             if yAxisMax > 100 {
                 RuleMark(y: .value("Target", 100))
-                    .foregroundStyle(AttuneTheme.success.opacity(0.55))
+                    .foregroundStyle(PonderaTheme.success.opacity(0.55))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     .annotation(position: .top, alignment: .trailing) {
                         Text("Target")
                             .font(.caption2)
-                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .foregroundStyle(PonderaTheme.textSecondary)
                     }
             }
 
@@ -110,7 +110,7 @@ struct MomentumChartView: View {
                     if selectedIntentionId != nil || filteredPoints.count <= 3 {
                         Text("\(Int(point.percent.rounded()))%")
                             .font(.caption2.monospacedDigit())
-                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .foregroundStyle(PonderaTheme.textSecondary)
                     }
                 }
                 .accessibilityLabel(point.intentionTitle)
@@ -121,20 +121,20 @@ struct MomentumChartView: View {
         .chartYScale(domain: 0...yAxisMax)
         .chartXAxis {
             AxisMarks(values: timeTicks) { value in
-                AxisGridLine().foregroundStyle(AttuneTheme.border)
+                AxisGridLine().foregroundStyle(PonderaTheme.border)
                 AxisValueLabel(format: .dateTime.hour(.defaultDigits(amPM: .abbreviated)))
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading, values: .stride(by: 25)) { value in
-                AxisGridLine().foregroundStyle(AttuneTheme.border)
+                AxisGridLine().foregroundStyle(PonderaTheme.border)
                 AxisValueLabel {
                     if let number = value.as(Double.self) {
                         Text("\(Int(number))%")
                     }
                 }
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
             }
         }
         .frame(height: 250)
@@ -168,11 +168,11 @@ struct MomentumChartView: View {
                 Text(title).lineLimit(1)
             }
             .font(.caption.weight(.medium))
-            .foregroundStyle(isSelected ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
+            .foregroundStyle(isSelected ? PonderaTheme.textPrimary : PonderaTheme.textSecondary)
             .padding(.horizontal, 10)
             .frame(minHeight: 44)
-            .background(isSelected ? AttuneTheme.surfaceStrong : AttuneTheme.surface, in: Capsule())
-            .overlay(Capsule().stroke(isSelected ? AttuneTheme.accent.opacity(0.7) : AttuneTheme.border, lineWidth: 1))
+            .background(isSelected ? PonderaTheme.surfaceStrong : PonderaTheme.surface, in: Capsule())
+            .overlay(Capsule().stroke(isSelected ? PonderaTheme.accent.opacity(0.7) : PonderaTheme.border, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(id == nil ? "Show all intentions" : "Show \(title)")
@@ -209,5 +209,5 @@ struct MomentumChartView: View {
 #Preview {
     MomentumChartView(points: [], yAxisMax: 100, selectedDate: Date(), hasIntentions: true)
         .padding()
-        .background(AttuneScreenBackground())
+        .background(PonderaScreenBackground())
 }

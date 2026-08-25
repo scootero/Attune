@@ -3,12 +3,12 @@
 //  Pondera
 //
 //  Month calendar and selected-day schedule for event-like details captured by
-//  Attune. Editing stays in Capture Review; there are no external calendar writes.
+//  Pondera. Editing stays in Capture Review; there are no external calendar writes.
 //
 
 import SwiftUI
 
-struct AttuneCalendarView: View {
+struct PonderaCalendarView: View {
     @State private var items: [ExtractedItem] = []
     @State private var corrections: [String: ItemCorrection] = [:]
     @State private var displayedMonth = Calendar.current.startOfDay(for: Date())
@@ -35,14 +35,14 @@ struct AttuneCalendarView: View {
 
     var body: some View {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     monthCard
                     agendaSection
                 }
-                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.top, 12)
                 .padding(.bottom, 96)
             }
@@ -58,7 +58,7 @@ struct AttuneCalendarView: View {
             }
         }
         .onAppear(perform: loadData)
-        .onReceive(NotificationCenter.default.publisher(for: .attuneCorrectionsDidChange)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .ponderaCorrectionsDidChange)) { _ in
             loadData()
         }
     }
@@ -77,7 +77,7 @@ struct AttuneCalendarView: View {
 
                 Text(displayedMonth.formatted(.dateTime.month(.wide).year()))
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
 
                 Spacer()
 
@@ -88,13 +88,13 @@ struct AttuneCalendarView: View {
                 }
                 .accessibilityLabel("Next month")
             }
-            .foregroundStyle(AttuneTheme.accent)
+            .foregroundStyle(PonderaTheme.accent)
 
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(weekdaySymbols, id: \.self) { symbol in
                     Text(symbol)
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textTertiary)
+                        .foregroundStyle(PonderaTheme.textTertiary)
                         .frame(maxWidth: .infinity)
                 }
 
@@ -108,7 +108,7 @@ struct AttuneCalendarView: View {
             }
         }
         .padding(16)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private func dayButton(for date: Date) -> some View {
@@ -123,23 +123,23 @@ struct AttuneCalendarView: View {
             VStack(spacing: 4) {
                 Text("\(calendar.component(.day, from: date))")
                     .font(.subheadline.weight(isSelected ? .bold : .medium))
-                    .foregroundStyle(isSelected ? AttuneTheme.background : AttuneTheme.textPrimary)
+                    .foregroundStyle(isSelected ? PonderaTheme.background : PonderaTheme.textPrimary)
 
                 HStack(spacing: 3) {
                     Circle()
-                        .fill(scheduledCount > 0 ? (isSelected ? AttuneTheme.background : AttuneTheme.accent) : .clear)
+                        .fill(scheduledCount > 0 ? (isSelected ? PonderaTheme.background : PonderaTheme.accent) : .clear)
                         .frame(width: 5, height: 5)
                     Circle()
-                        .fill(capturedCount > 0 ? (isSelected ? AttuneTheme.background.opacity(0.72) : AttuneTheme.warning) : .clear)
+                        .fill(capturedCount > 0 ? (isSelected ? PonderaTheme.background.opacity(0.72) : PonderaTheme.warning) : .clear)
                         .frame(width: 5, height: 5)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(isSelected ? AttuneTheme.accent : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(isSelected ? PonderaTheme.accent : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
                 if isToday && !isSelected {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(AttuneTheme.accent.opacity(0.7), lineWidth: 1)
+                        .stroke(PonderaTheme.accent.opacity(0.7), lineWidth: 1)
                 }
             }
             .contentShape(Rectangle())
@@ -155,10 +155,10 @@ struct AttuneCalendarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(selectedDate.formatted(.dateTime.weekday(.wide).month(.wide).day()))
                         .font(.headline)
-                        .foregroundStyle(AttuneTheme.textPrimary)
+                        .foregroundStyle(PonderaTheme.textPrimary)
                     Text(agendaSubtitle)
                         .font(.caption)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                 }
                 Spacer()
             }
@@ -170,7 +170,7 @@ struct AttuneCalendarView: View {
                     agendaGroupHeader(
                         title: "Day schedule",
                         detail: "Events are ordered by their scheduled time.",
-                        color: AttuneTheme.accent
+                        color: PonderaTheme.accent
                     )
 
                     ForEach(selectedCaptures) { capture in
@@ -185,7 +185,7 @@ struct AttuneCalendarView: View {
                     agendaGroupHeader(
                         title: "Needs scheduling",
                         detail: "Recorded this day; open Review to choose a date and time.",
-                        color: AttuneTheme.warning
+                        color: PonderaTheme.warning
                     )
 
                     ForEach(selectedUndatedCaptures) { capture in
@@ -217,10 +217,10 @@ struct AttuneCalendarView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text(detail)
                     .font(.caption2)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
         }
         .padding(.top, 4)
@@ -230,19 +230,19 @@ struct AttuneCalendarView: View {
         VStack(spacing: 10) {
             Image(systemName: "calendar.badge.plus")
                 .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
             Text("Nothing scheduled from your captures")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
             Text("Event-like details with a clear date or time will appear here after Pondera processes what you said.")
                 .font(.caption)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(18)
         .frame(maxWidth: .infinity)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private func eventRow(_ capture: CalendarCapture) -> some View {
@@ -250,17 +250,17 @@ struct AttuneCalendarView: View {
             VStack(alignment: .trailing, spacing: 3) {
                 Text(timeLabel(for: capture))
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .multilineTextAlignment(.trailing)
             }
             .frame(width: 72, alignment: .trailing)
 
             VStack(spacing: 0) {
                 Circle()
-                    .fill(AttuneTheme.accent)
+                    .fill(PonderaTheme.accent)
                     .frame(width: 9, height: 9)
                 Rectangle()
-                    .fill(AttuneTheme.accent.opacity(0.28))
+                    .fill(PonderaTheme.accent.opacity(0.28))
                     .frame(width: 2)
             }
             .frame(maxHeight: .infinity)
@@ -268,11 +268,11 @@ struct AttuneCalendarView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(capture.title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
 
                 Text(eventDetail(for: capture))
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .lineLimit(3)
             }
 
@@ -280,30 +280,30 @@ struct AttuneCalendarView: View {
 
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textTertiary)
+                .foregroundStyle(PonderaTheme.textTertiary)
         }
         .padding(14)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private func undatedEventRow(_ capture: CalendarUndatedCapture) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.headline)
-                .foregroundStyle(AttuneTheme.warning)
+                .foregroundStyle(PonderaTheme.warning)
                 .frame(width: 38, height: 38)
-                .background(AttuneTheme.warning.opacity(0.12), in: Circle())
+                .background(PonderaTheme.warning.opacity(0.12), in: Circle())
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(capture.title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text("Choose date & time in Review")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.warning)
+                    .foregroundStyle(PonderaTheme.warning)
                 Text(capture.item.summary.isEmpty ? capture.item.sourceQuote : capture.item.summary)
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .lineLimit(3)
             }
 
@@ -311,10 +311,10 @@ struct AttuneCalendarView: View {
 
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textTertiary)
+                .foregroundStyle(PonderaTheme.textTertiary)
         }
         .padding(14)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private func timeLabel(for capture: CalendarCapture) -> String {
@@ -402,6 +402,6 @@ struct AttuneCalendarView: View {
 
 #Preview {
     NavigationStack {
-        AttuneCalendarView()
+        PonderaCalendarView()
     }
 }

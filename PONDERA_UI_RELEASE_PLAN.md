@@ -222,7 +222,7 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - Added a DEBUG + Simulator-only Settings tool that creates approximately fourteen days of ordinary `CheckIn` and linked `ProgressEntry` JSON records using the four existing intentions; it never duplicates or edits those intention files.
 - Namespaced every generated record with `ATTUNE_DEMO_` and recorded every exact created path plus protected intention-file hashes in `Documents/Attune/MomentumDemoManifest.json`.
 - Added **Remove and Verify Demo Data**, which deletes manifest paths, performs a second type-aware reserved-ID scan for interrupted/orphaned runs, verifies zero residue, and reports whether protected intentions changed.
-- Kept a non-Debug launch purge in `AttuneApp` so installing Release over a Debug simulator container cannot carry demo history forward. The seeder and Settings controls do not compile into Release or onto a physical device.
+- Kept a non-Debug launch purge in `PonderaApp` so installing Release over a Debug simulator container cannot carry demo history forward. The seeder and Settings controls do not compile into Release or onto a physical device.
 - The authoritative cleanup contract and future-removal handoff comments are at the top of `Storage/MomentumDemoDataManager.swift` and beside the Settings controls. Do not remove only the UI; first run cleanup and retain the non-Debug residue purge.
 - Current simulator handoff state: the Debug build is installed and one 17-check-in/68-progress-entry demo run is intentionally loaded for review. Remove it from **Settings → Developer → Remove and Verify Demo Data**.
 

@@ -19,34 +19,34 @@ struct ProLockedFeatureView: View {
 
     var body: some View {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
 
             VStack(spacing: 20) {
                 Spacer()
                 Image(systemName: icon)
                     .font(.system(size: 42, weight: .semibold))
-                    .foregroundStyle(AttuneTheme.accent)
+                    .foregroundStyle(PonderaTheme.accent)
                     .frame(width: 92, height: 92)
-                    .background(AttuneTheme.accent.opacity(0.13), in: Circle())
+                    .background(PonderaTheme.accent.opacity(0.13), in: Circle())
 
                 VStack(spacing: 8) {
                     Text(title)
                         .font(.title.bold())
-                        .foregroundStyle(AttuneTheme.textPrimary)
+                        .foregroundStyle(PonderaTheme.textPrimary)
                     Text(detail)
                         .font(.body)
                         .multilineTextAlignment(.center)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Button("View Pondera Pro") { showPaywall = true }
-                    .buttonStyle(AttunePrimaryButtonStyle())
+                    .buttonStyle(PonderaPrimaryButtonStyle())
 
                 Text("\(subscriptionManager.priceText). Cancel anytime.")
                     .font(.footnote)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(AttuneTheme.textTertiary)
+                    .foregroundStyle(PonderaTheme.textTertiary)
                 Spacer()
             }
             .padding(.horizontal, 28)
@@ -73,17 +73,17 @@ struct FreeMomentumTodayView: View {
 
     var body: some View {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Momentum")
                             .font(.largeTitle.bold())
-                            .foregroundStyle(AttuneTheme.textPrimary)
+                            .foregroundStyle(PonderaTheme.textPrimary)
                         Text("Today's progress from your Voice Check-In.")
                             .font(.subheadline)
-                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .foregroundStyle(PonderaTheme.textSecondary)
                     }
 
                     HStack(spacing: 0) {
@@ -92,7 +92,7 @@ struct FreeMomentumTodayView: View {
                         summary(value: "\(checkInCount)", label: checkInCount == 1 ? "check-in" : "check-ins")
                     }
                     .padding(.vertical, 14)
-                    .attuneCard()
+                    .ponderaCard()
 
                     MomentumChartView(
                         points: points,
@@ -105,28 +105,28 @@ struct FreeMomentumTodayView: View {
                         HStack(spacing: 13) {
                             Image(systemName: "calendar.badge.clock")
                                 .font(.title3)
-                                .foregroundStyle(AttuneTheme.warning)
+                                .foregroundStyle(PonderaTheme.warning)
                                 .frame(width: 42, height: 42)
-                                .background(AttuneTheme.warning.opacity(0.13), in: Circle())
+                                .background(PonderaTheme.warning.opacity(0.13), in: Circle())
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Unlock your full Momentum history")
                                     .font(.headline)
-                                    .foregroundStyle(AttuneTheme.textPrimary)
+                                    .foregroundStyle(PonderaTheme.textPrimary)
                                 Text("See past days plus Week and Month views with Pondera Pro.")
                                     .font(.subheadline)
-                                    .foregroundStyle(AttuneTheme.textSecondary)
+                                    .foregroundStyle(PonderaTheme.textSecondary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             Spacer(minLength: 0)
                             Image(systemName: "chevron.right")
-                                .foregroundStyle(AttuneTheme.textTertiary)
+                                .foregroundStyle(PonderaTheme.textTertiary)
                         }
                         .padding(16)
                     }
                     .buttonStyle(.plain)
-                    .attuneCard()
+                    .ponderaCard()
                 }
-                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.top, 8)
                 .padding(.bottom, 112)
             }
@@ -143,10 +143,10 @@ struct FreeMomentumTodayView: View {
         VStack(spacing: 3) {
             Text(value)
                 .font(.headline.monospacedDigit())
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
             Text(label)
                 .font(.caption)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
         }
         .frame(maxWidth: .infinity)
     }

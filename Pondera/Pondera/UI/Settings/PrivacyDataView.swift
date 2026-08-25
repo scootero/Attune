@@ -80,7 +80,7 @@ struct PrivacyDataView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-        .background(AttuneScreenBackground())
+        .background(PonderaScreenBackground())
         .navigationTitle("Permissions & Privacy")
         .navigationBarTitleDisplayMode(.inline)
         .task { await refreshStatuses() }
@@ -93,7 +93,7 @@ struct PrivacyDataView: View {
     private func permissionRow(title: String, icon: String, status: PermissionDisplayStatus) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
                 .frame(width: 24)
             Text(title)
             Spacer()
@@ -107,7 +107,7 @@ struct PrivacyDataView: View {
     private func privacyPoint(icon: String, title: String, detail: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
                 .frame(width: 24, height: 24)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
@@ -160,9 +160,9 @@ private enum PermissionDisplayStatus {
     var color: Color {
         switch self {
         case .checking, .notRequested: return .secondary
-        case .allowed: return AttuneTheme.success
-        case .off: return AttuneTheme.warning
-        case .limited: return AttuneTheme.accentSecondary
+        case .allowed: return PonderaTheme.success
+        case .off: return PonderaTheme.warning
+        case .limited: return PonderaTheme.accentSecondary
         }
     }
 

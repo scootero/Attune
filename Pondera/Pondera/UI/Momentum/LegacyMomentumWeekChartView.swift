@@ -218,7 +218,7 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
             Chart {
                 if yAxisMax > 100 {
                     RuleMark(y: .value("Target", 100))
-                        .foregroundStyle(AttuneTheme.success.opacity(0.5))
+                        .foregroundStyle(PonderaTheme.success.opacity(0.5))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                 }
 
@@ -248,18 +248,18 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
             .chartXAxis {
                 AxisMarks(values: days.map(\.date)) { value in
                     AxisValueLabel(format: .dateTime.weekday(.narrow))
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                 }
             }
             .chartYAxis {
                 AxisMarks(position: .leading, values: .stride(by: 25)) { value in
-                    AxisGridLine().foregroundStyle(AttuneTheme.border)
+                    AxisGridLine().foregroundStyle(PonderaTheme.border)
                     AxisValueLabel {
                         if let number = value.as(Double.self) {
                             Text("\(Int(number))%")
                         }
                     }
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                 }
             }
             .frame(height: 220)
@@ -306,12 +306,12 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
                 } label: {
                     Text(option.rawValue)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(dimension == option ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
+                        .foregroundStyle(dimension == option ? PonderaTheme.textPrimary : PonderaTheme.textSecondary)
                         .padding(.horizontal, 12)
                         .frame(minHeight: 44)
                         .background {
                             if dimension == option {
-                                Capsule().fill(AttuneTheme.accent.opacity(0.22))
+                                Capsule().fill(PonderaTheme.accent.opacity(0.22))
                             }
                         }
                 }
@@ -320,9 +320,9 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
             }
         }
         .padding(2)
-        .background(AttuneTheme.surface, in: Capsule())
+        .background(PonderaTheme.surface, in: Capsule())
         .overlay {
-            Capsule().stroke(AttuneTheme.border.opacity(0.8), lineWidth: 1)
+            Capsule().stroke(PonderaTheme.border.opacity(0.8), lineWidth: 1)
         }
     }
 }

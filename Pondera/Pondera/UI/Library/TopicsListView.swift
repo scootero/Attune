@@ -33,14 +33,14 @@ struct TopicsListView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.horizontal, PonderaTheme.horizontalPadding)
                     .padding(.vertical, 12)
                     .padding(.bottom, 96)
                 }
                 .scrollIndicators(.hidden)
             }
         }
-        .background(AttuneScreenBackground())
+        .background(PonderaScreenBackground())
         .navigationTitle("Themes")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Search themes")

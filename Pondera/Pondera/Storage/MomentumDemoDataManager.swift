@@ -30,7 +30,7 @@ struct MomentumDemoStatus {
 ///    of IntentionSets, CheckIns, and ProgressEntries to catch interrupted/orphaned runs.
 /// 4. Removal must never delete Intention files, DailyMood, overrides, sessions,
 ///    audio, extractions, topics, or any record without the reserved demo namespace.
-/// 5. The non-Debug launch cleanup in AttuneApp must remain even if the Settings
+/// 5. The non-Debug launch cleanup in PonderaApp must remain even if the Settings
 ///    controls/seeder are later removed. It prevents simulator demo files from
 ///    surviving when a Release build is installed over a Debug build.
 /// 6. A full simulator-app uninstall remains the absolute container-level fallback.

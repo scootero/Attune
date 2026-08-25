@@ -3,7 +3,7 @@
 //  Pondera
 //
 //  First-launch sheet explaining mic, speech recognition, and AI processing.
-//  User must accept before Attune sends transcripts to the AI proxy.
+//  User must accept before Pondera sends transcripts to the AI proxy.
 //
 
 import SwiftUI

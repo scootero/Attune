@@ -77,7 +77,7 @@ final class EngagementMetricsTests: XCTestCase {
 
     func testStoreDeduplicatesPersistentCompletionEvents() throws {
         let temporaryDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("AttuneEngagementMetricsTests-\(UUID().uuidString)")
+            .appendingPathComponent("PonderaEngagementMetricsTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
 

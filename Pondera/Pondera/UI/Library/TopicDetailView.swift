@@ -15,7 +15,7 @@ struct TopicDetailView: View {
 
     var body: some View {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
@@ -27,12 +27,12 @@ struct TopicDetailView: View {
                             title: "No visible captures",
                             detail: "Captures you hide during review are removed from this theme."
                         )
-                        .padding(.horizontal, -AttuneTheme.horizontalPadding)
+                        .padding(.horizontal, -PonderaTheme.horizontalPadding)
                     } else {
                         VStack(alignment: .leading, spacing: 10) {
                             Text(visibleOccurrences.count == 1 ? "Mention" : "Mentions")
                                 .font(.headline)
-                                .foregroundStyle(AttuneTheme.textPrimary)
+                                .foregroundStyle(PonderaTheme.textPrimary)
 
                             ForEach(visibleOccurrences) { item in
                                 NavigationLink(destination: InsightDetailView(item: item)) {
@@ -43,7 +43,7 @@ struct TopicDetailView: View {
                         }
                     }
                 }
-                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.top, 12)
                 .padding(.bottom, 96)
             }
@@ -61,33 +61,33 @@ struct TopicDetailView: View {
                 systemImage: visibleOccurrences.count > 1 ? "repeat" : "circle.dotted"
             )
             .font(.caption.weight(.semibold))
-            .foregroundStyle(AttuneTheme.accentSecondary)
+            .foregroundStyle(PonderaTheme.accentSecondary)
 
             Text(topic.displayTitle)
                 .font(.title2.bold())
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
 
             Text("\(visibleOccurrences.count) \(visibleOccurrences.count == 1 ? "mention" : "mentions") · Last mentioned \(InsightDisplay.relativeDate(topic.lastSeenAtISO))")
                 .font(.subheadline)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
 
             if !topic.categories.isEmpty {
                 HStack(spacing: 8) {
                     ForEach(topic.categories.prefix(3), id: \.self) { category in
                         Label(InsightDisplay.categoryLabel(category), systemImage: InsightDisplay.categoryIcon(category))
                             .font(.caption)
-                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .foregroundStyle(PonderaTheme.textSecondary)
                     }
                 }
             }
 
             Text("Pondera groups related captures into a theme. A theme does not change Today’s progress or create a tracked intention.")
                 .font(.caption)
-                .foregroundStyle(AttuneTheme.textTertiary)
+                .foregroundStyle(PonderaTheme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var visibleOccurrences: [ExtractedItem] {

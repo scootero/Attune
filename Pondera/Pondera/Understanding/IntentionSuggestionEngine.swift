@@ -105,7 +105,7 @@ enum IntentionSuggestionEngine {
         // still allowed to produce a genuinely different idea later.
         let available = topics
         // The feature gets its own introduction clock for every user. It starts
-        // responsive, then deliberately quiets down as Attune learns more.
+        // responsive, then deliberately quiets down as Pondera learns more.
         let programStart = snapshot.firstLaunchAt ?? now
         let days = max(0, calendar.dateComponents(
             [.day],

@@ -15,12 +15,12 @@ import SwiftUI
 /// All colors use SwiftUI Color for consistency across light/dark modes (though this is dark-only design).
 struct NeonPalette {
     // Base dark background colors
-    static let darkBase = AttuneTheme.background
-    static let darkOverlay = AttuneTheme.backgroundRaised
+    static let darkBase = PonderaTheme.background
+    static let darkOverlay = PonderaTheme.backgroundRaised
     
     // Primary neon teal (used for glows, progress fills, accents)
-    static let neonTeal = AttuneTheme.accent
-    static let neonTealGlow = AttuneTheme.accent
+    static let neonTeal = PonderaTheme.accent
+    static let neonTealGlow = PonderaTheme.accent
     
     // Secondary glow (softer, used for background fog)
     static let fogTeal = Color(red: 0.14, green: 0.48, blue: 0.45)
@@ -30,11 +30,11 @@ struct NeonPalette {
     static let edgeLightBottom = Color.white.opacity(0.0)                    // Edge light gradient end (transparent)
     
     // Glass card strokes
-    static let glassStrokePrimary = AttuneTheme.border
+    static let glassStrokePrimary = PonderaTheme.border
     static let glassStrokeSubtle = Color.white.opacity(0.05)
     
     // Shadow/bloom colors
-    static let bloomShadow = AttuneTheme.accent.opacity(0.22)
+    static let bloomShadow = PonderaTheme.accent.opacity(0.22)
     static let darkShadow = Color.black.opacity(0.42)
     
     // Low mood colors (red/orange) - reuse MoodTier mapping but define accent palette
@@ -286,7 +286,7 @@ extension View {
 }
 
 private struct TodayIntentionsCardModifier: ViewModifier {
-    private let shape = RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+    private let shape = RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
     private let neonPink = Color(red: 1.00, green: 0.22, blue: 0.62)
     private let neonPurple = Color(red: 0.58, green: 0.34, blue: 1.00)
     private let neonCyan = Color(red: 0.10, green: 0.90, blue: 0.94)

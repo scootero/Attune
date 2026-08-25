@@ -39,7 +39,7 @@ struct SettingsView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            .background(AttuneScreenBackground())
+            .background(PonderaScreenBackground())
             .navigationTitle("Settings")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -83,9 +83,9 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "crown.fill")
                         .font(.headline)
-                        .foregroundStyle(AttuneTheme.warning)
+                        .foregroundStyle(PonderaTheme.warning)
                         .frame(width: 36, height: 36)
-                        .background(AttuneTheme.warning.opacity(0.14), in: Circle())
+                        .background(PonderaTheme.warning.opacity(0.14), in: Circle())
                     VStack(alignment: .leading, spacing: 3) {
                         Text(SubscriptionConfig.displayName)
                             .font(.headline)
@@ -97,7 +97,7 @@ struct SettingsView: View {
                     Spacer()
                     Text(subscriptionManager.isSubscribed ? "Active" : "View")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.accent)
+                        .foregroundStyle(PonderaTheme.accent)
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.tertiary)
@@ -108,12 +108,12 @@ struct SettingsView: View {
             Button {
                 Task { await subscriptionManager.restore() }
             } label: {
-                settingsLabel("Restore Purchases", icon: "arrow.clockwise", color: AttuneTheme.accent)
+                settingsLabel("Restore Purchases", icon: "arrow.clockwise", color: PonderaTheme.accent)
             }
             .disabled(subscriptionManager.isBusy)
 
             Button { showManageSubscriptions = true } label: {
-                settingsLabel("Manage Subscription", icon: "person.crop.circle", color: AttuneTheme.accentSecondary)
+                settingsLabel("Manage Subscription", icon: "person.crop.circle", color: PonderaTheme.accentSecondary)
             }
 
             if let message = subscriptionManager.actionState.message {
@@ -124,7 +124,7 @@ struct SettingsView: View {
                         : "info.circle.fill"
                 )
                 .font(.footnote)
-                .foregroundStyle(subscriptionManager.actionState.isFailure ? AttuneTheme.warning : Color.secondary)
+                .foregroundStyle(subscriptionManager.actionState.isFailure ? PonderaTheme.warning : Color.secondary)
             }
         } header: {
             Text("Membership")
@@ -162,17 +162,17 @@ struct SettingsView: View {
     private var privacyAndDataSection: some View {
         Section {
             NavigationLink(destination: PrivacyDataView()) {
-                settingsLabel("Permissions & Privacy", icon: "hand.raised.fill", color: AttuneTheme.accentSecondary)
+                settingsLabel("Permissions & Privacy", icon: "hand.raised.fill", color: PonderaTheme.accentSecondary)
             }
 
             Button(action: handleExportTap) {
                 HStack {
-                    settingsLabel("Export My Data", icon: "square.and.arrow.up", color: AttuneTheme.warning)
+                    settingsLabel("Export My Data", icon: "square.and.arrow.up", color: PonderaTheme.warning)
                     Spacer()
                     if !subscriptionManager.canExportData {
                         Image(systemName: "crown.fill")
                             .font(.caption)
-                            .foregroundStyle(AttuneTheme.warning)
+                            .foregroundStyle(PonderaTheme.warning)
                     }
                 }
             }
@@ -189,13 +189,13 @@ struct SettingsView: View {
                 settingsLabel("About Pondera", icon: "info.circle.fill", color: .blue)
             }
             Link(destination: LegalLinks.support) {
-                settingsLabel("Help & Support", icon: "questionmark.circle.fill", color: AttuneTheme.accent)
+                settingsLabel("Help & Support", icon: "questionmark.circle.fill", color: PonderaTheme.accent)
             }
             Link(destination: LegalLinks.privacyPolicy) {
-                settingsLabel("Privacy Policy", icon: "lock.shield.fill", color: AttuneTheme.accentSecondary)
+                settingsLabel("Privacy Policy", icon: "lock.shield.fill", color: PonderaTheme.accentSecondary)
             }
             Link(destination: LegalLinks.termsOfUse) {
-                settingsLabel("Terms of Use", icon: "doc.text.fill", color: AttuneTheme.textSecondary)
+                settingsLabel("Terms of Use", icon: "doc.text.fill", color: PonderaTheme.textSecondary)
             }
         }
     }
@@ -216,7 +216,7 @@ struct SettingsView: View {
             }
 
             NavigationLink(destination: EngagementDiagnosticsView()) {
-                settingsLabel("Engagement Diagnostics", icon: "chart.bar.doc.horizontal", color: AttuneTheme.accent)
+                settingsLabel("Engagement Diagnostics", icon: "chart.bar.doc.horizontal", color: PonderaTheme.accent)
             }
 
             #if targetEnvironment(simulator)
@@ -225,7 +225,7 @@ struct SettingsView: View {
             // IntentionSet/CheckIn/ProgressEntry files plus one manifest.
             // Never remove this UI by itself. First run "Remove and Verify",
             // confirm 0 records remain, and preserve the non-Debug residue cleanup
-            // in AttuneApp/MomentumDemoDataManager. Full contract is documented at
+            // in PonderaApp/MomentumDemoDataManager. Full contract is documented at
             // the top of MomentumDemoDataManager.swift.
             Button {
                 loadMomentumDemoData()

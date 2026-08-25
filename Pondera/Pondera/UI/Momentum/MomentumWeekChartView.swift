@@ -17,10 +17,10 @@ struct MomentumWeekChartView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Week at a glance")
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text("Daily totals for each intention")
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
 
             if bars.isEmpty {
@@ -29,7 +29,7 @@ struct MomentumWeekChartView: View {
                 Chart {
                     if yAxisMax > 100 {
                         RuleMark(y: .value("Target", 100))
-                            .foregroundStyle(AttuneTheme.success.opacity(0.5))
+                            .foregroundStyle(PonderaTheme.success.opacity(0.5))
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     }
 
@@ -51,18 +51,18 @@ struct MomentumWeekChartView: View {
                 .chartXAxis {
                     AxisMarks(values: days.map(\.date)) { value in
                         AxisValueLabel(format: .dateTime.weekday(.narrow))
-                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .foregroundStyle(PonderaTheme.textSecondary)
                     }
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .stride(by: 25)) { value in
-                        AxisGridLine().foregroundStyle(AttuneTheme.border)
+                        AxisGridLine().foregroundStyle(PonderaTheme.border)
                         AxisValueLabel {
                             if let number = value.as(Double.self) {
                                 Text("\(Int(number))%")
                             }
                         }
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                     }
                 }
                 .frame(height: 245)
@@ -70,7 +70,7 @@ struct MomentumWeekChartView: View {
             }
         }
         .padding(16)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var bars: [WeekIntentionBar] {
@@ -81,13 +81,13 @@ struct MomentumWeekChartView: View {
         VStack(spacing: 10) {
             Image(systemName: "calendar.badge.clock")
                 .font(.system(size: 30, weight: .medium))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
             Text("No recorded progress this week")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
             Text("Progress appears after a check-in records a numeric update.")
                 .font(.caption)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -99,5 +99,5 @@ struct MomentumWeekChartView: View {
 #Preview {
     MomentumWeekChartView(days: [], yAxisMax: 100)
         .padding()
-        .background(AttuneScreenBackground())
+        .background(PonderaScreenBackground())
 }

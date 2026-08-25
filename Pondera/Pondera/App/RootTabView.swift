@@ -20,7 +20,7 @@ struct RootTabView: View {
     init() {
         // Wire up dependency: inject TranscriptionQueue into RecorderService
         RecorderService.shared.transcriptionQueue = TranscriptionQueue.shared
-        AttuneTheme.configureAppearance()
+        PonderaTheme.configureAppearance()
     }
 
     var body: some View {
@@ -85,9 +85,9 @@ struct RootTabView: View {
                     .tag(RootTab.progress) // Keep enum tag unchanged to avoid churn elsewhere
             }
         }
-        .tint(AttuneTheme.accent)
+        .tint(PonderaTheme.accent)
         .preferredColorScheme(.dark)
-        .background(AttuneScreenBackground())
+        .background(PonderaScreenBackground())
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environmentObject(subscriptionManager)
@@ -100,7 +100,7 @@ struct RootTabView: View {
         } message: {
             Text(reminderConfirmation ?? "")
         }
-        .onReceive(NotificationCenter.default.publisher(for: .attuneDailyReminderRouteRequested)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .ponderaDailyReminderRouteRequested)) { _ in
             handlePendingReminderRoute()
         }
         .onChange(of: appRouter.selectedRootTab) { _, selectedTab in
@@ -146,9 +146,9 @@ struct RootTabView: View {
                     .foregroundStyle(
                         LinearGradient(
                             colors: [
-                                AttuneTheme.textPrimary,
+                                PonderaTheme.textPrimary,
                                 Color.white.opacity(0.88),
-                                AttuneTheme.accent.opacity(0.94)
+                                PonderaTheme.accent.opacity(0.94)
                             ],
                             startPoint: .leading,
                             endPoint: .trailing
@@ -162,36 +162,36 @@ struct RootTabView: View {
             Spacer(minLength: 0)
 
             Button {
-                AttuneHaptics.selection()
+                PonderaHaptics.selection()
                 showSettings = true
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                     .frame(width: 44, height: 44)
                     .background(.ultraThinMaterial, in: Circle())
-                    .background(AttuneTheme.surface.opacity(0.72), in: Circle())
+                    .background(PonderaTheme.surface.opacity(0.72), in: Circle())
                     .overlay(
                         Circle()
                             .stroke(
                                 LinearGradient(
-                                    colors: [Color.white.opacity(0.28), AttuneTheme.border],
+                                    colors: [Color.white.opacity(0.28), PonderaTheme.border],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
                                 lineWidth: 1
                             )
                     )
-                    .shadow(color: AttuneTheme.accent.opacity(0.08), radius: 12, y: 5)
+                    .shadow(color: PonderaTheme.accent.opacity(0.08), radius: 12, y: 5)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Settings")
             .accessibilityHint("Opens Pondera settings")
         }
-        .padding(.horizontal, AttuneTheme.horizontalPadding)
+        .padding(.horizontal, PonderaTheme.horizontalPadding)
         .padding(.vertical, 6)
         .background {
-            AttuneHeaderGlassBackground()
+            PonderaHeaderGlassBackground()
                 .frame(height: 72)
                 .offset(y: 8)
                 .ignoresSafeArea(edges: .top)
@@ -204,7 +204,7 @@ struct RootTabView: View {
             get: { appRouter.selectedRootTab },
             set: { selectedTab in
                 guard selectedTab != appRouter.selectedRootTab else { return }
-                AttuneHaptics.selection()
+                PonderaHaptics.selection()
                 appRouter.selectedRootTab = selectedTab
             }
         )
@@ -233,35 +233,35 @@ struct RootTabView: View {
     }
 }
 
-private struct AttuneHeaderGlassBackground: View {
+private struct PonderaHeaderGlassBackground: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         ZStack {
             if reduceTransparency {
-                AttuneTheme.background.opacity(0.98)
+                PonderaTheme.background.opacity(0.98)
             } else {
                 Rectangle()
                     .fill(.ultraThinMaterial)
 
                 LinearGradient(
                     colors: [
-                        AttuneTheme.background.opacity(0.76),
-                        AttuneTheme.background.opacity(0.38),
-                        AttuneTheme.background.opacity(0.08)
+                        PonderaTheme.background.opacity(0.76),
+                        PonderaTheme.background.opacity(0.38),
+                        PonderaTheme.background.opacity(0.08)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
 
                 Ellipse()
-                    .fill(AttuneTheme.accent.opacity(0.10))
+                    .fill(PonderaTheme.accent.opacity(0.10))
                     .frame(width: 210, height: 48)
                     .blur(radius: 22)
                     .offset(x: -95, y: -14)
 
                 Ellipse()
-                    .fill(AttuneTheme.accentSecondary.opacity(0.08))
+                    .fill(PonderaTheme.accentSecondary.opacity(0.08))
                     .frame(width: 170, height: 42)
                     .blur(radius: 24)
                     .offset(x: 120, y: -10)

@@ -65,9 +65,9 @@ private enum MomentumViewMode: String, CaseIterable {
 
     var tintColor: Color {
         switch self {
-        case .day: return AttuneTheme.accent
-        case .week: return AttuneTheme.accentSecondary
-        case .month: return AttuneTheme.warning
+        case .day: return PonderaTheme.accent
+        case .week: return PonderaTheme.accentSecondary
+        case .month: return PonderaTheme.warning
         }
     }
 }
@@ -101,7 +101,7 @@ struct MomentumView: View {
 
     var body: some View {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
             MomentumProgressAtmosphere(progress: momentumAtmosphereProgress)
                 .animation(
                     reduceMotion ? nil : .easeInOut(duration: 0.7),
@@ -116,7 +116,7 @@ struct MomentumView: View {
                     periodNavigation
                     modeContent
                 }
-                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.bottom, 112)
             }
         }
@@ -136,11 +136,11 @@ struct MomentumView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Momentum")
                     .font(.title.bold())
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
 
                 Text("Progress recorded through your check-ins.")
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
 
             Spacer(minLength: 4)
@@ -150,10 +150,10 @@ struct MomentumView: View {
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(AttuneTheme.accent)
+                    .foregroundStyle(PonderaTheme.accent)
                     .frame(width: 44, height: 44)
-                    .background(AttuneTheme.surface, in: Circle())
-                    .overlay(Circle().stroke(AttuneTheme.border, lineWidth: 1))
+                    .background(PonderaTheme.surface, in: Circle())
+                    .overlay(Circle().stroke(PonderaTheme.border, lineWidth: 1))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Progress history")
@@ -192,8 +192,8 @@ struct MomentumView: View {
         .padding(5)
         .background {
             MomentumTintedCardBackground(
-                tint: AttuneTheme.accentSecondary,
-                cornerRadius: AttuneTheme.controlRadius + 3,
+                tint: PonderaTheme.accentSecondary,
+                cornerRadius: PonderaTheme.controlRadius + 3,
                 strength: 0.6
             )
         }
@@ -209,7 +209,7 @@ struct MomentumView: View {
             Text("YOUR PROGRESS, OVER TIME")
                 .font(.caption.weight(.bold))
                 .tracking(1.1)
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
 
             VStack(alignment: .leading, spacing: 5) {
                 momentumGuidePoint("Each check-in adds progress to your day.")
@@ -233,7 +233,7 @@ struct MomentumView: View {
 
             Text(text)
                 .font(.caption)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -249,7 +249,7 @@ struct MomentumView: View {
 
                 Text(periodLabel)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
 
                 Spacer()
 
@@ -268,7 +268,7 @@ struct MomentumView: View {
         .background {
             MomentumTintedCardBackground(
                 tint: viewMode.tintColor,
-                cornerRadius: AttuneTheme.controlRadius,
+                cornerRadius: PonderaTheme.controlRadius,
                 strength: 0.82
             )
         }
@@ -309,10 +309,10 @@ struct MomentumView: View {
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textTertiary)
+                        .foregroundStyle(PonderaTheme.textTertiary)
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
                 .padding(16)
             }
             .buttonStyle(.plain)
@@ -370,10 +370,10 @@ struct MomentumView: View {
                 VStack(spacing: 3) {
                     Text(item.value)
                         .font(.title3.bold().monospacedDigit())
-                        .foregroundStyle(index == 0 ? viewMode.tintColor : AttuneTheme.textPrimary)
+                        .foregroundStyle(index == 0 ? viewMode.tintColor : PonderaTheme.textPrimary)
                     Text(item.label)
                         .font(.caption)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
@@ -402,7 +402,7 @@ struct MomentumView: View {
                             .foregroundStyle(MomentumPalette.color(forIndex: item.colorIndex))
                     }
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                 }
             }
             .padding(.horizontal, 2)
@@ -811,7 +811,7 @@ struct MomentumView: View {
 /// Faint etched lines sit inside clear glass and disappear toward the lower
 /// edge. The neutral treatment lets functional section colors carry meaning.
 private struct MomentumGuideCardBackground: View {
-    private let shape = RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+    private let shape = RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
 
     var body: some View {
         ZStack {
@@ -884,7 +884,7 @@ private struct MomentumProgressAtmosphere: View {
 
     private var tint: Color {
         guard let normalizedProgress else {
-            return AttuneTheme.accentSecondary
+            return PonderaTheme.accentSecondary
         }
 
         let hue = 0.075 + (normalizedProgress * 0.205)
@@ -962,7 +962,7 @@ private struct MomentumProgressAtmosphere: View {
 /// restrained opacity, and a shared silhouette keep the screen cohesive.
 private struct MomentumTintedCardBackground: View {
     let tint: Color
-    var cornerRadius: CGFloat = AttuneTheme.cardRadius
+    var cornerRadius: CGFloat = PonderaTheme.cardRadius
     var strength: Double = 0.6
 
     private var shape: RoundedRectangle {
@@ -972,7 +972,7 @@ private struct MomentumTintedCardBackground: View {
     var body: some View {
         ZStack {
             shape.fill(.ultraThinMaterial)
-            shape.fill(AttuneTheme.surface)
+            shape.fill(PonderaTheme.surface)
 
             LinearGradient(
                 colors: [
@@ -988,7 +988,7 @@ private struct MomentumTintedCardBackground: View {
         .overlay {
             shape.strokeBorder(
                 LinearGradient(
-                    colors: [tint.opacity(0.58 * strength), AttuneTheme.border, tint.opacity(0.12 * strength)],
+                    colors: [tint.opacity(0.58 * strength), PonderaTheme.border, tint.opacity(0.12 * strength)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
@@ -1006,7 +1006,7 @@ private struct MomentumSectionOutlineModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay {
-                RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
                     .stroke(
                         LinearGradient(
                             colors: [tint.opacity(0.42), tint.opacity(0.08), Color.clear],

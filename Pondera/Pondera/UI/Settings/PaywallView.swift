@@ -17,7 +17,7 @@ struct PaywallView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AttuneScreenBackground()
+                PonderaScreenBackground()
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -26,11 +26,11 @@ struct PaywallView: View {
                         if let reason, !reason.isEmpty {
                             Label(reason, systemImage: "sparkles")
                                 .font(.subheadline.weight(.medium))
-                                .foregroundStyle(AttuneTheme.textPrimary)
+                                .foregroundStyle(PonderaTheme.textPrimary)
                                 .padding(14)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(AttuneTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous).stroke(AttuneTheme.accent.opacity(0.28)))
+                                .background(PonderaTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous).stroke(PonderaTheme.accent.opacity(0.28)))
                         }
 
                         VStack(spacing: 12) {
@@ -64,16 +64,16 @@ struct PaywallView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Pondera Free")
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(AttuneTheme.textSecondary)
+                                .foregroundStyle(PonderaTheme.textSecondary)
                                 .textCase(.uppercase)
                                 .tracking(0.8)
                             Text("Track one active intention, record one Voice Check-In per day, see today's Momentum, and use the daily progress reminder.")
                                 .font(.subheadline)
-                                .foregroundStyle(AttuneTheme.textSecondary)
+                                .foregroundStyle(PonderaTheme.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(16)
-                        .attuneCard()
+                        .ponderaCard()
 
                         legalFooter
                     }
@@ -102,31 +102,31 @@ struct PaywallView: View {
         VStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(AttuneTheme.warning.opacity(0.14))
+                    .fill(PonderaTheme.warning.opacity(0.14))
                     .frame(width: 82, height: 82)
                 Image(systemName: "crown.fill")
                     .font(.system(size: 36, weight: .semibold))
-                    .foregroundStyle(AttuneTheme.warning)
+                    .foregroundStyle(PonderaTheme.warning)
             }
             .accessibilityHidden(true)
 
             VStack(spacing: 6) {
                 Text(SubscriptionConfig.displayName)
                     .font(.largeTitle.bold())
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text("Track more, see the patterns, and keep your full progress history.")
                     .font(.body)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
 
             Text("\(subscriptionManager.priceText). Cancel anytime.")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
             Text("Includes a generous monthly AI processing allowance that refreshes each calendar month.")
                 .font(.footnote)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(AttuneTheme.textTertiary)
+                .foregroundStyle(PonderaTheme.textTertiary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -135,23 +135,23 @@ struct PaywallView: View {
         HStack(alignment: .top, spacing: 13) {
             Image(systemName: icon)
                 .font(.headline)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
                 .frame(width: 40, height: 40)
-                .background(AttuneTheme.accent.opacity(0.12), in: Circle())
+                .background(PonderaTheme.accent.opacity(0.12), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text(detail)
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
         .padding(16)
-        .attuneCard()
+        .ponderaCard()
         .accessibilityElement(children: .combine)
     }
 
@@ -161,25 +161,25 @@ struct PaywallView: View {
             if subscriptionManager.isSubscribed {
                 Label("Pondera Pro is active", systemImage: "checkmark.seal.fill")
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.success)
+                    .foregroundStyle(PonderaTheme.success)
                     .frame(maxWidth: .infinity)
                     .padding(16)
-                    .attuneCard()
+                    .ponderaCard()
             } else if subscriptionManager.isLoadingProduct {
                 HStack(spacing: 10) {
-                    SwiftUI.ProgressView().tint(AttuneTheme.accent)
+                    SwiftUI.ProgressView().tint(PonderaTheme.accent)
                     Text("Loading Pondera Pro…")
                         .font(.headline)
-                        .foregroundStyle(AttuneTheme.textPrimary)
+                        .foregroundStyle(PonderaTheme.textPrimary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(18)
-                .attuneCard()
+                .ponderaCard()
             } else {
                 if let message = subscriptionManager.actionState.message {
                     Label(message, systemImage: subscriptionManager.actionState.isFailure ? "exclamationmark.triangle.fill" : "info.circle.fill")
                         .font(.footnote)
-                        .foregroundStyle(subscriptionManager.actionState.isFailure ? AttuneTheme.warning : AttuneTheme.textSecondary)
+                        .foregroundStyle(subscriptionManager.actionState.isFailure ? PonderaTheme.warning : PonderaTheme.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -200,14 +200,14 @@ struct PaywallView: View {
                         Text(subscriptionManager.isProductAvailable ? "Subscribe to Pondera Pro" : "Try Again")
                     }
                 }
-                .buttonStyle(AttunePrimaryButtonStyle())
+                .buttonStyle(PonderaPrimaryButtonStyle())
                 .disabled(subscriptionManager.isBusy)
 
                 if subscriptionManager.isProductAvailable {
                     Text("\(subscriptionManager.priceText), auto-renewing unless cancelled at least 24 hours before renewal.")
                         .font(.footnote)
                         .multilineTextAlignment(.center)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -219,7 +219,7 @@ struct PaywallView: View {
                 }
             }
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(AttuneTheme.accent)
+            .foregroundStyle(PonderaTheme.accent)
             .frame(minHeight: 44)
             .disabled(subscriptionManager.isBusy || subscriptionManager.isLoadingProduct)
         }
@@ -233,7 +233,7 @@ struct PaywallView: View {
             .background(.ultraThinMaterial)
             .overlay(alignment: .top) {
                 Rectangle()
-                    .fill(AttuneTheme.border)
+                    .fill(PonderaTheme.border)
                     .frame(height: 1)
             }
     }
@@ -252,7 +252,7 @@ struct PaywallView: View {
                 .multilineTextAlignment(.center)
         }
         .font(.caption)
-        .foregroundStyle(AttuneTheme.textTertiary)
+        .foregroundStyle(PonderaTheme.textTertiary)
         .frame(maxWidth: .infinity)
     }
 

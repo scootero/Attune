@@ -42,7 +42,7 @@ struct InsightsListView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .padding(.horizontal, AttuneTheme.horizontalPadding)
+            .padding(.horizontal, PonderaTheme.horizontalPadding)
             .padding(.vertical, 12)
 
             if selectedTab == .captures {
@@ -52,7 +52,7 @@ struct InsightsListView: View {
                 themesContent
             }
         }
-        .background(AttuneScreenBackground())
+        .background(PonderaScreenBackground())
         .navigationTitle(selectedTab.rawValue)
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: selectedTab == .captures ? "Search captures" : "Search themes")
@@ -69,7 +69,7 @@ struct InsightsListView: View {
                 filterChip(title: "Events", value: ExtractedItem.ItemType.event)
                 filterChip(title: "States", value: ExtractedItem.ItemType.state)
             }
-            .padding(.horizontal, AttuneTheme.horizontalPadding)
+            .padding(.horizontal, PonderaTheme.horizontalPadding)
             .padding(.bottom, 8)
         }
         .scrollIndicators(.hidden)
@@ -81,10 +81,10 @@ struct InsightsListView: View {
         } label: {
             Text(title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(selectedType == value ? AttuneTheme.background : AttuneTheme.textSecondary)
+                .foregroundStyle(selectedType == value ? PonderaTheme.background : PonderaTheme.textSecondary)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 44)
-                .background(selectedType == value ? AttuneTheme.accent : AttuneTheme.surfaceStrong, in: Capsule())
+                .background(selectedType == value ? PonderaTheme.accent : PonderaTheme.surfaceStrong, in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selectedType == value ? .isSelected : [])
@@ -110,7 +110,7 @@ struct InsightsListView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.horizontal, PonderaTheme.horizontalPadding)
                     .padding(.vertical, 8)
                     .padding(.bottom, 96)
                 }
@@ -139,7 +139,7 @@ struct InsightsListView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.horizontal, PonderaTheme.horizontalPadding)
                     .padding(.vertical, 8)
                     .padding(.bottom, 96)
                 }
@@ -209,22 +209,22 @@ struct InsightCaptureRow: View {
                 Spacer()
                 Text(InsightDisplay.relativeDate(item.createdAt))
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textTertiary)
+                    .foregroundStyle(PonderaTheme.textTertiary)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textTertiary)
+                    .foregroundStyle(PonderaTheme.textTertiary)
             }
 
             Text(corrected.displayTitle)
                 .font(.headline)
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
                 .multilineTextAlignment(.leading)
                 .lineLimit(2)
 
             if !item.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(item.summary)
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
             }
@@ -232,7 +232,7 @@ struct InsightCaptureRow: View {
             if let category = corrected.displayCategories.first {
                 Label(InsightDisplay.categoryLabel(category), systemImage: InsightDisplay.categoryIcon(category))
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textTertiary)
+                    .foregroundStyle(PonderaTheme.textTertiary)
             }
         }
         .padding(14)
@@ -248,22 +248,22 @@ struct TopicSummaryRow: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
                 Image(systemName: summary.mentionCount > 1 ? "repeat" : "circle.dotted")
-                    .foregroundStyle(AttuneTheme.accentSecondary)
+                    .foregroundStyle(PonderaTheme.accentSecondary)
                 Text(summary.mentionCount > 1 ? "Recurring theme" : "Mentioned once")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.accentSecondary)
+                    .foregroundStyle(PonderaTheme.accentSecondary)
                 Spacer()
                 Text("\(summary.mentionCount) \(summary.mentionCount == 1 ? "mention" : "mentions")")
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textTertiary)
+                    .foregroundStyle(PonderaTheme.textTertiary)
             }
 
             Text(summary.topic.displayTitle)
                 .font(.headline)
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
                 .multilineTextAlignment(.leading)
                 .lineLimit(2)
 
@@ -275,11 +275,11 @@ struct TopicSummaryRow: View {
                 Text("Last mentioned \(InsightDisplay.relativeDate(summary.topic.lastSeenAtISO))")
             }
             .font(.caption)
-            .foregroundStyle(AttuneTheme.textTertiary)
+            .foregroundStyle(PonderaTheme.textTertiary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .attuneCard()
+        .ponderaCard()
     }
 }
 
@@ -301,20 +301,20 @@ func insightsEmptyState(icon: String, title: String, detail: String) -> some Vie
     VStack(spacing: 12) {
         Image(systemName: icon)
             .font(.system(size: 34, weight: .medium))
-            .foregroundStyle(AttuneTheme.accent)
+            .foregroundStyle(PonderaTheme.accent)
         Text(title)
             .font(.title3.weight(.semibold))
-            .foregroundStyle(AttuneTheme.textPrimary)
+            .foregroundStyle(PonderaTheme.textPrimary)
         Text(detail)
             .font(.subheadline)
-            .foregroundStyle(AttuneTheme.textSecondary)
+            .foregroundStyle(PonderaTheme.textSecondary)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
     }
     .padding(22)
     .frame(maxWidth: .infinity)
-    .attuneCard()
-    .padding(.horizontal, AttuneTheme.horizontalPadding)
+    .ponderaCard()
+    .padding(.horizontal, PonderaTheme.horizontalPadding)
     .padding(.top, 24)
 }
 
@@ -341,11 +341,11 @@ enum InsightDisplay {
 
     static func typeColor(_ type: String) -> Color {
         switch type {
-        case ExtractedItem.ItemType.event: return AttuneTheme.accentSecondary
-        case ExtractedItem.ItemType.intention: return AttuneTheme.accent
-        case ExtractedItem.ItemType.commitment: return AttuneTheme.warning
-        case ExtractedItem.ItemType.state: return AttuneTheme.success
-        default: return AttuneTheme.textSecondary
+        case ExtractedItem.ItemType.event: return PonderaTheme.accentSecondary
+        case ExtractedItem.ItemType.intention: return PonderaTheme.accent
+        case ExtractedItem.ItemType.commitment: return PonderaTheme.warning
+        case ExtractedItem.ItemType.state: return PonderaTheme.success
+        default: return PonderaTheme.textSecondary
         }
     }
 

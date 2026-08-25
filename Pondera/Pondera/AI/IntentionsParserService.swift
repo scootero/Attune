@@ -1,5 +1,5 @@
 // IntentionsParserService.swift // explains the file purpose
-// Attune // keeps project context consistent
+// Pondera // keeps project context consistent
 // Calls OpenAI to convert a transcript into structured intentions with strict JSON schema. // summarizes behavior
 import Foundation // needed for JSON parsing and data structures
 

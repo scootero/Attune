@@ -36,23 +36,23 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
 
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("Pondera")
                             .font(.title2.bold())
-                            .foregroundStyle(AttuneTheme.textPrimary)
+                            .foregroundStyle(PonderaTheme.textPrimary)
                         Spacer()
                         Text("\(selectedPage + 1) of \(pages.count)")
                             .font(.caption.monospacedDigit())
-                            .foregroundStyle(AttuneTheme.textTertiary)
+                            .foregroundStyle(PonderaTheme.textTertiary)
                     }
                     if selectedPage == 0 {
                         Text("Your voice, made meaningful.")
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .foregroundStyle(PonderaTheme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -70,7 +70,7 @@ struct OnboardingView: View {
                 HStack(spacing: 8) {
                     ForEach(pages.indices, id: \.self) { index in
                         Capsule()
-                            .fill(index == selectedPage ? AttuneTheme.accent : AttuneTheme.textTertiary.opacity(0.45))
+                            .fill(index == selectedPage ? PonderaTheme.accent : PonderaTheme.textTertiary.opacity(0.45))
                             .frame(width: index == selectedPage ? 24 : 8, height: 8)
                             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: selectedPage)
                     }
@@ -83,7 +83,7 @@ struct OnboardingView: View {
             Button(action: advance) {
                 Text(selectedPage == pages.count - 1 ? "Continue" : "Next")
             }
-            .buttonStyle(AttunePrimaryButtonStyle())
+            .buttonStyle(PonderaPrimaryButtonStyle())
             .padding(.horizontal, 24)
             .padding(.bottom, 16)
             .accessibilityHint(selectedPage == pages.count - 1 ? "Continues to voice and privacy information" : "Shows the next introduction page")
@@ -101,14 +101,14 @@ struct OnboardingView: View {
             VStack(spacing: 26) {
                 ZStack {
                     Circle()
-                        .fill(AttuneTheme.accent.opacity(0.14))
+                        .fill(PonderaTheme.accent.opacity(0.14))
                         .frame(width: 132, height: 132)
                     Circle()
-                        .stroke(AttuneTheme.accent.opacity(0.28), lineWidth: 1)
+                        .stroke(PonderaTheme.accent.opacity(0.28), lineWidth: 1)
                         .frame(width: 132, height: 132)
                     Image(systemName: page.icon)
                         .font(.system(size: 48, weight: .medium))
-                        .foregroundStyle(AttuneTheme.accent)
+                        .foregroundStyle(PonderaTheme.accent)
                 }
                 .accessibilityHidden(true)
 
@@ -116,15 +116,15 @@ struct OnboardingView: View {
                     Text(page.eyebrow)
                         .font(.caption.weight(.bold))
                         .tracking(1.2)
-                        .foregroundStyle(AttuneTheme.accent)
+                        .foregroundStyle(PonderaTheme.accent)
                     Text(page.title)
                         .font(.largeTitle.bold())
                         .multilineTextAlignment(.center)
-                        .foregroundStyle(AttuneTheme.textPrimary)
+                        .foregroundStyle(PonderaTheme.textPrimary)
                     Text(page.detail)
                         .font(.body)
                         .multilineTextAlignment(.center)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 28)
@@ -139,7 +139,7 @@ struct OnboardingView: View {
 
     private func advance() {
         if selectedPage < pages.count - 1 {
-            AttuneHaptics.selection()
+            PonderaHaptics.selection()
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
                 selectedPage += 1
             }
@@ -154,7 +154,7 @@ struct OnboardingView: View {
             get: { selectedPage },
             set: { page in
                 guard page != selectedPage else { return }
-                AttuneHaptics.selection()
+                PonderaHaptics.selection()
                 selectedPage = page
             }
         )
@@ -170,7 +170,7 @@ private struct OnboardingPage {
 
 /// Separate from AIPrivacyConsent so the benefit introduction and processing
 /// consent remain two explicit, independently auditable first-run steps.
-enum AttuneOnboardingState {
+enum PonderaOnboardingState {
     private static let completedKey = "attune.onboarding.completed.v1"
 
     static var hasCompleted: Bool {

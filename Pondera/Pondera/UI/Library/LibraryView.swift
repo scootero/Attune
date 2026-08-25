@@ -24,7 +24,7 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AttuneScreenBackground()
+                PonderaScreenBackground()
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
@@ -44,7 +44,7 @@ struct LibraryView: View {
 
                         historySection
                     }
-                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.horizontal, PonderaTheme.horizontalPadding)
                     .padding(.top, 12)
                     .padding(.bottom, 104)
                 }
@@ -67,16 +67,16 @@ struct LibraryView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("Insights")
                     .font(.title.bold())
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text("What you’ve said—and what keeps coming up.")
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
 
             Spacer(minLength: 4)
 
             if CalendarFeature.isEnabled {
-                NavigationLink(destination: AttuneCalendarView()) {
+                NavigationLink(destination: PonderaCalendarView()) {
                     CalendarShortcutLabel(hasUnseenEvents: !unseenCalendarCaptureIDs.isEmpty)
                 }
                 .buttonStyle(.plain)
@@ -90,16 +90,16 @@ struct LibraryView: View {
         HStack(spacing: 0) {
             summaryMetric(value: visibleItems.count, label: "Captured", icon: "sparkles")
             Rectangle()
-                .fill(AttuneTheme.border)
+                .fill(PonderaTheme.border)
                 .frame(width: 1, height: 40)
             summaryMetric(value: recurringTopicCount, label: "Recurring", icon: "repeat")
             Rectangle()
-                .fill(AttuneTheme.border)
+                .fill(PonderaTheme.border)
                 .frame(width: 1, height: 40)
             summaryMetric(value: sessions.count, label: "Sessions", icon: "waveform")
         }
         .padding(.vertical, 14)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private func summaryMetric(value: Int, label: String, icon: String) -> some View {
@@ -107,15 +107,15 @@ struct LibraryView: View {
             HStack(spacing: 5) {
                 Image(systemName: icon)
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.accent)
+                    .foregroundStyle(PonderaTheme.accent)
                     .accessibilityHidden(true)
                 Text("\(value)")
                     .font(.headline.monospacedDigit())
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
             }
             Text(label)
                 .font(.caption2)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
@@ -177,16 +177,16 @@ struct LibraryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
             Spacer()
             NavigationLink(destination: destination) {
                 Text("View all")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.accent)
+                    .foregroundStyle(PonderaTheme.accent)
             }
         }
     }
@@ -195,7 +195,7 @@ struct LibraryView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("History")
                 .font(.headline)
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
 
             VStack(spacing: 0) {
                 NavigationLink(destination: SessionListView(sessions: sessions)) {
@@ -207,7 +207,7 @@ struct LibraryView: View {
                 }
                 .buttonStyle(.plain)
 
-                Divider().overlay(AttuneTheme.border)
+                Divider().overlay(PonderaTheme.border)
 
                 NavigationLink(destination: CheckInsListView(checkIns: checkIns, title: "Voice Check-Ins")) {
                     historyRow(
@@ -218,7 +218,7 @@ struct LibraryView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .attuneCard()
+            .ponderaCard()
         }
     }
 
@@ -226,40 +226,40 @@ struct LibraryView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Plan from your captures")
                 .font(.headline)
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
 
-            NavigationLink(destination: AttuneCalendarView()) {
+            NavigationLink(destination: PonderaCalendarView()) {
                 HStack(spacing: 12) {
                     Image(systemName: "calendar")
                         .font(.headline)
-                        .foregroundStyle(AttuneTheme.accent)
+                        .foregroundStyle(PonderaTheme.accent)
                         .frame(width: 38, height: 38)
-                        .background(AttuneTheme.accent.opacity(0.12), in: Circle())
+                        .background(PonderaTheme.accent.opacity(0.12), in: Circle())
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Calendar")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AttuneTheme.textPrimary)
+                            .foregroundStyle(PonderaTheme.textPrimary)
                         Text(calendarCaptureCount == 0
                              ? (undatedCalendarEventCount == 0
                                 ? "Clear dates and times will appear here."
                                 : "\(undatedCalendarEventCount) event\(undatedCalendarEventCount == 1 ? "" : "s") need a date")
                              : "\(calendarCaptureCount) dated capture\(calendarCaptureCount == 1 ? "" : "s")")
                             .font(.caption)
-                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .foregroundStyle(PonderaTheme.textSecondary)
                     }
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textTertiary)
+                        .foregroundStyle(PonderaTheme.textTertiary)
                 }
                 .padding(14)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .attuneCard()
+            .ponderaCard()
         }
     }
 
@@ -275,21 +275,21 @@ struct LibraryView: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.headline)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
                 .frame(width: 34, height: 34)
-                .background(AttuneTheme.accent.opacity(0.12), in: Circle())
+                .background(PonderaTheme.accent.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text(detail)
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
             Spacer()
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textTertiary)
+                .foregroundStyle(PonderaTheme.textTertiary)
         }
         .padding(14)
         .contentShape(Rectangle())
@@ -299,19 +299,19 @@ struct LibraryView: View {
         VStack(spacing: 12) {
             Image(systemName: "sparkles")
                 .font(.system(size: 34, weight: .medium))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
             Text("Your patterns will appear here")
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
             Text("Use Talk it out and speak naturally. Pondera will organize clear intentions, commitments, events, and states—and group related ideas over time.")
                 .font(.subheadline)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(22)
         .frame(maxWidth: .infinity)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var visibleItems: [ExtractedItem] {
@@ -390,22 +390,22 @@ private struct CalendarShortcutLabel: View {
     var body: some View {
         Label("Calendar", systemImage: hasUnseenEvents ? "calendar.badge.exclamationmark" : "calendar")
             .font(.caption.weight(.semibold))
-            .foregroundStyle(hasUnseenEvents ? AttuneTheme.textPrimary : AttuneTheme.accent)
+            .foregroundStyle(hasUnseenEvents ? PonderaTheme.textPrimary : PonderaTheme.accent)
             .padding(.horizontal, 12)
             .frame(minHeight: 38)
             .background(
-                hasUnseenEvents ? AttuneTheme.accentSecondary.opacity(0.24) : AttuneTheme.accent.opacity(0.12),
+                hasUnseenEvents ? PonderaTheme.accentSecondary.opacity(0.24) : PonderaTheme.accent.opacity(0.12),
                 in: Capsule()
             )
             .overlay {
                 Capsule()
                     .stroke(
-                        hasUnseenEvents ? AttuneTheme.accentSecondary.opacity(isPulsing ? 0.95 : 0.42) : AttuneTheme.accent.opacity(0.28),
+                        hasUnseenEvents ? PonderaTheme.accentSecondary.opacity(isPulsing ? 0.95 : 0.42) : PonderaTheme.accent.opacity(0.28),
                         lineWidth: hasUnseenEvents ? (isPulsing ? 2 : 1.25) : 1
                     )
             }
             .shadow(
-                color: hasUnseenEvents ? AttuneTheme.accentSecondary.opacity(isPulsing ? 0.38 : 0.16) : .clear,
+                color: hasUnseenEvents ? PonderaTheme.accentSecondary.opacity(isPulsing ? 0.38 : 0.16) : .clear,
                 radius: isPulsing ? 10 : 5,
                 y: 3
             )

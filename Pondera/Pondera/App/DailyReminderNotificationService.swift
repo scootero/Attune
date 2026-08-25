@@ -36,7 +36,7 @@ enum DailyReminderPolicy {
 }
 
 extension Notification.Name {
-    static let attuneDailyReminderRouteRequested = Notification.Name("attune.daily.reminder.route.requested")
+    static let ponderaDailyReminderRouteRequested = Notification.Name("attune.daily.reminder.route.requested")
 }
 
 @MainActor
@@ -117,7 +117,7 @@ final class DailyReminderNotificationService {
             notificationCenter.removePendingNotificationRequests(withIdentifiers: [followUpRequestId])
         }
 
-        NotificationCenter.default.post(name: .attuneDailyReminderRouteRequested, object: nil)
+        NotificationCenter.default.post(name: .ponderaDailyReminderRouteRequested, object: nil)
     }
 
     func consumePendingRoute() -> ReminderNotificationRoute? {

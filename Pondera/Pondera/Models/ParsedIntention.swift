@@ -1,5 +1,5 @@
 // ParsedIntention.swift // explains the file purpose for clarity
-// Attune // keeps project context consistent
+// Pondera // keeps project context consistent
 // Lightweight DTO returned by the IntentionsParserService for voice-derived intentions // states why this type exists
 import Foundation // needed for String and Double types
 

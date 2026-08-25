@@ -18,7 +18,7 @@ struct SessionDetailView: View {
 
     var body: some View {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
 
             if let session {
                 ScrollView {
@@ -33,7 +33,7 @@ struct SessionDetailView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("Captured")
                                     .font(.headline)
-                                    .foregroundStyle(AttuneTheme.textPrimary)
+                                    .foregroundStyle(PonderaTheme.textPrimary)
                                 ForEach(visibleCaptures) { item in
                                     NavigationLink(destination: InsightDetailView(item: item)) {
                                         InsightCaptureRow(item: item, correction: corrections[item.id])
@@ -49,7 +49,7 @@ struct SessionDetailView: View {
                             quietEmptyState
                         }
                     }
-                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.horizontal, PonderaTheme.horizontalPadding)
                     .padding(.top, 12)
                     .padding(.bottom, 96)
                 }
@@ -71,11 +71,11 @@ struct SessionDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Talk it out", systemImage: "waveform")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
 
             Text(session.startedAt.formatted(date: .complete, time: .shortened))
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
 
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 14) {
@@ -88,11 +88,11 @@ struct SessionDetailView: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(AttuneTheme.textSecondary)
+            .foregroundStyle(PonderaTheme.textSecondary)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .attuneCard()
+        .ponderaCard()
     }
 
     @ViewBuilder
@@ -107,29 +107,29 @@ struct SessionDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Transcript")
                 .font(.headline)
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
             Text(transcript)
                 .font(.body)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var quietEmptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "waveform")
                 .font(.title2)
-                .foregroundStyle(AttuneTheme.textTertiary)
+                .foregroundStyle(PonderaTheme.textTertiary)
             Text("Nothing was captured from this session.")
                 .font(.subheadline)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
         }
         .padding(18)
         .frame(maxWidth: .infinity)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var visibleCaptures: [ExtractedItem] {

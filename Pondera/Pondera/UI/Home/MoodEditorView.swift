@@ -3,7 +3,7 @@
 //  Pondera
 //
 //  Clear centered mood score with optional descriptive tags.
-//  Saves as manual override. Clearing allows Attune to update mood from a check-in.
+//  Saves as manual override. Clearing allows Pondera to update mood from a check-in.
 //
 
 import SwiftUI
@@ -27,7 +27,7 @@ struct MoodEditorView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AttuneScreenBackground()
+                PonderaScreenBackground()
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
@@ -36,11 +36,11 @@ struct MoodEditorView: View {
                                 .font(.system(size: 48))
                             Text(MoodDisplayScale.formattedCenteredValue(forStoredScore: moodScore))
                                 .font(.system(size: 64, weight: .bold, design: .rounded))
-                                .foregroundStyle(AttuneTheme.textPrimary)
+                                .foregroundStyle(PonderaTheme.textPrimary)
                                 .contentTransition(.numericText())
                             Text(scoreDescription)
                                 .font(.headline)
-                                .foregroundStyle(AttuneTheme.accent)
+                                .foregroundStyle(PonderaTheme.accent)
 
                             Slider(
                                 value: Binding(
@@ -50,7 +50,7 @@ struct MoodEditorView: View {
                                 in: 0...10,
                                 step: 1
                             )
-                            .tint(AttuneTheme.accent)
+                            .tint(PonderaTheme.accent)
                             .accessibilityLabel("Mood score")
                             .accessibilityValue(MoodDisplayScale.formattedCenteredValue(forStoredScore: moodScore))
 
@@ -62,18 +62,18 @@ struct MoodEditorView: View {
                                 Text("+5")
                             }
                             .font(.caption)
-                            .foregroundStyle(AttuneTheme.textTertiary)
+                            .foregroundStyle(PonderaTheme.textTertiary)
                         }
                         .padding(20)
-                        .attuneCard()
+                        .ponderaCard()
 
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Add a feeling")
                                 .font(.headline)
-                                .foregroundStyle(AttuneTheme.textPrimary)
+                                .foregroundStyle(PonderaTheme.textPrimary)
                             Text("Optional · choose one that fits best")
                                 .font(.subheadline)
-                                .foregroundStyle(AttuneTheme.textSecondary)
+                                .foregroundStyle(PonderaTheme.textSecondary)
 
                             LazyVGrid(columns: tagColumns, spacing: 10) {
                                 ForEach(MoodDisplayScale.feelingLabels, id: \.self) { label in
@@ -88,16 +88,16 @@ struct MoodEditorView: View {
                                             }
                                         }
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(selectedLabel == label ? Color.black.opacity(0.78) : AttuneTheme.textPrimary)
+                                        .foregroundStyle(selectedLabel == label ? Color.black.opacity(0.78) : PonderaTheme.textPrimary)
                                         .padding(.horizontal, 12)
                                         .frame(minHeight: 44)
                                         .background(
-                                            selectedLabel == label ? AttuneTheme.accent : AttuneTheme.surfaceStrong,
+                                            selectedLabel == label ? PonderaTheme.accent : PonderaTheme.surfaceStrong,
                                             in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                                         )
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .stroke(selectedLabel == label ? Color.clear : AttuneTheme.border)
+                                                .stroke(selectedLabel == label ? Color.clear : PonderaTheme.border)
                                         )
                                     }
                                     .buttonStyle(.plain)
@@ -105,12 +105,12 @@ struct MoodEditorView: View {
                             }
                         }
                         .padding(18)
-                        .attuneCard()
+                        .ponderaCard()
 
                         Button(action: saveAndDismiss) {
                             Text("Save Mood")
                         }
-                        .buttonStyle(AttunePrimaryButtonStyle())
+                        .buttonStyle(PonderaPrimaryButtonStyle())
 
                         if hasExistingMood {
                             Button(role: .destructive, action: clearMood) {
@@ -119,10 +119,10 @@ struct MoodEditorView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
-                            .tint(AttuneTheme.recording)
+                            .tint(PonderaTheme.recording)
                         }
                     }
-                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.horizontal, PonderaTheme.horizontalPadding)
                     .padding(.top, 14)
                     .padding(.bottom, 36)
                 }
@@ -166,11 +166,11 @@ struct MoodEditorView: View {
                 moodScore: moodScore
             )
             onSaved()
-            AttuneHaptics.saved()
+            PonderaHaptics.saved()
             dismiss()
         } catch {
             AppLogger.log(AppLogger.ERR, "MoodEditor save failed error=\"\(error.localizedDescription)\"")
-            AttuneHaptics.error()
+            PonderaHaptics.error()
         }
     }
     
@@ -178,11 +178,11 @@ struct MoodEditorView: View {
         do {
             try DailyMoodStore.shared.clearManualOverride(dateKey: dateKey)
             onSaved()
-            AttuneHaptics.saved()
+            PonderaHaptics.saved()
             dismiss()
         } catch {
             AppLogger.log(AppLogger.ERR, "MoodEditor clear failed error=\"\(error.localizedDescription)\"")
-            AttuneHaptics.error()
+            PonderaHaptics.error()
         }
     }
 }

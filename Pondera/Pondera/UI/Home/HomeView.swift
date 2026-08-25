@@ -252,7 +252,7 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
         ZStack {
-            AttuneScreenBackground()
+            PonderaScreenBackground()
             
             ScrollView {
                 VStack(spacing: 0) {
@@ -270,7 +270,7 @@ struct HomeView: View {
                             intentionSuggestionArea
                         }
                     }
-                    .padding(.horizontal, AttuneTheme.horizontalPadding)
+                    .padding(.horizontal, PonderaTheme.horizontalPadding)
                     .padding(.top, 6)
                     // TabView already lays Home out above the tab bar. Keeping a
                     // second tab-bar-sized spacer here made an otherwise fitting
@@ -294,7 +294,7 @@ struct HomeView: View {
                     },
                     onDismiss: { declineSuggestion(suggestion) }
                 )
-                .padding(.horizontal, AttuneTheme.horizontalPadding)
+                .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.bottom, 76)
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .transition(suggestionToastTransition(edge: .bottom))
@@ -349,17 +349,17 @@ struct HomeView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             refreshAll()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .attuneListeningSessionDidFinishProcessing)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .ponderaListeningSessionDidFinishProcessing)) { _ in
             refreshMoodAndStreak()
             Task { await evaluateIntentionSuggestion(shouldPresentToast: true) }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .attuneReviewIntentionSuggestion)) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .ponderaReviewIntentionSuggestion)) { notification in
             guard let suggestion = notification.object as? SuggestedIntentionAction else { return }
             intentionSuggestion = suggestion
             suggestionToastCenter.dismissHomeSuggestion(id: suggestion.id)
             showSuggestionEditor = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: .attuneIntentionSuggestionDidResolve)) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .ponderaIntentionSuggestionDidResolve)) { notification in
             guard let suggestionId = notification.object as? String,
                   intentionSuggestion?.id == suggestionId else { return }
             intentionSuggestion = nil
@@ -485,25 +485,25 @@ struct HomeView: View {
                 Text("A SMALL NEXT STEP")
                     .font(.caption.weight(.bold))
                     .tracking(1.0)
-                    .foregroundStyle(AttuneTheme.accent)
+                    .foregroundStyle(PonderaTheme.accent)
                 Text(suggestion.title)
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text("\(suggestion.targetValue.formatted()) \(suggestion.unit) · \(suggestion.timeframe)")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                 Text(suggestion.reason)
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                 if let safetyNote = suggestion.safetyNote {
                     Text(safetyNote)
                         .font(.caption)
-                        .foregroundStyle(AttuneTheme.textTertiary)
+                        .foregroundStyle(PonderaTheme.textTertiary)
                 }
                 if let replacement = suggestedReplacement {
                     Text("Maybe let “\(replacement.title)” rest for now and try this instead. It can come off the bench later.")
                         .font(.footnote.weight(.medium))
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                 }
                 HStack {
                     Button("Why this?") { showSuggestionEvidence = true }
@@ -516,27 +516,27 @@ struct HomeView: View {
                 }
             }
             .padding(16)
-            .attuneCard()
+            .ponderaCard()
         } else if let suggestionNudge {
             HStack(spacing: 10) {
                 Image(systemName: "waveform.badge.mic")
-                    .foregroundStyle(AttuneTheme.accent)
+                    .foregroundStyle(PonderaTheme.accent)
                 Text(suggestionNudge)
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                 Spacer(minLength: 0)
             }
             .padding(14)
-            .attuneCard()
+            .ponderaCard()
         } else if isGeneratingSuggestion {
             HStack(spacing: 10) {
                 ProgressView()
                 Text("Looking for one useful small step…")
                     .font(.subheadline)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
             .padding(14)
-            .attuneCard()
+            .ponderaCard()
         }
     }
     
@@ -604,7 +604,7 @@ struct HomeView: View {
                 HStack(spacing: 10) {
                     Text("Add something you want to move forward today.")
                         .font(.subheadline)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                     Spacer()
                 }
                 .padding(.vertical, 4)
@@ -638,7 +638,7 @@ struct HomeView: View {
 
                         Text(intentionProgressSummaryText(for: row))
                             .font(.caption2)
-                            .foregroundStyle(AttuneTheme.textSecondary)
+                            .foregroundStyle(PonderaTheme.textSecondary)
                             .monospacedDigit()
                     }
                     .padding(.horizontal, 8)
@@ -647,7 +647,7 @@ struct HomeView: View {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(
                                 highlightedProgressIntentionIDs.contains(row.id)
-                                    ? AttuneTheme.success.opacity(0.18)
+                                    ? PonderaTheme.success.opacity(0.18)
                                     : Color.clear
                             )
                     )
@@ -655,7 +655,7 @@ struct HomeView: View {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .stroke(
                                 highlightedProgressIntentionIDs.contains(row.id)
-                                    ? AttuneTheme.success.opacity(0.55)
+                                    ? PonderaTheme.success.opacity(0.55)
                                     : Color.clear,
                                 lineWidth: 1
                             )
@@ -684,7 +684,7 @@ struct HomeView: View {
                                     systemImage: showsAllIntentionsOnHome ? "chevron.up" : "chevron.down"
                                 )
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(AttuneTheme.textSecondary)
+                                .foregroundStyle(PonderaTheme.textSecondary)
                                 .frame(minHeight: 44)
                             }
                             .buttonStyle(.plain)
@@ -699,13 +699,13 @@ struct HomeView: View {
                         Button(action: { enterUpdateProgressMode() }) {
                             Label("Update Progress", systemImage: "slider.horizontal.3")
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(AttuneTheme.accent)
+                                .foregroundStyle(PonderaTheme.accent)
                                 .padding(.horizontal, 12)
                                 .frame(minHeight: 44)
-                                .background(AttuneTheme.surfaceStrong, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .background(PonderaTheme.surfaceStrong, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(AttuneTheme.border)
+                                        .stroke(PonderaTheme.border)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -733,7 +733,7 @@ struct HomeView: View {
                 } label: {
                     Image(systemName: "info.circle")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -748,7 +748,7 @@ struct HomeView: View {
             HStack(alignment: .center, spacing: 14) {
                 Text(focusModePrompt)
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -788,11 +788,11 @@ struct HomeView: View {
             Text("SWITCH FOCUS")
                 .font(.caption2.weight(.bold))
                 .tracking(0.7)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
 
             Text(adjacentFocusRow(offset: -1)?.intention.title ?? "Current")
                 .font(.caption2.weight(.medium))
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .lineLimit(1)
                 .frame(maxWidth: 104)
 
@@ -818,7 +818,7 @@ struct HomeView: View {
 
             Text(adjacentFocusRow(offset: 1)?.intention.title ?? "Current")
                 .font(.caption2.weight(.medium))
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .lineLimit(1)
                 .frame(maxWidth: 104)
         }
@@ -834,7 +834,7 @@ struct HomeView: View {
 
             Text("Focus Mode appeared because no intention progress was recorded on either of the last two days. It keeps one intention visible so today feels more manageable.")
                 .font(.subheadline)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Button(role: .destructive) {
@@ -908,7 +908,7 @@ struct HomeView: View {
     private var progressCardTitle: some View {
         Text("Today's Intentions")
             .font(.headline)
-            .foregroundStyle(AttuneTheme.textPrimary)
+            .foregroundStyle(PonderaTheme.textPrimary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -932,7 +932,7 @@ struct HomeView: View {
                 Button(action: { showEditIntentions = true }) {
                     Text("Manage")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.accent)
+                        .foregroundStyle(PonderaTheme.accent)
                         .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
@@ -960,8 +960,8 @@ struct HomeView: View {
                     Capsule()
                         .fill(
                             index == 0 || index == ManualProgressSliderPolicy.segmentCount
-                                ? AttuneTheme.textTertiary.opacity(0.7)
-                                : AttuneTheme.textTertiary.opacity(0.5)
+                                ? PonderaTheme.textTertiary.opacity(0.7)
+                                : PonderaTheme.textTertiary.opacity(0.5)
                         )
                         .frame(width: 1.5, height: index.isMultiple(of: 2) ? 9 : 6)
                     if index < ManualProgressSliderPolicy.segmentCount {
@@ -1108,7 +1108,7 @@ struct HomeView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .attuneCard()
+        .ponderaCard()
         .accessibilityHint("Opens detailed Momentum history")
     }
 
@@ -1117,10 +1117,10 @@ struct HomeView: View {
             Text("THIS WEEK")
                 .font(.caption2.weight(.bold))
                 .tracking(1.4)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
             Text("Daily intention progress")
                 .font(.headline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
         }
     }
 
@@ -1152,11 +1152,11 @@ struct HomeView: View {
                 VStack(alignment: .trailing, spacing: 0) {
                     Text("\(streak)")
                         .font(.subheadline.monospacedDigit().weight(.bold))
-                        .foregroundStyle(AttuneTheme.textPrimary)
+                        .foregroundStyle(PonderaTheme.textPrimary)
                     Text("STREAK")
                         .font(.system(size: 8, weight: .bold))
                         .tracking(0.55)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                 }
             }
             .padding(.leading, 6)
@@ -1168,7 +1168,7 @@ struct HomeView: View {
 
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(streak) day streak. Open Momentum history")
@@ -1201,10 +1201,10 @@ struct HomeView: View {
                     if weekMomentum.days.isEmpty {
                         HStack(spacing: 10) {
                             Image(systemName: "circle.dotted")
-                                .foregroundStyle(AttuneTheme.accent)
+                                .foregroundStyle(PonderaTheme.accent)
                             Text("Your week will take shape after your first check-in.")
                                 .font(.caption)
-                                .foregroundStyle(AttuneTheme.textSecondary)
+                                .foregroundStyle(PonderaTheme.textSecondary)
                         }
                         .frame(maxWidth: .infinity, minHeight: 92, alignment: .center)
                     } else {
@@ -1222,7 +1222,7 @@ struct HomeView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .attuneCard()
+        .ponderaCard()
         .accessibilityHint("Opens detailed Momentum history")
     }
 
@@ -1231,10 +1231,10 @@ struct HomeView: View {
             Text("THIS WEEK")
                 .font(.caption2.weight(.bold))
                 .tracking(1.4)
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
             Text("Momentum path")
                 .font(.headline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
         }
     }
 
@@ -1246,11 +1246,11 @@ struct HomeView: View {
                     .foregroundStyle(weeklyMomentumAverageColor)
                 Text(weeklyMomentumAverageCaption)
                     .font(.caption2)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
         }
     }
 
@@ -1274,7 +1274,7 @@ struct HomeView: View {
     }
 
     private var weeklyMomentumAverageColor: Color {
-        guard let ratio = weeklyMomentumAverageRatio else { return AttuneTheme.accent }
+        guard let ratio = weeklyMomentumAverageRatio else { return PonderaTheme.accent }
         return colorForProgressRatio(ratio)
     }
 
@@ -1289,23 +1289,23 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("This Week")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AttuneTheme.textPrimary)
+                            .foregroundStyle(PonderaTheme.textPrimary)
                         Label("View Momentum", systemImage: "chevron.right")
                             .font(.caption)
-                            .foregroundStyle(AttuneTheme.accent)
+                            .foregroundStyle(PonderaTheme.accent)
                     }
                 } else {
                     HStack {
                         Text("This Week")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AttuneTheme.textPrimary)
+                            .foregroundStyle(PonderaTheme.textPrimary)
                         Spacer()
                         Text("View Momentum")
                             .font(.caption)
-                            .foregroundStyle(AttuneTheme.accent)
+                            .foregroundStyle(PonderaTheme.accent)
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(AttuneTheme.accent)
+                            .foregroundStyle(PonderaTheme.accent)
                     }
                 }
                 
@@ -1320,7 +1320,7 @@ struct HomeView: View {
                             } else if !day.hasData {
                                 ZStack(alignment: .bottom) {
                                     RoundedRectangle(cornerRadius: 3)
-                                        .fill(AttuneTheme.surfaceStrong)
+                                        .fill(PonderaTheme.surfaceStrong)
                                         .frame(width: 10, height: 6)
                                 }
                                 .frame(width: 10, height: 24)
@@ -1342,18 +1342,18 @@ struct HomeView: View {
                             }
                             Text(day.weekdayLetter)
                                 .font(.caption2.weight(isToday ? .bold : .medium))
-                                .foregroundStyle(isToday ? AttuneTheme.accent : AttuneTheme.textSecondary)
+                                .foregroundStyle(isToday ? PonderaTheme.accent : PonderaTheme.textSecondary)
                                 .frame(width: 12, alignment: .center)
                         }
                         .padding(.vertical, 3)
                         .frame(maxWidth: .infinity)
                         .background(
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(isToday ? AttuneTheme.accent.opacity(0.12) : Color.clear)
+                                .fill(isToday ? PonderaTheme.accent.opacity(0.12) : Color.clear)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .stroke(isToday ? AttuneTheme.accent.opacity(0.75) : Color.clear, lineWidth: 1)
+                                .stroke(isToday ? PonderaTheme.accent.opacity(0.75) : Color.clear, lineWidth: 1)
                         )
                         .accessibilityLabel("\(isToday ? "Today, " : "")\(day.weekdayLetter), \(momentumAccessibilityText(for: day))")
                     }
@@ -1364,7 +1364,7 @@ struct HomeView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .attuneCard()
+        .ponderaCard()
     }
 
     /// Free shows only today's aggregate, matching the today-only Momentum tab.
@@ -1375,27 +1375,27 @@ struct HomeView: View {
             HStack(spacing: 12) {
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .font(.headline)
-                    .foregroundStyle(AttuneTheme.accent)
+                    .foregroundStyle(PonderaTheme.accent)
                     .frame(width: 38, height: 38)
-                    .background(AttuneTheme.accent.opacity(0.12), in: Circle())
+                    .background(PonderaTheme.accent.opacity(0.12), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Today's Momentum")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textPrimary)
+                        .foregroundStyle(PonderaTheme.textPrimary)
                     Text("\(todayMomentumPercent)% overall today")
                         .font(.caption)
-                        .foregroundStyle(AttuneTheme.textSecondary)
+                        .foregroundStyle(PonderaTheme.textSecondary)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.accent)
+                    .foregroundStyle(PonderaTheme.accent)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
         }
         .buttonStyle(.plain)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var todayMomentumPercent: Int {
@@ -1502,12 +1502,12 @@ struct HomeView: View {
         highlightProgressRows(visiblyChangedIDs)
         if !visiblyChangedIDs.isEmpty {
             if !newlyCompletedIntentionIDs(since: previousPercents).isEmpty {
-                AttuneHaptics.reward()
+                PonderaHaptics.reward()
             } else {
-                AttuneHaptics.saved()
+                PonderaHaptics.saved()
             }
         } else if attemptedChangeCount > 0 {
-            AttuneHaptics.error()
+            PonderaHaptics.error()
         }
     }
 
@@ -1665,20 +1665,20 @@ struct HomeView: View {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 0) {
                     moodControl
-                    Divider().overlay(AttuneTheme.border)
+                    Divider().overlay(PonderaTheme.border)
                     feelingControl
                 }
             } else {
                 HStack(spacing: 0) {
                     moodControl
                     Rectangle()
-                        .fill(AttuneTheme.border)
+                        .fill(PonderaTheme.border)
                         .frame(width: 1, height: 40)
                     feelingControl
                 }
             }
         }
-        .attuneCard()
+        .ponderaCard()
         .anchorPreference(key: FeelingPickerAnchorKey.self, value: .bounds) {
             $0
         }
@@ -1696,12 +1696,12 @@ struct HomeView: View {
 
             ZStack(alignment: .topLeading) {
                 Rectangle()
-                    .fill(AttuneTheme.border)
+                    .fill(PonderaTheme.border)
                     .frame(width: trackWidth, height: 2)
                     .offset(x: horizontalInset, y: 50)
 
                 Rectangle()
-                    .fill(AttuneTheme.accent.opacity(0.62))
+                    .fill(PonderaTheme.accent.opacity(0.62))
                     .frame(
                         width: abs(selectedX - geometry.size.width / 2),
                         height: 2
@@ -1711,7 +1711,7 @@ struct HomeView: View {
                 ForEach(0...10, id: \.self) { score in
                     let tickX = horizontalInset + trackWidth * CGFloat(score) / 10
                     Rectangle()
-                        .fill(score == inlineMoodScore ? AttuneTheme.accent : AttuneTheme.textTertiary.opacity(0.72))
+                        .fill(score == inlineMoodScore ? PonderaTheme.accent : PonderaTheme.textTertiary.opacity(0.72))
                         .frame(width: score == 5 ? 2 : 1, height: score == 5 ? 12 : 8)
                         .offset(x: tickX - (score == 5 ? 1 : 0.5), y: score == 5 ? 45 : 47)
                 }
@@ -1721,18 +1721,18 @@ struct HomeView: View {
                         .font(.system(size: 25))
                     Text(hasMoodSet ? MoodDisplayScale.formattedCenteredValue(forStoredScore: inlineMoodScore) : "?")
                         .font(.caption2.weight(.bold).monospacedDigit())
-                        .foregroundStyle(hasMoodSet ? AttuneTheme.accent : AttuneTheme.textSecondary)
+                        .foregroundStyle(hasMoodSet ? PonderaTheme.accent : PonderaTheme.textSecondary)
                 }
                 .fixedSize()
                 .padding(.horizontal, 7)
                 .frame(height: 36)
-                .background(AttuneTheme.surfaceStrong.opacity(0.94), in: Capsule())
-                .overlay(Capsule().stroke(AttuneTheme.accent.opacity(0.28), lineWidth: 1))
+                .background(PonderaTheme.surfaceStrong.opacity(0.94), in: Capsule())
+                .overlay(Capsule().stroke(PonderaTheme.accent.opacity(0.28), lineWidth: 1))
                 .contentShape(Capsule())
                 .position(x: selectedX, y: 23)
                 .scaleEffect(isMoodDragActive ? 1.06 : 1)
                 .shadow(
-                    color: AttuneTheme.accent.opacity(isMoodDragActive ? 0.30 : 0),
+                    color: PonderaTheme.accent.opacity(isMoodDragActive ? 0.30 : 0),
                     radius: isMoodDragActive ? 8 : 0
                 )
                 .animation(reduceMotion ? nil : .snappy(duration: 0.18), value: inlineMoodScore)
@@ -1815,24 +1815,24 @@ struct HomeView: View {
             HStack(spacing: 9) {
                 Image(systemName: "heart.text.square.fill")
                     .font(.title3)
-                    .foregroundStyle(AttuneTheme.accent)
+                    .foregroundStyle(PonderaTheme.accent)
                     .frame(width: 34, height: 34)
-                    .background(AttuneTheme.accent.opacity(0.14), in: Circle())
+                    .background(PonderaTheme.accent.opacity(0.14), in: Circle())
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Feeling")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.textPrimary)
+                        .foregroundStyle(PonderaTheme.textPrimary)
                     Text(todayMood?.moodLabel ?? "Choose one")
                         .font(.caption)
-                        .foregroundStyle(todayMood?.moodLabel == nil ? AttuneTheme.textSecondary : AttuneTheme.accent)
+                        .foregroundStyle(todayMood?.moodLabel == nil ? PonderaTheme.textSecondary : PonderaTheme.accent)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(AttuneTheme.textTertiary)
+                    .foregroundStyle(PonderaTheme.textTertiary)
             }
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
@@ -1860,7 +1860,7 @@ struct HomeView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(
                     LinearGradient(
-                        colors: [AttuneTheme.accent.opacity(0.62), Color.white.opacity(0.12)],
+                        colors: [PonderaTheme.accent.opacity(0.62), Color.white.opacity(0.12)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
@@ -1889,21 +1889,21 @@ struct HomeView: View {
 
                 Text(feeling)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                     .lineLimit(1)
 
                 Spacer(minLength: 8)
 
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(AttuneTheme.accent)
+                        .foregroundStyle(PonderaTheme.accent)
                 }
             }
             .padding(.horizontal, 10)
             .frame(width: 160)
             .frame(minHeight: 35)
             .background(
-                isSelected ? AttuneTheme.accent.opacity(0.13) : Color.clear,
+                isSelected ? PonderaTheme.accent.opacity(0.13) : Color.clear,
                 in: RoundedRectangle(cornerRadius: 10, style: .continuous)
             )
             .contentShape(Rectangle())
@@ -1976,7 +1976,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Quick Check-In")
                 .font(.headline)
-                .foregroundStyle(AttuneTheme.textPrimary)
+                .foregroundStyle(PonderaTheme.textPrimary)
 
             switch state {
             case .idle:
@@ -1986,7 +1986,7 @@ struct HomeView: View {
                     icon: "mic.badge.plus",
                     title: "Getting ready…",
                     detail: "Waiting for microphone and speech access.",
-                    color: AttuneTheme.accent,
+                    color: PonderaTheme.accent,
                     showsProgress: true
                 )
             case .recording:
@@ -2003,22 +2003,22 @@ struct HomeView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .attuneCard()
+        .ponderaCard()
     }
 
     private var recordCheckInSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Update progress or mood by voice")
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
                 .font(.subheadline)
 
             Button(action: {
-                AttuneHaptics.action()
+                PonderaHaptics.action()
                 startCheckIn()
             }) {
                 Label("Record Check-In", systemImage: "mic.fill")
             }
-            .buttonStyle(AttunePrimaryButtonStyle())
+            .buttonStyle(PonderaPrimaryButtonStyle())
             .accessibilityHint("Starts a short voice update for tracked intentions and mood")
 
             if !todayCheckIns.isEmpty {
@@ -2026,7 +2026,7 @@ struct HomeView: View {
                     showAllCheckInsSheet = true
                 }
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(AttuneTheme.accent)
+                .foregroundStyle(PonderaTheme.accent)
             }
         }
     }
@@ -2065,9 +2065,9 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Circle()
-                    .fill(AttuneTheme.recording)
+                    .fill(PonderaTheme.recording)
                     .frame(width: 10, height: 10)
-                    .shadow(color: AttuneTheme.recording.opacity(0.7), radius: 6)
+                    .shadow(color: PonderaTheme.recording.opacity(0.7), radius: 6)
                     .accessibilityHidden(true)
                 Text("Listening")
                     .font(.headline)
@@ -2080,20 +2080,20 @@ struct HomeView: View {
             .accessibilityValue(elapsedFormatted)
             Text("Name the intention and amount. Say “more” or “total today.” Mood is optional.")
                 .font(.subheadline)
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
             Button(action: stopCheckIn) {
                 Label("Finish Check-In", systemImage: "stop.fill")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .foregroundStyle(.white)
-                    .background(AttuneTheme.recording, in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
+                    .background(PonderaTheme.recording, in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous))
             }
             .buttonStyle(.plain)
         }
         .padding(14)
-        .background(AttuneTheme.recording.opacity(0.10), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous).stroke(AttuneTheme.recording.opacity(0.35)))
+        .background(PonderaTheme.recording.opacity(0.10), in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous).stroke(PonderaTheme.recording.opacity(0.35)))
     }
 
     private var elapsedFormatted: String {
@@ -2107,7 +2107,7 @@ struct HomeView: View {
             icon: "sparkles",
             title: "Reviewing your check-in…",
             detail: "Pondera is looking for clear progress and mood updates.",
-            color: AttuneTheme.accentSecondary,
+            color: PonderaTheme.accentSecondary,
             showsProgress: true
         )
     }
@@ -2118,11 +2118,11 @@ struct HomeView: View {
                 icon: "checkmark.circle.fill",
                 title: "Check-in saved",
                 detail: checkInReceiptText(checkInId: checkInId),
-                color: AttuneTheme.success
+                color: PonderaTheme.success
             )
             Button("Record another") { state = .idle }
                 .buttonStyle(.bordered)
-                .tint(AttuneTheme.accent)
+                .tint(PonderaTheme.accent)
         }
     }
 
@@ -2168,17 +2168,17 @@ struct HomeView: View {
                 icon: "exclamationmark.triangle.fill",
                 title: "Check-in unavailable",
                 detail: friendlyCheckInError(message),
-                color: AttuneTheme.warning
+                color: PonderaTheme.warning
             )
             HStack {
                 Text("This message closes automatically.")
                     .font(.caption2)
-                    .foregroundStyle(AttuneTheme.textTertiary)
+                    .foregroundStyle(PonderaTheme.textTertiary)
                 Spacer()
                 Button("Try Again") { state = .idle }
                     .font(.caption.weight(.semibold))
                     .buttonStyle(.bordered)
-                    .tint(AttuneTheme.accent)
+                    .tint(PonderaTheme.accent)
             }
         }
     }
@@ -2189,17 +2189,17 @@ struct HomeView: View {
                 icon: "mic.slash.fill",
                 title: "Recording access is off",
                 detail: "Allow Microphone and Speech Recognition in Settings to record check-ins.",
-                color: AttuneTheme.warning
+                color: PonderaTheme.warning
             )
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     openURL(url)
                 }
             }
-            .buttonStyle(AttunePrimaryButtonStyle())
+            .buttonStyle(PonderaPrimaryButtonStyle())
             Button("Not now") { state = .idle }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
         }
     }
 
@@ -2226,17 +2226,17 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AttuneTheme.textPrimary)
+                    .foregroundStyle(PonderaTheme.textPrimary)
                 Text(detail)
                     .font(.caption)
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
         .padding(10)
-        .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous).stroke(color.opacity(0.26)))
+        .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous).stroke(color.opacity(0.26)))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
         .accessibilityValue(detail)
@@ -2286,7 +2286,7 @@ struct HomeView: View {
             at: Date()
         )
         state = .saved(checkInId: checkInId)
-        AttuneHaptics.saved()
+        PonderaHaptics.saved()
     }
 
     private func scheduleReviewRequestAfterSavedReceipt() {
@@ -2878,7 +2878,7 @@ struct HomeView: View {
             beginRecording()
         case .denied:
             state = .permissionDenied
-            AttuneHaptics.warning()
+            PonderaHaptics.warning()
         case .needsRequest:
             state = .requestingPermission
             Task { @MainActor in
@@ -2888,7 +2888,7 @@ struct HomeView: View {
                     beginRecording()
                 } else {
                     state = .permissionDenied
-                    AttuneHaptics.warning()
+                    PonderaHaptics.warning()
                 }
             }
         }
@@ -2900,7 +2900,7 @@ struct HomeView: View {
             // If not cached, this will load synchronously but should be rare
             guard let _ = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else {
                 state = .error(message: "Could not load intentions")
-                AttuneHaptics.error()
+                PonderaHaptics.error()
                 return
             }
             
@@ -2916,13 +2916,13 @@ struct HomeView: View {
         } catch {
             // If any error occurs, show error state
             state = .error(message: error.localizedDescription)
-            AttuneHaptics.error()
+            PonderaHaptics.error()
         }
     }
     
     private func stopCheckIn() {
         guard let result = checkInRecorder.stopRecording() else { return }
-        AttuneHaptics.action()
+        PonderaHaptics.action()
         processingCheckInId = result.checkInId
         state = .processing
         
@@ -2943,7 +2943,7 @@ struct HomeView: View {
             
             guard let intentionSet = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else {
                 state = .error(message: "Could not load intention set")
-                AttuneHaptics.error()
+                PonderaHaptics.error()
                 return
             }
             
@@ -3102,7 +3102,7 @@ struct HomeView: View {
                 eventID: "check-in-failed:\(checkInId)"
             )
             state = .error(message: error.localizedDescription)
-            AttuneHaptics.error()
+            PonderaHaptics.error()
             
             // Replace placeholder with failed row; red flash
             processingCheckInId = nil
@@ -3145,7 +3145,7 @@ private struct WeeklyMomentumDayTileStrip: View {
         ForEach(days) { day in
             WeeklyMomentumDayTile(
                 day: day,
-                color: day.completionRatio.map(colorForProgress) ?? AttuneTheme.textTertiary
+                color: day.completionRatio.map(colorForProgress) ?? PonderaTheme.textTertiary
             )
             .frame(maxWidth: .infinity)
             .frame(height: 92)
@@ -3219,7 +3219,7 @@ private struct WeeklyMomentumDayTile: View {
                 VStack(spacing: 4) {
                     Text(day.weekdayLetter)
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(isToday ? AttuneTheme.accent : AttuneTheme.textSecondary)
+                        .foregroundStyle(isToday ? PonderaTheme.accent : PonderaTheme.textSecondary)
 
                     Spacer(minLength: 1)
 
@@ -3236,7 +3236,7 @@ private struct WeeklyMomentumDayTile: View {
                         .foregroundStyle(
                             isMissedDay
                                 ? Color(red: 0.96, green: 0.48, blue: 0.50).opacity(0.76)
-                                : (visibleRatio == nil ? AttuneTheme.textTertiary : Color.white)
+                                : (visibleRatio == nil ? PonderaTheme.textTertiary : Color.white)
                         )
                         .minimumScaleFactor(0.72)
                         .lineLimit(1)
@@ -3253,7 +3253,7 @@ private struct WeeklyMomentumDayTile: View {
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .stroke(
                         isToday
-                            ? AttuneTheme.accent.opacity(0.88)
+                            ? PonderaTheme.accent.opacity(0.88)
                             : (isMissedDay ? Color.red.opacity(0.25) : Color.white.opacity(0.09)),
                         lineWidth: isToday ? 1.4 : 0.7
                     )
@@ -3397,16 +3397,16 @@ private struct WeeklyMomentumCardAtmosphere: View {
             ZStack {
                 LinearGradient(
                     colors: [
-                        AttuneTheme.accent.opacity(0.08),
+                        PonderaTheme.accent.opacity(0.08),
                         Color.clear,
-                        AttuneTheme.accentSecondary.opacity(0.07)
+                        PonderaTheme.accentSecondary.opacity(0.07)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
 
                 Circle()
-                    .fill(AttuneTheme.accent.opacity(0.10))
+                    .fill(PonderaTheme.accent.opacity(0.10))
                     .frame(width: geometry.size.width * 0.7)
                     .blur(radius: 32)
                     .offset(x: geometry.size.width * 0.34, y: -geometry.size.height * 0.46)
@@ -3458,9 +3458,9 @@ private struct WeeklyMomentumDepthChart: View {
                         path,
                         with: .linearGradient(
                             Gradient(colors: [
-                                AttuneTheme.accent.opacity(0.34),
+                                PonderaTheme.accent.opacity(0.34),
                                 Color.white.opacity(0.25),
-                                AttuneTheme.accentSecondary.opacity(0.34)
+                                PonderaTheme.accentSecondary.opacity(0.34)
                             ]),
                             startPoint: CGPoint(x: 0, y: 0),
                             endPoint: CGPoint(x: size.width, y: 0)
@@ -3498,9 +3498,9 @@ private struct WeeklyMomentumDepthChart: View {
                     VStack(spacing: 3) {
                         Text(day.weekdayLetter)
                             .font(.caption.weight(isToday ? .bold : .semibold))
-                            .foregroundStyle(isToday ? AttuneTheme.textPrimary : AttuneTheme.textSecondary)
+                            .foregroundStyle(isToday ? PonderaTheme.textPrimary : PonderaTheme.textSecondary)
                         Capsule()
-                            .fill(isToday ? AttuneTheme.accent : Color.clear)
+                            .fill(isToday ? PonderaTheme.accent : Color.clear)
                             .frame(width: 12, height: 2)
                     }
                     .frame(width: slotWidth)
@@ -3561,14 +3561,14 @@ private struct MomentumDepthDial: View {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: [Color.white.opacity(0.10), AttuneTheme.surfaceStrong.opacity(0.96)],
+                        colors: [Color.white.opacity(0.10), PonderaTheme.surfaceStrong.opacity(0.96)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
 
             Circle()
-                .stroke(AttuneTheme.border.opacity(isFuture ? 0.48 : 0.8), lineWidth: 4.5)
+                .stroke(PonderaTheme.border.opacity(isFuture ? 0.48 : 0.8), lineWidth: 4.5)
 
             if !isFuture && hasData {
                 Circle()
@@ -3589,7 +3589,7 @@ private struct MomentumDepthDial: View {
                     .shadow(color: color.opacity(0.7), radius: 3)
             } else if !isFuture {
                 Circle()
-                    .fill(AttuneTheme.textSecondary.opacity(0.52))
+                    .fill(PonderaTheme.textSecondary.opacity(0.52))
                     .frame(width: 4, height: 4)
             }
         }

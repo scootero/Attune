@@ -55,20 +55,20 @@ struct LegacyMomentumMonthChartView: View {
         .chartXScale(domain: monthDomain)
         .chartXAxis {
             AxisMarks(values: .stride(by: .day, count: 5)) { _ in
-                AxisGridLine().foregroundStyle(AttuneTheme.border)
+                AxisGridLine().foregroundStyle(PonderaTheme.border)
                 AxisValueLabel(format: .dateTime.day())
-                    .foregroundStyle(AttuneTheme.textSecondary)
+                    .foregroundStyle(PonderaTheme.textSecondary)
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading, values: [0, 25, 50, 75, 100]) { value in
-                AxisGridLine().foregroundStyle(AttuneTheme.border)
+                AxisGridLine().foregroundStyle(PonderaTheme.border)
                 AxisValueLabel {
                     if let number = value.as(Int.self) {
                         Text("\(number)%")
                     }
                 }
-                .foregroundStyle(AttuneTheme.textSecondary)
+                .foregroundStyle(PonderaTheme.textSecondary)
             }
         }
         .frame(height: 220)
@@ -125,16 +125,16 @@ struct LegacyMomentumMonthChartView: View {
 
     private func barColor(for bar: MonthDayBar) -> Color {
         guard bar.ratio != nil else {
-            return AttuneTheme.textTertiary.opacity(0.24)
+            return PonderaTheme.textTertiary.opacity(0.24)
         }
 
         switch bar.tier {
-        case .veryLow: return AttuneTheme.recording
-        case .low: return AttuneTheme.warning
+        case .veryLow: return PonderaTheme.recording
+        case .low: return PonderaTheme.warning
         case .neutral: return Color(red: 0.90, green: 0.76, blue: 0.32)
-        case .good: return AttuneTheme.success
-        case .great: return AttuneTheme.accent
-        case nil: return AttuneTheme.textTertiary
+        case .good: return PonderaTheme.success
+        case .great: return PonderaTheme.accent
+        case nil: return PonderaTheme.textTertiary
         }
     }
 
@@ -147,5 +147,5 @@ struct LegacyMomentumMonthChartView: View {
 #Preview {
     LegacyMomentumMonthChartView(bars: [])
         .padding()
-        .background(AttuneScreenBackground())
+        .background(PonderaScreenBackground())
 }
