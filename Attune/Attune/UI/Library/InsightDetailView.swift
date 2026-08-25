@@ -361,15 +361,19 @@ struct CaptureReviewSheet: View {
             do {
                 try CorrectionsStore.shared.setCorrection(updated)
                 correction = updated
+                AttuneHaptics.saved()
             } catch {
                 AppLogger.log(AppLogger.ERR, "Capture correction save failed item=\(AppLogger.shortId(item.id))")
+                AttuneHaptics.error()
             }
         } else if correction != nil {
             do {
                 try CorrectionsStore.shared.deleteCorrection(itemId: item.id)
                 correction = nil
+                AttuneHaptics.saved()
             } catch {
                 AppLogger.log(AppLogger.ERR, "Capture correction delete failed item=\(AppLogger.shortId(item.id))")
+                AttuneHaptics.error()
             }
         }
     }

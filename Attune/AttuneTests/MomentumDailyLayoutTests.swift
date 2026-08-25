@@ -126,6 +126,12 @@ final class MomentumDailyLayoutTests: XCTestCase {
         XCTAssertTrue(ManualProgressSavePolicy.hasChanged(current: 7, original: 10))
     }
 
+    func testManualProgressRewardOnlyWhenCrossingTarget() {
+        XCTAssertTrue(ManualProgressSavePolicy.crossedTarget(previousPercent: 0.8, currentPercent: 1))
+        XCTAssertFalse(ManualProgressSavePolicy.crossedTarget(previousPercent: 1, currentPercent: 1.2))
+        XCTAssertFalse(ManualProgressSavePolicy.crossedTarget(previousPercent: 0.8, currentPercent: 0.9))
+    }
+
     func testPersistedProgressReplacesStaleSliderDraftAfterEditingEnds() {
         XCTAssertEqual(
             ManualProgressDisplayPolicy.displayedTotal(stored: 10, draft: 2, isEditing: false),

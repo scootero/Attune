@@ -8,6 +8,15 @@ final class IntentionSuggestionEngineTests: XCTestCase {
         return value
     }
 
+    func testRapidSuggestionTestingRequiresExplicitLaunchArgument() {
+        XCTAssertFalse(RapidIntentionSuggestionTestingFeature.isEnabled(arguments: []))
+        XCTAssertTrue(
+            RapidIntentionSuggestionTestingFeature.isEnabled(
+                arguments: [RapidIntentionSuggestionTestingFeature.launchArgument]
+            )
+        )
+    }
+
     func testTopicCountsDistinctSessionsAndAssignsMonthBySessionStart() {
         let august = session("august", "2026-08-02T00:00:00Z")
         let july = session("july", "2026-07-31T23:59:59Z")

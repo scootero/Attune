@@ -44,7 +44,6 @@ struct HomeRecordView: View {
     /// Ensures an older delayed fade cannot clear newer completion feedback.
     @State private var completionFeedbackToken = UUID()
     @State private var showSessionsSheet = false
-    @State private var showInsightsSheet = false
     @State private var showPaywall = false
     @State private var recapPreview: (sessionId: String, recap: SessionRecap)?
     @State private var recapDetailSessionId: String?
@@ -140,18 +139,6 @@ struct HomeRecordView: View {
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button("Done") { showSessionsSheet = false }
-                        }
-                    }
-            }
-        }
-        .sheet(isPresented: $showInsightsSheet, onDismiss: { loadTodayCounts() }) {
-            NavigationView {
-                InsightsListView()
-                    .navigationTitle("Captured")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Done") { showInsightsSheet = false }
                         }
                     }
             }
@@ -410,7 +397,7 @@ struct HomeRecordView: View {
                     icon: "sparkles",
                     badgeText: recentInsightsAddedCount > 0 ? "+\(recentInsightsAddedCount) new" : nil,
                     isHighlighted: showsRecentSessionCompletion,
-                    action: { showInsightsSheet = true }
+                    action: openInsights
                 )
             }
         }
@@ -428,6 +415,14 @@ struct HomeRecordView: View {
             radius: 12
         )
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: showsRecentSessionCompletion)
+    }
+
+    private func openInsights() {
+        guard subscriptionManager.canUseInsights else {
+            showPaywall = true
+            return
+        }
+        appRouter.selectedRootTab = .library
     }
 
     private func historyButton(
@@ -691,7 +686,8 @@ struct HomeRecordView: View {
     /// Displays completion feedback only after this session's transcription and captures are saved.
     private func showCompletionFeedback(for sessionId: String) {
         recentInsightsAddedCount = ExtractionStore.shared.loadExtractions(sessionId: sessionId).count
-        if let session = SessionStore.shared.loadSession(id: sessionId) {
+        let completedSession = SessionStore.shared.loadSession(id: sessionId)
+        if let session = completedSession {
             if session.status == "complete" {
                 EngagementMetricsStore.shared.record(
                     .talkSessionCompleted,
@@ -724,6 +720,13 @@ struct HomeRecordView: View {
         completionFeedbackToken = token
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
             showsRecentSessionCompletion = true
+        }
+        if completedSession?.status == "error" {
+            AttuneHaptics.error()
+        } else if recentInsightsAddedCount > 0 {
+            AttuneHaptics.reward()
+        } else {
+            AttuneHaptics.saved()
         }
 
         Task { @MainActor in

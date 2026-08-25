@@ -166,9 +166,11 @@ struct MoodEditorView: View {
                 moodScore: moodScore
             )
             onSaved()
+            AttuneHaptics.saved()
             dismiss()
         } catch {
             AppLogger.log(AppLogger.ERR, "MoodEditor save failed error=\"\(error.localizedDescription)\"")
+            AttuneHaptics.error()
         }
     }
     
@@ -176,9 +178,11 @@ struct MoodEditorView: View {
         do {
             try DailyMoodStore.shared.clearManualOverride(dateKey: dateKey)
             onSaved()
+            AttuneHaptics.saved()
             dismiss()
         } catch {
             AppLogger.log(AppLogger.ERR, "MoodEditor clear failed error=\"\(error.localizedDescription)\"")
+            AttuneHaptics.error()
         }
     }
 }

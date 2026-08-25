@@ -56,9 +56,15 @@ struct DayDetailView: View {
                         amount: newAmount,
                         unit: item.intention.unit
                     )
-                    try? OverrideStore.shared.setOverride(override)
-                    data = ProgressDataHelper.loadDayDetail(dateKey: dateKey)
-                    adjustTotalForIntention = nil
+                    do {
+                        try OverrideStore.shared.setOverride(override)
+                        data = ProgressDataHelper.loadDayDetail(dateKey: dateKey)
+                        AttuneHaptics.saved()
+                        adjustTotalForIntention = nil
+                    } catch {
+                        AppLogger.log(AppLogger.ERR, "Historical progress override save failed intention=\(AppLogger.shortId(item.intention.id)) error=\"\(error.localizedDescription)\"")
+                        AttuneHaptics.error()
+                    }
                 },
                 onCancel: { adjustTotalForIntention = nil }
             )

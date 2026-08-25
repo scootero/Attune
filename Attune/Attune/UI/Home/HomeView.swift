@@ -97,6 +97,10 @@ enum ManualProgressSavePolicy {
     static func hasChanged(current: Double, original: Double, epsilon: Double = 0.000_001) -> Bool {
         abs(current - original) > epsilon
     }
+
+    static func crossedTarget(previousPercent: Double, currentPercent: Double) -> Bool {
+        previousPercent < 1 && currentPercent >= 1
+    }
 }
 
 /// Draft slider totals are visible only while the manual editor is open.
@@ -147,21 +151,32 @@ private enum ManualProgressHaptics {
         generator.selectionChanged()
     }
 
-    static func savedChanges() {
-        Task { @MainActor in
-            let generator = UIImpactFeedbackGenerator(style: .soft)
-            generator.prepare()
-            generator.impactOccurred(intensity: 0.35)
-            try? await Task.sleep(for: .milliseconds(110))
-            generator.prepare()
-            generator.impactOccurred(intensity: 0.55)
-            try? await Task.sleep(for: .milliseconds(140))
-            generator.impactOccurred(intensity: 0.8)
-        }
+}
+
+@MainActor
+private enum MoodRailHaptics {
+    static func activated() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.65)
+    }
+
+    static func crossedTick() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+    }
+
+    static func committed() {
+        let generator = UIImpactFeedbackGenerator(style: .soft)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.75)
     }
 }
 
 struct HomeView: View {
+    private static let collapsedIntentionLimit = 4
+
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -177,6 +192,8 @@ struct HomeView: View {
     /// Draft score for the inline mood rail. Stored in the existing 0...10
     /// representation; the rail presents it as -5...+5.
     @State private var inlineMoodScore: Int = MoodDisplayScale.neutralStoredScore
+    /// The mood thumb ignores taps and only begins tracking after a deliberate hold.
+    @State private var isMoodDragActive = false
     @State private var streak: Int = 0
     @State private var showEditIntentions = false
     @State private var showMoodEditor = false
@@ -228,6 +245,9 @@ struct HomeView: View {
     @State private var oneThingMode = OneThingModeState.empty
     @State private var showFocusModeInfo = false
     @State private var suggestedReplacement: Intention?
+    /// Home is intentionally a fixed dashboard until the user asks to reveal
+    /// more than the four intention rows that fit comfortably above the tab bar.
+    @State private var showsAllIntentionsOnHome = false
     
     var body: some View {
         NavigationView {
@@ -252,10 +272,16 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, AttuneTheme.horizontalPadding)
                     .padding(.top, 6)
-                    .padding(.bottom, 104)
+                    // TabView already lays Home out above the tab bar. Keeping a
+                    // second tab-bar-sized spacer here made an otherwise fitting
+                    // Home screen just tall enough to scroll into empty space.
+                    // Retain only a small visual inset; larger accessibility text
+                    // can still grow and scroll naturally.
+                    .padding(.bottom, dynamicTypeSize.isAccessibilitySize ? 20 : 6)
                 }
             }
             .scrollBounceBehavior(.basedOnSize)
+            .scrollDisabled(!homeScrollingIsEnabled)
             .scrollIndicators(.hidden)
 
             if let suggestion = suggestionToastCenter.homeSuggestion {
@@ -567,7 +593,7 @@ struct HomeView: View {
     // MARK: - B) Intentions and Today's Progress
     
     private var todaysProgressCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             progressCardHeader
 
             if OneThingModeFeature.isEnabled && oneThingMode.isActive {
@@ -587,15 +613,15 @@ struct HomeView: View {
                     let neonTextColor = intentionNeonTextColor(at: index)
                     let neonAccentColor = intentionNeonAccentColor(at: index)
 
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack(alignment: .firstTextBaseline) {
                             Text(row.intention.title)
-                                .font(.headline.weight(.semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(neonTextColor)
                                 .lineLimit(1)
                             Spacer()
                             Text("\(Int(currentPercent(for: row) * 100))%")
-                                .font(.headline.weight(.semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .monospacedDigit()
                                 .foregroundStyle(neonTextColor)
                         }
@@ -616,7 +642,7 @@ struct HomeView: View {
                             .monospacedDigit()
                     }
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(
@@ -643,7 +669,33 @@ struct HomeView: View {
                 
                 if !isUpdateProgressMode {
                     HStack {
-                        Spacer()
+                        if !dynamicTypeSize.isAccessibilitySize,
+                           !oneThingMode.isActive,
+                           todaysProgress.count > Self.collapsedIntentionLimit {
+                            Button {
+                                withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
+                                    showsAllIntentionsOnHome.toggle()
+                                }
+                            } label: {
+                                Label(
+                                    showsAllIntentionsOnHome
+                                        ? "Show Less"
+                                        : "View \(todaysProgress.count - Self.collapsedIntentionLimit) More",
+                                    systemImage: showsAllIntentionsOnHome ? "chevron.up" : "chevron.down"
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AttuneTheme.textSecondary)
+                                .frame(minHeight: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(
+                                showsAllIntentionsOnHome
+                                    ? "Collapses the intentions card to four rows"
+                                    : "Expands the intentions card and enables Home scrolling"
+                            )
+                        }
+
+                        Spacer(minLength: 8)
                         Button(action: { enterUpdateProgressMode() }) {
                             Label("Update Progress", systemImage: "slider.horizontal.3")
                                 .font(.caption.weight(.semibold))
@@ -807,8 +859,20 @@ struct HomeView: View {
     }
 
     private var visibleProgressRows: [IntentionProgressRow] {
-        guard oneThingMode.isActive, let focusedProgressRow else { return todaysProgress }
-        return [focusedProgressRow]
+        if oneThingMode.isActive, let focusedProgressRow {
+            return [focusedProgressRow]
+        }
+        if showsAllIntentionsOnHome || isUpdateProgressMode || dynamicTypeSize.isAccessibilitySize {
+            return todaysProgress
+        }
+        return Array(todaysProgress.prefix(Self.collapsedIntentionLimit))
+    }
+
+    /// The default Home dashboard cannot move at all. Scrolling becomes useful
+    /// only after an explicit expansion action, or when accessibility text needs
+    /// more vertical room.
+    private var homeScrollingIsEnabled: Bool {
+        dynamicTypeSize.isAccessibilitySize || showsAllIntentionsOnHome
     }
 
     private func adjacentFocusRow(offset: Int) -> IntentionProgressRow? {
@@ -1369,6 +1433,9 @@ struct HomeView: View {
         originalTotals = Dictionary(uniqueKeysWithValues: todaysProgress.map { ($0.intention.id, $0.total) }) // snapshot current totals for cancel
         sliderValues = originalTotals // seed sliders with current totals
         activeProgressSnapTicks = [:]
+        if todaysProgress.count > Self.collapsedIntentionLimit {
+            showsAllIntentionsOnHome = true
+        }
         isUpdateProgressMode = true // toggle mode on
         ManualProgressHaptics.editorOpened()
     }
@@ -1403,11 +1470,13 @@ struct HomeView: View {
         let previousPercents = displayedProgressPercentages()
         let dateKey = ProgressCalculator.dateKey(for: Date()) // today’s date key
         let savedAt = Date() // one timestamp keeps multiple real changes in the same manual chart cluster
+        var attemptedChangeCount = 0
         var savedChangeCount = 0
         for row in todaysProgress { // iterate intentions shown
             let value = sliderValues[row.intention.id] ?? row.total // use slider or existing total
             let originalValue = originalTotals[row.intention.id] ?? row.total
             guard ManualProgressSavePolicy.hasChanged(current: value, original: originalValue) else { continue }
+            attemptedChangeCount += 1
             let override = ManualProgressOverride( // build override payload
                 dateKey: dateKey, // apply to today
                 intentionId: row.intention.id, // target intention
@@ -1432,7 +1501,13 @@ struct HomeView: View {
         let visiblyChangedIDs = changedProgressIntentionIDs(since: previousPercents)
         highlightProgressRows(visiblyChangedIDs)
         if !visiblyChangedIDs.isEmpty {
-            ManualProgressHaptics.savedChanges()
+            if !newlyCompletedIntentionIDs(since: previousPercents).isEmpty {
+                AttuneHaptics.reward()
+            } else {
+                AttuneHaptics.saved()
+            }
+        } else if attemptedChangeCount > 0 {
+            AttuneHaptics.error()
         }
     }
 
@@ -1446,6 +1521,18 @@ struct HomeView: View {
         Set(todaysProgress.compactMap { row in
             guard let previous = previousPercents[row.id],
                   abs(previous - row.percent) > 0.000_001 else { return nil }
+            return row.id
+        })
+    }
+
+    /// A completion reward is earned only when this save crosses the target.
+    private func newlyCompletedIntentionIDs(since previousPercents: [String: Double]) -> Set<String> {
+        Set(todaysProgress.compactMap { row in
+            guard let previous = previousPercents[row.id],
+                  ManualProgressSavePolicy.crossedTarget(
+                    previousPercent: previous,
+                    currentPercent: row.percent
+                  ) else { return nil }
             return row.id
         })
     }
@@ -1641,25 +1728,51 @@ struct HomeView: View {
                 .frame(height: 36)
                 .background(AttuneTheme.surfaceStrong.opacity(0.94), in: Capsule())
                 .overlay(Capsule().stroke(AttuneTheme.accent.opacity(0.28), lineWidth: 1))
+                .contentShape(Capsule())
                 .position(x: selectedX, y: 23)
+                .scaleEffect(isMoodDragActive ? 1.06 : 1)
+                .shadow(
+                    color: AttuneTheme.accent.opacity(isMoodDragActive ? 0.30 : 0),
+                    radius: isMoodDragActive ? 8 : 0
+                )
                 .animation(reduceMotion ? nil : .snappy(duration: 0.18), value: inlineMoodScore)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: isMoodDragActive)
+                .gesture(
+                    LongPressGesture(minimumDuration: 0.35, maximumDistance: 20)
+                        .sequenced(
+                            before: DragGesture(
+                                minimumDistance: 0,
+                                coordinateSpace: .named("homeMoodRail")
+                            )
+                        )
+                        .onChanged { value in
+                            switch value {
+                            case .first(true):
+                                activateMoodDragIfNeeded()
+                            case .second(true, let drag?):
+                                activateMoodDragIfNeeded()
+                                updateInlineMood(
+                                    at: drag.location.x,
+                                    horizontalInset: horizontalInset,
+                                    trackWidth: trackWidth
+                                )
+                            default:
+                                break
+                            }
+                        }
+                        .onEnded { value in
+                            guard case .second(true, _) = value,
+                                  isMoodDragActive else {
+                                isMoodDragActive = false
+                                return
+                            }
+                            isMoodDragActive = false
+                            saveInlineMood(score: inlineMoodScore)
+                            MoodRailHaptics.committed()
+                        }
+                )
             }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                    .onChanged { value in
-                        let progress = min(1, max(0, (value.location.x - horizontalInset) / trackWidth))
-                        let nextScore = Int((progress * 10).rounded())
-                        guard nextScore != inlineMoodScore else { return }
-                        inlineMoodScore = nextScore
-                        let generator = UISelectionFeedbackGenerator()
-                        generator.prepare()
-                        generator.selectionChanged()
-                    }
-                    .onEnded { _ in
-                        saveInlineMood(score: inlineMoodScore)
-                    }
-            )
+            .coordinateSpace(name: "homeMoodRail")
         }
         .frame(maxWidth: .infinity, minHeight: 66)
         .padding(.horizontal, 4)
@@ -1678,6 +1791,21 @@ struct HomeView: View {
             inlineMoodScore = nextScore
             saveInlineMood(score: nextScore)
         }
+    }
+
+    private func activateMoodDragIfNeeded() {
+        guard !isMoodDragActive else { return }
+        isMoodDragActive = true
+        MoodRailHaptics.activated()
+    }
+
+    private func updateInlineMood(at x: CGFloat, horizontalInset: CGFloat, trackWidth: CGFloat) {
+        guard isMoodDragActive else { return }
+        let progress = min(1, max(0, (x - horizontalInset) / trackWidth))
+        let nextScore = Int((progress * 10).rounded())
+        guard nextScore != inlineMoodScore else { return }
+        inlineMoodScore = nextScore
+        MoodRailHaptics.crossedTick()
     }
 
     private var feelingControl: some View {
@@ -1885,8 +2013,7 @@ struct HomeView: View {
                 .font(.subheadline)
 
             Button(action: {
-                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                impactFeedback.impactOccurred()
+                AttuneHaptics.action()
                 startCheckIn()
             }) {
                 Label("Record Check-In", systemImage: "mic.fill")
@@ -2159,6 +2286,7 @@ struct HomeView: View {
             at: Date()
         )
         state = .saved(checkInId: checkInId)
+        AttuneHaptics.saved()
     }
 
     private func scheduleReviewRequestAfterSavedReceipt() {
@@ -2318,9 +2446,9 @@ struct HomeView: View {
             }
         } catch {
             AppLogger.log(AppLogger.ERR, "Intention suggestion unavailable error=\"\(error.localizedDescription)\"")
-            if RapidIntentionSuggestionTestingFeature.isEnabled {
-                suggestionNudge = "Rapid suggestion test failed. Check the app log and Worker deployment."
-            }
+            // Suggestion generation is optional. Keep technical failures in the
+            // diagnostic log instead of presenting them as actionable Home UI.
+            suggestionNudge = nil
         }
     }
 
@@ -2564,6 +2692,9 @@ struct HomeView: View {
         }
         
         todaysProgress = rows
+        if rows.count <= Self.collapsedIntentionLimit {
+            showsAllIntentionsOnHome = false
+        }
         DailyReminderNotificationService.shared.refreshReminderForToday() // Re-evaluate today's reminder whenever progress data changes.
         
         if isUpdateProgressMode { // keep slider state in sync when data refreshes during update mode
@@ -2737,6 +2868,7 @@ struct HomeView: View {
             beginRecording()
         case .denied:
             state = .permissionDenied
+            AttuneHaptics.warning()
         case .needsRequest:
             state = .requestingPermission
             Task { @MainActor in
@@ -2746,6 +2878,7 @@ struct HomeView: View {
                     beginRecording()
                 } else {
                     state = .permissionDenied
+                    AttuneHaptics.warning()
                 }
             }
         }
@@ -2757,6 +2890,7 @@ struct HomeView: View {
             // If not cached, this will load synchronously but should be rare
             guard let _ = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else {
                 state = .error(message: "Could not load intentions")
+                AttuneHaptics.error()
                 return
             }
             
@@ -2772,11 +2906,13 @@ struct HomeView: View {
         } catch {
             // If any error occurs, show error state
             state = .error(message: error.localizedDescription)
+            AttuneHaptics.error()
         }
     }
     
     private func stopCheckIn() {
         guard let result = checkInRecorder.stopRecording() else { return }
+        AttuneHaptics.action()
         processingCheckInId = result.checkInId
         state = .processing
         
@@ -2797,6 +2933,7 @@ struct HomeView: View {
             
             guard let intentionSet = try? IntentionSetStore.shared.loadOrCreateCurrentIntentionSet() else {
                 state = .error(message: "Could not load intention set")
+                AttuneHaptics.error()
                 return
             }
             
@@ -2955,6 +3092,7 @@ struct HomeView: View {
                 eventID: "check-in-failed:\(checkInId)"
             )
             state = .error(message: error.localizedDescription)
+            AttuneHaptics.error()
             
             // Replace placeholder with failed row; red flash
             processingCheckInId = nil

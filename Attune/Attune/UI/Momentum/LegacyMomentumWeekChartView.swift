@@ -123,10 +123,10 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
                 for (idx, day) in days.enumerated() { // Iterate day columns.
                     let dayLeft = leftPadding + (CGFloat(idx) * dayWidth) // Left boundary for this column.
                     let innerWidth = dayWidth * 0.6 // Inner width for slotting bars with padding.
-                    let barWidth = max(8, innerWidth * 0.22) // Bar width scaled to inner area with a minimum for visibility.
+                    let barWidth = max(9, innerWidth * 0.26) // Keep the staggered bars a touch wider and easier to distinguish.
                     let barDepth = dimension == .threeD ? min(max(2.5, barWidth * 0.34), 7) : 0 // Remove extrusion in 2D mode.
                     let topRise = barDepth * 0.58 // Vertical rise of the back edge for top-face perspective.
-                    let clusterStep = barWidth * 0.62 // Tight, consistent stagger so adjacent bars overlap slightly.
+                    let clusterStep = barWidth * 0.48 // Cascade bars while keeping just over half of each front face overlapped.
                     let clusterCenter = dayLeft + (dayWidth / 2) - (barDepth / 2) // Visually center front faces plus their right-side depth.
                     let sortedBars = day.bars.sorted { lhs, rhs in // Stable left-to-right order inside every day.
                         if lhs.percent != rhs.percent { return lhs.percent < rhs.percent }

@@ -54,10 +54,27 @@ private enum MomentumViewMode: String, CaseIterable {
     case day = "Day"
     case week = "Week"
     case month = "Month"
+
+    var symbolName: String {
+        switch self {
+        case .day: return "sun.max.fill"
+        case .week: return "calendar"
+        case .month: return "calendar.badge.clock"
+        }
+    }
+
+    var tintColor: Color {
+        switch self {
+        case .day: return AttuneTheme.accent
+        case .week: return AttuneTheme.accentSecondary
+        case .month: return AttuneTheme.warning
+        }
+    }
 }
 
 struct MomentumView: View {
     @EnvironmentObject private var appRouter: AppRouter
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var selectedDate: Date
     @State private var viewMode: MomentumViewMode = .day
@@ -85,6 +102,11 @@ struct MomentumView: View {
     var body: some View {
         ZStack {
             AttuneScreenBackground()
+            MomentumProgressAtmosphere(progress: momentumAtmosphereProgress)
+                .animation(
+                    reduceMotion ? nil : .easeInOut(duration: 0.7),
+                    value: momentumAtmosphereProgress
+                )
 
             ScrollView {
                 VStack(alignment: .leading, spacing: viewMode == .day ? 8 : 16) {
@@ -141,17 +163,47 @@ struct MomentumView: View {
     }
 
     private var modeSelector: some View {
-        Picker("Time period", selection: $viewMode) {
+        HStack(spacing: 6) {
             ForEach(MomentumViewMode.allCases, id: \.self) { mode in
-                Text(mode.rawValue).tag(mode)
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                        viewMode = mode
+                    }
+                } label: {
+                    Label(mode.rawValue, systemImage: mode.symbolName)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .foregroundStyle(viewMode == mode ? Color.white : mode.tintColor.opacity(0.9))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(
+                            mode.tintColor.opacity(viewMode == mode ? 0.28 : 0.055),
+                            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                .stroke(mode.tintColor.opacity(viewMode == mode ? 0.72 : 0.15), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(viewMode == mode ? .isSelected : [])
             }
         }
-        .pickerStyle(.segmented)
+        .padding(5)
+        .background {
+            MomentumTintedCardBackground(
+                tint: AttuneTheme.accentSecondary,
+                cornerRadius: AttuneTheme.controlRadius + 3,
+                strength: 0.6
+            )
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Time period")
         .accessibilityHint("Changes the momentum chart period")
     }
 
     /// A quiet orientation card for people arriving from Home. The neutral,
-    /// fading texture keeps it distinct from the data colors used in charts.
+    /// fading texture keeps it distinct from the period-specific data colors.
     private var momentumGuideCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("YOUR PROGRESS, OVER TIME")
@@ -213,11 +265,13 @@ struct MomentumView: View {
             }
         }
         .padding(viewMode == .day ? 6 : 12)
-        .background(AttuneTheme.surface, in: RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: AttuneTheme.controlRadius, style: .continuous)
-                .stroke(AttuneTheme.border, lineWidth: 1)
-        )
+        .background {
+            MomentumTintedCardBackground(
+                tint: viewMode.tintColor,
+                cornerRadius: AttuneTheme.controlRadius,
+                strength: 0.82
+            )
+        }
     }
 
     @ViewBuilder
@@ -245,6 +299,7 @@ struct MomentumView: View {
                 yAxisMax: legacyYAxisMax,
                 selectedDate: selectedDate
             )
+            .momentumSectionOutline(tint: viewMode.tintColor)
 
             NavigationLink {
                 DayDetailView(dateKey: ProgressCalculator.dateKey(for: selectedDate))
@@ -261,7 +316,9 @@ struct MomentumView: View {
                 .padding(16)
             }
             .buttonStyle(.plain)
-            .attuneCard()
+            .background {
+                MomentumTintedCardBackground(tint: viewMode.tintColor, strength: 0.52)
+            }
         }
     }
 
@@ -279,6 +336,7 @@ struct MomentumView: View {
             ])
 
             LegacyMomentumWeekChartView(days: legacyWeekDaysChart, yAxisMax: legacyWeekYAxisMax)
+                .momentumSectionOutline(tint: viewMode.tintColor)
 
             if !allBars.isEmpty {
                 intentionLegend(items: uniqueWeekIntentions)
@@ -297,6 +355,7 @@ struct MomentumView: View {
             ])
 
             LegacyMomentumMonthChartView(bars: monthBars)
+                .momentumSectionOutline(tint: viewMode.tintColor)
         }
     }
 
@@ -311,7 +370,7 @@ struct MomentumView: View {
                 VStack(spacing: 3) {
                     Text(item.value)
                         .font(.title3.bold().monospacedDigit())
-                        .foregroundStyle(index == 0 ? AttuneTheme.accent : AttuneTheme.textPrimary)
+                        .foregroundStyle(index == 0 ? viewMode.tintColor : AttuneTheme.textPrimary)
                     Text(item.label)
                         .font(.caption)
                         .foregroundStyle(AttuneTheme.textSecondary)
@@ -321,13 +380,15 @@ struct MomentumView: View {
                 .frame(maxWidth: .infinity)
 
                 if index < items.count - 1 {
-                    Divider().overlay(AttuneTheme.border)
+                    Divider().overlay(viewMode.tintColor.opacity(0.2))
                         .frame(height: 34)
                 }
             }
         }
         .padding(.vertical, viewMode == .day ? 8 : 14)
-        .attuneCard()
+        .background {
+            MomentumTintedCardBackground(tint: viewMode.tintColor, strength: 0.68)
+        }
     }
 
     private func intentionLegend(items: [(id: String, title: String, colorIndex: Int)]) -> some View {
@@ -346,6 +407,11 @@ struct MomentumView: View {
             }
             .padding(.horizontal, 2)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            MomentumTintedCardBackground(tint: viewMode.tintColor, strength: 0.42)
+        }
     }
 
     private func periodButton(systemImage: String, label: String, action: @escaping () -> Void) -> some View {
@@ -356,7 +422,7 @@ struct MomentumView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(AttuneTheme.accent)
+        .foregroundStyle(viewMode.tintColor)
         .accessibilityLabel(label)
     }
 
@@ -386,6 +452,24 @@ struct MomentumView: View {
             let selected = calendar.dateComponents([.year, .month], from: selectedDate)
             let current = calendar.dateComponents([.year, .month], from: Date())
             return (selected.year ?? 0, selected.month ?? 0) < (current.year ?? 0, current.month ?? 0)
+        }
+    }
+
+    /// Drives only the page atmosphere. No recorded data stays neutral rather
+    /// than presenting an empty period as poor performance.
+    private var momentumAtmosphereProgress: Double? {
+        switch viewMode {
+        case .day:
+            guard dayIntentionCount > 0 else { return nil }
+            return dayOverallRatio
+        case .week:
+            let bars = weekDaysChart.flatMap(\.bars)
+            guard !bars.isEmpty else { return nil }
+            return bars.map(\.percent).reduce(0, +) / Double(bars.count) / 100
+        case .month:
+            let recorded = monthBars.compactMap(\.ratio)
+            guard !recorded.isEmpty else { return nil }
+            return recorded.reduce(0, +) / Double(recorded.count)
         }
     }
 
@@ -725,7 +809,7 @@ struct MomentumView: View {
 }
 
 /// Faint etched lines sit inside clear glass and disappear toward the lower
-/// edge. The treatment is intentionally neutral so chart colors retain meaning.
+/// edge. The neutral treatment lets functional section colors carry meaning.
 private struct MomentumGuideCardBackground: View {
     private let shape = RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
 
@@ -785,6 +869,161 @@ private struct MomentumGuideCardBackground: View {
             )
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// A deliberately quiet, progress-driven wash behind the Momentum page. The
+/// hue travels from warm orange to a muted avocado green, while no-data periods
+/// retain the app's neutral violet atmosphere.
+private struct MomentumProgressAtmosphere: View {
+    let progress: Double?
+
+    private var normalizedProgress: Double? {
+        progress.map { min(max($0, 0), 1) }
+    }
+
+    private var tint: Color {
+        guard let normalizedProgress else {
+            return AttuneTheme.accentSecondary
+        }
+
+        let hue = 0.075 + (normalizedProgress * 0.205)
+        return Color(
+            hue: hue,
+            saturation: 0.72 - (normalizedProgress * 0.08),
+            brightness: 0.92 - (normalizedProgress * 0.08)
+        )
+    }
+
+    private var textureOpacity: Double {
+        normalizedProgress == nil ? 0.42 : 0.72
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                RadialGradient(
+                    colors: [tint.opacity(0.13), tint.opacity(0.045), Color.clear],
+                    center: .topTrailing,
+                    startRadius: 12,
+                    endRadius: geometry.size.height * 0.54
+                )
+
+                RadialGradient(
+                    colors: [tint.opacity(0.075), Color.clear],
+                    center: .bottomLeading,
+                    startRadius: 24,
+                    endRadius: geometry.size.width * 1.05
+                )
+
+                Canvas { context, size in
+                    let ringCenter = CGPoint(x: size.width * 1.02, y: size.height * 0.2)
+
+                    // Offset contour rings create a soft, screen-printed 1970s
+                    // texture without reading as another data visualization.
+                    for index in 0..<8 {
+                        let radius = CGFloat(58 + index * 30)
+                        let rect = CGRect(
+                            x: ringCenter.x - radius,
+                            y: ringCenter.y - radius * 0.7,
+                            width: radius * 2,
+                            height: radius * 1.4
+                        )
+                        context.stroke(
+                            Path(ellipseIn: rect),
+                            with: .color(tint.opacity(0.026 + Double(index) * 0.002)),
+                            style: StrokeStyle(lineWidth: 0.7, lineCap: .round)
+                        )
+                    }
+
+                    // Sparse halftone points keep the lower wash tactile but
+                    // remain nearly invisible behind cards and chart content.
+                    for row in 0..<9 {
+                        for column in 0..<8 {
+                            let x = CGFloat(column) * 34 + (row.isMultiple(of: 2) ? 7 : 22)
+                            let y = size.height * 0.68 + CGFloat(row) * 31
+                            let diameter: CGFloat = (column + row).isMultiple(of: 3) ? 1.5 : 1
+                            let dot = CGRect(x: x, y: y, width: diameter, height: diameter)
+                            context.fill(Path(ellipseIn: dot), with: .color(tint.opacity(0.055)))
+                        }
+                    }
+                }
+                .opacity(textureOpacity)
+            }
+        }
+        .blendMode(.screen)
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A period-aware glass surface. The tint provides hierarchy while material,
+/// restrained opacity, and a shared silhouette keep the screen cohesive.
+private struct MomentumTintedCardBackground: View {
+    let tint: Color
+    var cornerRadius: CGFloat = AttuneTheme.cardRadius
+    var strength: Double = 0.6
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
+
+    var body: some View {
+        ZStack {
+            shape.fill(.ultraThinMaterial)
+            shape.fill(AttuneTheme.surface)
+
+            LinearGradient(
+                colors: [
+                    tint.opacity(0.22 * strength),
+                    tint.opacity(0.07 * strength),
+                    Color.clear
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .clipShape(shape)
+        .overlay {
+            shape.strokeBorder(
+                LinearGradient(
+                    colors: [tint.opacity(0.58 * strength), AttuneTheme.border, tint.opacity(0.12 * strength)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+        }
+        .shadow(color: tint.opacity(0.1 * strength), radius: 14, x: 0, y: 7)
+        .allowsHitTesting(false)
+    }
+}
+
+private struct MomentumSectionOutlineModifier: ViewModifier {
+    let tint: Color
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [tint.opacity(0.42), tint.opacity(0.08), Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: tint.opacity(0.08), radius: 14, x: 0, y: 7)
+    }
+}
+
+private extension View {
+    func momentumSectionOutline(tint: Color) -> some View {
+        modifier(MomentumSectionOutlineModifier(tint: tint))
     }
 }
 

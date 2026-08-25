@@ -11,9 +11,15 @@ enum IntentionSuggestionFeature {
 }
 
 enum RapidIntentionSuggestionTestingFeature {
+    static let launchArgument = "-EnableRapidIntentionSuggestions"
+
     static var isEnabled: Bool {
+        isEnabled(arguments: ProcessInfo.processInfo.arguments)
+    }
+
+    static func isEnabled(arguments: [String]) -> Bool {
         #if DEBUG
-        true
+        arguments.contains(launchArgument)
         #else
         false
         #endif

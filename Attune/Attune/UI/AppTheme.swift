@@ -94,6 +94,38 @@ struct AttuneCardModifier: ViewModifier {
     }
 }
 
+struct InsightCaptureCardModifier: ViewModifier {
+    let isHighlighted: Bool
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: AttuneTheme.cardRadius, style: .continuous)
+
+        content
+            .background(
+                isHighlighted
+                    ? AttuneTheme.accentSecondary.opacity(0.28)
+                    : Color.clear,
+                in: shape
+            )
+            .background(.ultraThinMaterial, in: shape)
+            .background(AttuneTheme.surface, in: shape)
+            .overlay(
+                shape
+                    .stroke(
+                        isHighlighted ? AttuneTheme.accentSecondary.opacity(0.72) : AttuneTheme.border,
+                        lineWidth: isHighlighted ? 1.5 : 1
+                    )
+                    .allowsHitTesting(false)
+            )
+            .shadow(
+                color: isHighlighted ? AttuneTheme.accentSecondary.opacity(0.24) : Color.black.opacity(0.24),
+                radius: isHighlighted ? 16 : 12,
+                x: 0,
+                y: 7
+            )
+    }
+}
+
 struct AttunePrimaryButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -120,5 +152,9 @@ struct AttunePrimaryButtonStyle: ButtonStyle {
 extension View {
     func attuneCard() -> some View {
         modifier(AttuneCardModifier())
+    }
+
+    func insightCaptureCard(isHighlighted: Bool) -> some View {
+        modifier(InsightCaptureCardModifier(isHighlighted: isHighlighted))
     }
 }

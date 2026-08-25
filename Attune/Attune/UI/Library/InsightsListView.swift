@@ -198,6 +198,7 @@ struct InsightsListView: View {
 struct InsightCaptureRow: View {
     let item: ExtractedItem
     let correction: ItemCorrection?
+    var isNewlySeen = false
 
     private var corrected: CorrectedItemView { item.applyingCorrection(correction) }
 
@@ -236,7 +237,7 @@ struct InsightCaptureRow: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .attuneCard()
+        .insightCaptureCard(isHighlighted: isNewlySeen)
     }
 }
 

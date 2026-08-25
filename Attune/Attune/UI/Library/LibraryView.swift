@@ -9,11 +9,17 @@
 import SwiftUI
 
 struct LibraryView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var items: [ExtractedItem] = []
     @State private var topics: [TopicAggregate] = []
     @State private var corrections: [String: ItemCorrection] = [:]
     @State private var sessions: [Session] = []
     @State private var checkIns: [CheckIn] = []
+    @State private var highlightedCaptureIDs: Set<String> = []
+    @State private var unseenCalendarCaptureIDs: Set<String> = []
+    @State private var seenFeedbackToken = UUID()
+
+    private let seenStore = InsightSeenStore()
 
     var body: some View {
         NavigationStack {
@@ -47,6 +53,12 @@ struct LibraryView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .onAppear(perform: loadData)
+            .task(id: seenFeedbackToken) {
+                guard !highlightedCaptureIDs.isEmpty || !unseenCalendarCaptureIDs.isEmpty else { return }
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                finishSeenFeedback()
+            }
         }
     }
 
@@ -65,19 +77,10 @@ struct LibraryView: View {
 
             if CalendarFeature.isEnabled {
                 NavigationLink(destination: AttuneCalendarView()) {
-                    Label("Calendar", systemImage: "calendar")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AttuneTheme.accent)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 36)
-                        .background(AttuneTheme.accent.opacity(0.12), in: Capsule())
-                        .overlay {
-                            Capsule()
-                                .stroke(AttuneTheme.accent.opacity(0.28), lineWidth: 1)
-                        }
-                        .contentShape(Capsule())
+                    CalendarShortcutLabel(hasUnseenEvents: !unseenCalendarCaptureIDs.isEmpty)
                 }
                 .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded(markCalendarCapturesSeen))
                 .accessibilityHint("Opens your captured events calendar")
             }
         }
@@ -152,9 +155,17 @@ struct LibraryView: View {
 
                     ForEach(Array(visibleItems.prefix(2))) { item in
                         NavigationLink(destination: InsightDetailView(item: item)) {
-                            InsightCaptureRow(item: item, correction: corrections[item.id])
+                            InsightCaptureRow(
+                                item: item,
+                                correction: corrections[item.id],
+                                isNewlySeen: highlightedCaptureIDs.contains(item.id)
+                            )
                         }
                         .buttonStyle(.plain)
+                        .animation(
+                            reduceMotion ? nil : .easeInOut(duration: 0.65),
+                            value: highlightedCaptureIDs.contains(item.id)
+                        )
                     }
                 }
             }
@@ -331,11 +342,89 @@ struct LibraryView: View {
     }
 
     private func loadData() {
-        corrections = CorrectionsStore.shared.loadCorrections()
-        items = ExtractionStore.shared.loadAllExtractions()
+        let loadedCorrections = CorrectionsStore.shared.loadCorrections()
+        let loadedItems = ExtractionStore.shared.loadAllExtractions()
+        let loadedVisibleItems = loadedItems.filter {
+            !($0.applyingCorrection(loadedCorrections[$0.id]).isMarkedIncorrect)
+        }
+        let unseenIDs = seenStore.unseenIDs(in: loadedVisibleItems.map(\.id))
+
+        corrections = loadedCorrections
+        items = loadedItems
         topics = Array(TopicAggregateStore.shared.loadTopics().values)
         sessions = SessionStore.shared.loadAllSessions().sorted { $0.startedAt > $1.startedAt }
         checkIns = CheckInStore.shared.loadAllCheckIns().sorted { $0.createdAt > $1.createdAt }
+        highlightedCaptureIDs = unseenIDs
+        unseenCalendarCaptureIDs = Set(
+            loadedVisibleItems
+                .filter { $0.applyingCorrection(loadedCorrections[$0.id]).displayType == ExtractedItem.ItemType.event }
+                .map(\.id)
+        ).intersection(unseenIDs)
+        seenFeedbackToken = UUID()
+    }
+
+    private func finishSeenFeedback() {
+        let IDsToMark = highlightedCaptureIDs.union(unseenCalendarCaptureIDs)
+        seenStore.markSeen(IDsToMark, retaining: items.map(\.id))
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.65)) {
+            highlightedCaptureIDs.removeAll()
+            unseenCalendarCaptureIDs.removeAll()
+        }
+    }
+
+    private func markCalendarCapturesSeen() {
+        let IDsToMark = unseenCalendarCaptureIDs
+        seenStore.markSeen(IDsToMark, retaining: items.map(\.id))
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
+            highlightedCaptureIDs.subtract(IDsToMark)
+            unseenCalendarCaptureIDs.removeAll()
+        }
+    }
+}
+
+private struct CalendarShortcutLabel: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let hasUnseenEvents: Bool
+    @State private var isPulsing = false
+
+    var body: some View {
+        Label("Calendar", systemImage: hasUnseenEvents ? "calendar.badge.exclamationmark" : "calendar")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(hasUnseenEvents ? AttuneTheme.textPrimary : AttuneTheme.accent)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 38)
+            .background(
+                hasUnseenEvents ? AttuneTheme.accentSecondary.opacity(0.24) : AttuneTheme.accent.opacity(0.12),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        hasUnseenEvents ? AttuneTheme.accentSecondary.opacity(isPulsing ? 0.95 : 0.42) : AttuneTheme.accent.opacity(0.28),
+                        lineWidth: hasUnseenEvents ? (isPulsing ? 2 : 1.25) : 1
+                    )
+            }
+            .shadow(
+                color: hasUnseenEvents ? AttuneTheme.accentSecondary.opacity(isPulsing ? 0.38 : 0.16) : .clear,
+                radius: isPulsing ? 10 : 5,
+                y: 3
+            )
+            .scaleEffect(hasUnseenEvents && isPulsing && !reduceMotion ? 1.035 : 1)
+            .contentShape(Capsule())
+            .onAppear(perform: updateAnimation)
+            .onChange(of: hasUnseenEvents) { _, _ in updateAnimation() }
+            .accessibilityLabel(hasUnseenEvents ? "Calendar, new captured events" : "Calendar")
+    }
+
+    private func updateAnimation() {
+        guard hasUnseenEvents, !reduceMotion else {
+            isPulsing = false
+            return
+        }
+        isPulsing = false
+        withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+            isPulsing = true
+        }
     }
 }
 

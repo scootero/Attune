@@ -561,10 +561,12 @@ struct EditIntentionsView: View {
             baselineAddDraft = addDraft // align baseline add draft with cleared add draft
             isAddExpanded = false // collapse add card post-save
             expandedEditId = nil // collapse edits post-save
-            
+
+            AttuneHaptics.saved()
             dismiss()
         } catch {
             AppLogger.log(AppLogger.ERR, "EditIntentions save failed error=\"\(error.localizedDescription)\"")
+            AttuneHaptics.error()
         }
     }
 }
