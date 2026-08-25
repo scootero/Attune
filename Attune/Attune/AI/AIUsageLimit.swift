@@ -71,7 +71,7 @@ struct AIUsageNotice: Identifiable, Equatable {
         case .warning:
             return "You’re nearing this month’s included AI processing limit." + refresh
         case .limited:
-            return "You’ve used this month’s included AI processing. Everything already saved in Attune is still available." + refresh
+            return "You’ve used this month’s included AI processing. Everything already saved in Pondera is still available." + refresh
         }
     }
 }

@@ -16,14 +16,14 @@ struct AIPrivacyDisclosureSheet: View {
     var body: some View {
         NavigationView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("How Attune uses your voice")
+                Text("How Pondera uses your voice")
                     .font(.title2.bold())
 
-                Text("Attune records your voice when you choose to check in or use Talk it out. Speech recognition may use Apple’s cloud services to turn audio into text.")
+                Text("Pondera records your voice when you choose to check in or use Talk it out. Speech recognition may use Apple’s cloud services to turn audio into text.")
                     .font(.body)
                     .foregroundColor(.secondary)
 
-                Text("To organize insights and update intentions, Attune sends those transcripts to OpenAI through Attune’s secure server. Your voice and text are used only for this purpose inside the app.")
+                Text("To organize insights and update intentions, Pondera sends those transcripts to OpenAI through Pondera’s secure server. Your voice and text are used only for this purpose inside the app.")
                     .font(.body)
                     .foregroundColor(.secondary)
 

@@ -61,6 +61,45 @@ enum AttuneTheme {
     }
 }
 
+/// Shared customer-facing Pondera mark used by the persistent header and launch intro.
+struct PonderaBrandMark: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color.white.opacity(0.95), AttuneTheme.accent.opacity(0.88), .clear],
+                        center: UnitPoint(x: 0.36, y: 0.30),
+                        startRadius: 0,
+                        endRadius: 12
+                    )
+                )
+                .blur(radius: 0.35)
+
+            Circle()
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            Color.white.opacity(0.78),
+                            AttuneTheme.accent.opacity(0.34),
+                            AttuneTheme.accentSecondary.opacity(0.58),
+                            Color.white.opacity(0.78)
+                        ],
+                        center: .center
+                    ),
+                    lineWidth: 1
+                )
+
+            Circle()
+                .trim(from: 0.12, to: 0.70)
+                .stroke(Color.white.opacity(0.72), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+                .frame(width: 12, height: 12)
+                .rotationEffect(.degrees(-18))
+        }
+        .shadow(color: AttuneTheme.accent.opacity(0.28), radius: 7)
+    }
+}
+
 struct AttuneScreenBackground: View {
     var body: some View {
         ZStack {

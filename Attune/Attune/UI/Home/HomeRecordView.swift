@@ -144,7 +144,7 @@ struct HomeRecordView: View {
             }
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView(reason: "Talk it out and the Insights it creates are included with Attune Pro.")
+            PaywallView(reason: "Talk it out and the Insights it creates are included with Pondera Pro.")
                 .environmentObject(subscriptionManager)
         }
         .sheet(
@@ -209,7 +209,7 @@ struct HomeRecordView: View {
                 Text("Say what’s on your mind")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(AttuneTheme.textPrimary)
-                Text("Talk naturally. Attune will organize the useful parts and notice what keeps coming up.")
+                Text("Talk naturally. Pondera will organize the useful parts and notice what keeps coming up.")
                     .font(.subheadline)
                     .foregroundStyle(AttuneTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -237,7 +237,7 @@ struct HomeRecordView: View {
             }
             .buttonStyle(AttunePrimaryButtonStyle())
             .disabled(isCheckingAIUsage)
-            .accessibilityHint("Starts recording so Attune can organize captured ideas and themes")
+            .accessibilityHint("Starts recording so Pondera can organize captured ideas and themes")
         }
     }
 
@@ -335,7 +335,7 @@ struct HomeRecordView: View {
         statusPanel(
             icon: "sparkles",
             title: "Organizing what you said…",
-            detail: "Attune is transcribing and grouping captured intentions and themes.",
+            detail: "Pondera is transcribing and grouping captured intentions and themes.",
             color: AttuneTheme.accentSecondary,
             showsProgress: true
         )

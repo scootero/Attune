@@ -30,7 +30,7 @@ struct AboutView: View {
                             .frame(width: 80, height: 80)
                             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 
-                        Text("Attune")
+                        Text("Pondera: Intentions")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
 
                         Text("Version \(versionString) (\(buildString))")
@@ -49,7 +49,7 @@ struct AboutView: View {
                 .listRowBackground(Color.clear)
             }
 
-            Section("How Attune Helps") {
+            Section("How Pondera Helps") {
                 Text("A private, voice-first app for capturing intentions, recognizing patterns, and understanding your progress.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -61,7 +61,7 @@ struct AboutView: View {
                 aboutPoint(
                     icon: "waveform.badge.mic",
                     title: "Talk it out",
-                    detail: "Think out loud while Attune captures clear intentions, commitments, events, and states from what you say."
+                    detail: "Think out loud while Pondera captures clear intentions, commitments, events, and states from what you say."
                 )
                 aboutPoint(
                     icon: "sparkles",
@@ -76,7 +76,7 @@ struct AboutView: View {
             }
 
             Section("Important to Know") {
-                Text("Attune records in Talk it out only after you tap Start talking. Event-like details remain reviewable captures; Attune does not currently add calendar appointments or event reminders.")
+                Text("Pondera records in Talk it out only after you tap Start talking. Event-like details remain reviewable captures; Pondera does not currently add calendar appointments or event reminders.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

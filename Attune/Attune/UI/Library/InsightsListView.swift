@@ -126,7 +126,7 @@ struct InsightsListView: View {
                     icon: searchText.isEmpty ? "repeat" : "magnifyingglass",
                     title: searchText.isEmpty ? "No themes yet" : "No matching themes",
                     detail: searchText.isEmpty
-                        ? "Themes form as Attune groups related ideas when you talk things out. Repeated ideas will show a higher mention count."
+                        ? "Themes form as Pondera groups related ideas when you talk things out. Repeated ideas will show a higher mention count."
                         : "Try another search."
                 )
             } else {

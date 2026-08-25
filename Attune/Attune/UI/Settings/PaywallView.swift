@@ -47,7 +47,7 @@ struct PaywallView: View {
                             proFeature(
                                 icon: "waveform.badge.mic",
                                 title: "Talk it out with Insights",
-                                detail: "Talk through what’s on your mind. Attune organizes clear intentions, commitments, events, and states, then groups repeated ideas into themes."
+                                detail: "Talk through what’s on your mind. Pondera organizes clear intentions, commitments, events, and states, then groups repeated ideas into themes."
                             )
                             proFeature(
                                 icon: "chart.line.uptrend.xyaxis",
@@ -57,12 +57,12 @@ struct PaywallView: View {
                             proFeature(
                                 icon: "square.and.arrow.up",
                                 title: "Voice Setup and Data Export",
-                                detail: "Create intentions by voice with review, and export a portable copy of your Attune data."
+                                detail: "Create intentions by voice with review, and export a portable copy of your Pondera data."
                             )
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Attune Free")
+                            Text("Pondera Free")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(AttuneTheme.textSecondary)
                                 .textCase(.uppercase)
@@ -159,7 +159,7 @@ struct PaywallView: View {
     private var purchaseArea: some View {
         VStack(spacing: 12) {
             if subscriptionManager.isSubscribed {
-                Label("Attune Pro is active", systemImage: "checkmark.seal.fill")
+                Label("Pondera Pro is active", systemImage: "checkmark.seal.fill")
                     .font(.headline)
                     .foregroundStyle(AttuneTheme.success)
                     .frame(maxWidth: .infinity)
@@ -168,7 +168,7 @@ struct PaywallView: View {
             } else if subscriptionManager.isLoadingProduct {
                 HStack(spacing: 10) {
                     SwiftUI.ProgressView().tint(AttuneTheme.accent)
-                    Text("Loading Attune Pro…")
+                    Text("Loading Pondera Pro…")
                         .font(.headline)
                         .foregroundStyle(AttuneTheme.textPrimary)
                 }
@@ -197,7 +197,7 @@ struct PaywallView: View {
                         if subscriptionManager.isBusy {
                             SwiftUI.ProgressView().tint(Color(red: 0.025, green: 0.12, blue: 0.12))
                         }
-                        Text(subscriptionManager.isProductAvailable ? "Subscribe to Attune Pro" : "Try Again")
+                        Text(subscriptionManager.isProductAvailable ? "Subscribe to Pondera Pro" : "Try Again")
                     }
                 }
                 .buttonStyle(AttunePrimaryButtonStyle())

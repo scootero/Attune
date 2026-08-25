@@ -2106,7 +2106,7 @@ struct HomeView: View {
         statusPanel(
             icon: "sparkles",
             title: "Reviewing your check-in…",
-            detail: "Attune is looking for clear progress and mood updates.",
+            detail: "Pondera is looking for clear progress and mood updates.",
             color: AttuneTheme.accentSecondary,
             showsProgress: true
         )
@@ -2397,7 +2397,7 @@ struct HomeView: View {
                     }
                 }
             case .nudgeToRecord(let key):
-                suggestionNudge = "Talk it out a few times so Attune can notice a recurring theme before suggesting anything."
+                suggestionNudge = "Talk it out a few times so Pondera can notice a recurring theme before suggesting anything."
                 try IntentionSuggestionStore.shared.recordNudge(opportunityKey: key)
             case .consume(let key):
                 try IntentionSuggestionStore.shared.consume(opportunityKey: key)
@@ -2858,7 +2858,7 @@ struct HomeView: View {
         // Free users get a daily check-in cap; subscribers are unlimited.
         let todayCount = todayCheckIns.count
         guard subscriptionManager.canStartCheckIn(todayCheckInCount: todayCount) else {
-            paywallReason = "You’ve reached today’s free Voice Check-In limit. Attune Pro includes unlimited check-ins."
+            paywallReason = "You’ve reached today’s free Voice Check-In limit. Pondera Pro includes unlimited check-ins."
             showPaywall = true
             return
         }

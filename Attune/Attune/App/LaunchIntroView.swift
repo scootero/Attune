@@ -2,10 +2,9 @@
 //  LaunchIntroView.swift
 //  Attune
 //
-//  Plays the short branded intro immediately after the static iOS launch screen.
+//  Plays the short Pondera intro immediately after the static iOS launch screen.
 //
 
-import AVFoundation
 import SwiftUI
 
 struct LaunchIntroView: View {
@@ -13,47 +12,67 @@ struct LaunchIntroView: View {
 
     let onFinished: () -> Void
 
-    @State private var player = AVPlayer()
-    @State private var fallbackTask: Task<Void, Never>?
+    @State private var introTask: Task<Void, Never>?
     @State private var hasFinished = false
+    @State private var isVisible = false
 
     var body: some View {
-        LaunchIntroPlayerView(player: player, videoGravity: .resizeAspect)
-        .background(Color.black)
+        ZStack {
+            AttuneScreenBackground()
+
+            VStack(spacing: 18) {
+                PonderaBrandMark()
+                    .frame(width: 58, height: 58)
+
+                Text("Pondera")
+                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                    .tracking(1.4)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [AttuneTheme.textPrimary, AttuneTheme.accent.opacity(0.94)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+            .opacity(isVisible ? 1 : 0)
+            .scaleEffect(isVisible ? 1 : 0.96)
+        }
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-        .onAppear(perform: startPlayback)
+        .onAppear(perform: startIntro)
         .onDisappear {
-            fallbackTask?.cancel()
-            player.pause()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
-            guard let finishedItem = notification.object as? AVPlayerItem,
-                  finishedItem === player.currentItem else { return }
-            finish()
+            introTask?.cancel()
         }
     }
 
-    private func startPlayback() {
-        guard !accessibilityReduceMotion else {
-            finish()
+    private func startIntro() {
+        guard introTask == nil else { return }
+
+        if accessibilityReduceMotion {
+            isVisible = true
+            introTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(450))
+                guard !Task.isCancelled else { return }
+                finish()
+            }
             return
         }
 
-        guard let videoURL = Bundle.main.url(forResource: "AttuneLaunchIntro", withExtension: "mp4") else {
-            finish()
-            return
+        withAnimation(.easeOut(duration: 0.35)) {
+            isVisible = true
         }
 
-        let item = AVPlayerItem(url: videoURL)
-        player.replaceCurrentItem(with: item)
-        player.actionAtItemEnd = .pause
-        player.play()
+        introTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.05))
+            guard !Task.isCancelled else { return }
 
-        // Never trap someone on the intro if playback or its completion notification fails.
-        fallbackTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(3.25))
+            withAnimation(.easeInOut(duration: 0.25)) {
+                isVisible = false
+            }
+
+            try? await Task.sleep(for: .milliseconds(280))
             guard !Task.isCancelled else { return }
             finish()
         }
@@ -62,34 +81,7 @@ struct LaunchIntroView: View {
     private func finish() {
         guard !hasFinished else { return }
         hasFinished = true
-        fallbackTask?.cancel()
-        player.pause()
+        introTask?.cancel()
         onFinished()
-    }
-}
-
-private struct LaunchIntroPlayerView: UIViewRepresentable {
-    let player: AVPlayer
-    let videoGravity: AVLayerVideoGravity
-
-    func makeUIView(context: Context) -> PlayerContainerView {
-        let view = PlayerContainerView()
-        view.backgroundColor = .black
-        view.playerLayer.player = player
-        view.playerLayer.videoGravity = videoGravity
-        return view
-    }
-
-    func updateUIView(_ uiView: PlayerContainerView, context: Context) {
-        uiView.playerLayer.player = player
-        uiView.playerLayer.videoGravity = videoGravity
-    }
-}
-
-private final class PlayerContainerView: UIView {
-    override class var layerClass: AnyClass { AVPlayerLayer.self }
-
-    var playerLayer: AVPlayerLayer {
-        layer as! AVPlayerLayer
     }
 }

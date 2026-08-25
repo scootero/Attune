@@ -40,7 +40,7 @@ struct ProLockedFeatureView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Button("View Attune Pro") { showPaywall = true }
+                Button("View Pondera Pro") { showPaywall = true }
                     .buttonStyle(AttunePrimaryButtonStyle())
 
                 Text("\(subscriptionManager.priceText). Cancel anytime.")
@@ -52,7 +52,7 @@ struct ProLockedFeatureView: View {
             .padding(.horizontal, 28)
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView(reason: "\(title) is included with Attune Pro.")
+            PaywallView(reason: "\(title) is included with Pondera Pro.")
                 .environmentObject(subscriptionManager)
         }
     }
@@ -112,7 +112,7 @@ struct FreeMomentumTodayView: View {
                                 Text("Unlock your full Momentum history")
                                     .font(.headline)
                                     .foregroundStyle(AttuneTheme.textPrimary)
-                                Text("See past days plus Week and Month views with Attune Pro.")
+                                Text("See past days plus Week and Month views with Pondera Pro.")
                                     .font(.subheadline)
                                     .foregroundStyle(AttuneTheme.textSecondary)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -134,7 +134,7 @@ struct FreeMomentumTodayView: View {
         }
         .onAppear(perform: loadToday)
         .sheet(isPresented: $showPaywall) {
-            PaywallView(reason: "Past days, Week and Month Momentum, and progress history are included with Attune Pro.")
+            PaywallView(reason: "Past days, Week and Month Momentum, and progress history are included with Pondera Pro.")
                 .environmentObject(subscriptionManager)
         }
     }

@@ -56,7 +56,7 @@ struct LogsView: View {
                 ShareLink(
                     item: createExportFile(),
                     preview: SharePreview(
-                        "Attune Logs",
+                        "Pondera Logs",
                         image: Image(systemName: "doc.text")
                     )
                 ) {

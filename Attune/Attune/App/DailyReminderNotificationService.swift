@@ -9,7 +9,7 @@ import Foundation
 @preconcurrency import UserNotifications
 
 enum DailyReminderCopy {
-    static let title = "Attune — Let’s make some progress"
+    static let title = "Pondera — Let’s make some progress"
 
     static func body(intentionTitles: [String]) -> String {
         let titles = intentionTitles.prefix(2)
@@ -145,7 +145,7 @@ final class DailyReminderNotificationService {
         let intention = intentionId.flatMap { IntentionStore.shared.loadIntention(id: $0) }
 
         let content = UNMutableNotificationContent()
-        content.title = "Attune — How did it go?"
+        content.title = "Pondera — How did it go?"
         content.body = DailyReminderCopy.followUpBody(intentionTitle: intention?.title)
         content.sound = .default
         content.categoryIdentifier = followUpCategoryId

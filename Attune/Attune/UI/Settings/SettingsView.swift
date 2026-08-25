@@ -129,7 +129,7 @@ struct SettingsView: View {
         } header: {
             Text("Membership")
         } footer: {
-            Text("Free includes one active intention, one Voice Check-In per day, today's Momentum, and the daily reminder. Attune Pro adds more active intentions and Talk it out for \(subscriptionManager.priceText).")
+            Text("Free includes one active intention, one Voice Check-In per day, today's Momentum, and the daily reminder. Pondera Pro adds more active intentions and Talk it out for \(subscriptionManager.priceText).")
         }
     }
 
@@ -155,7 +155,7 @@ struct SettingsView: View {
         } header: {
             Text("Notifications")
         } footer: {
-            Text("When enabled, Attune reminds you at your chosen time only if no intention progress has been updated. You can choose an intention from the alert and get a one-hour follow-up.")
+            Text("When enabled, Pondera reminds you at your chosen time only if no intention progress has been updated. You can choose an intention from the alert and get a one-hour follow-up.")
         }
     }
 
@@ -179,14 +179,14 @@ struct SettingsView: View {
         } header: {
             Text("Privacy & Data")
         } footer: {
-            Text("Attune Pro can export a portable copy of the data in your app folder for backup or personal records.")
+            Text("Pondera Pro can export a portable copy of the data in your app folder for backup or personal records.")
         }
     }
 
     private var supportSection: some View {
         Section("Support") {
             NavigationLink(destination: AboutView()) {
-                settingsLabel("About Attune", icon: "info.circle.fill", color: .blue)
+                settingsLabel("About Pondera", icon: "info.circle.fill", color: .blue)
             }
             Link(destination: LegalLinks.support) {
                 settingsLabel("Help & Support", icon: "questionmark.circle.fill", color: AttuneTheme.accent)
@@ -300,7 +300,7 @@ struct SettingsView: View {
 
     private func handleExportTap() {
         guard subscriptionManager.canExportData else {
-            paywallReason = "Portable data export is included with Attune Pro."
+            paywallReason = "Portable data export is included with Pondera Pro."
             showPaywall = true
             return
         }

@@ -114,7 +114,7 @@ struct MoodEditorView: View {
 
                         if hasExistingMood {
                             Button(role: .destructive, action: clearMood) {
-                                Label("Clear mood and let Attune update it", systemImage: "trash")
+                                Label("Clear mood and let Pondera update it", systemImage: "trash")
                                     .font(.subheadline.weight(.semibold))
                                     .frame(maxWidth: .infinity)
                             }

@@ -93,7 +93,7 @@ struct InsightDetailView: View {
 
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("What Attune captured")
+            Text("What Pondera captured")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AttuneTheme.textPrimary)
             Text(item.summary.isEmpty ? corrected.displayTitle : item.summary)

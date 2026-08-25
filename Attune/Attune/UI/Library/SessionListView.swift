@@ -17,7 +17,7 @@ struct SessionListView: View {
                 insightsEmptyState(
                     icon: "waveform",
                     title: "No past sessions yet",
-                    detail: "Open Talk when you want to think out loud and let Attune organize what you say."
+                    detail: "Open Talk when you want to think out loud and let Pondera organize what you say."
                 )
             } else {
                 List(sessions.sorted { $0.startedAt > $1.startedAt }) { session in

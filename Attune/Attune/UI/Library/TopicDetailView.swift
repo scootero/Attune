@@ -81,7 +81,7 @@ struct TopicDetailView: View {
                 }
             }
 
-            Text("Attune groups related captures into a theme. A theme does not change Today’s progress or create a tracked intention.")
+            Text("Pondera groups related captures into a theme. A theme does not change Today’s progress or create a tracked intention.")
                 .font(.caption)
                 .foregroundStyle(AttuneTheme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)

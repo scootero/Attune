@@ -43,7 +43,7 @@ struct RootTabView: View {
                     } else {
                         ProLockedFeatureView(
                             title: "Talk it out",
-                            detail: "Talk through what’s on your mind. Attune organizes clear intentions, commitments, events, and states into reviewable Insights.",
+                            detail: "Talk through what’s on your mind. Pondera organizes clear intentions, commitments, events, and states into reviewable Insights.",
                             icon: "waveform.badge.mic"
                         )
                     }
@@ -61,7 +61,7 @@ struct RootTabView: View {
                     } else {
                         ProLockedFeatureView(
                             title: "Insights",
-                            detail: "Review what Attune found when you talked things out and notice themes that repeat over time.",
+                            detail: "Review what Pondera found when you talked things out and notice themes that repeat over time.",
                             icon: "sparkles"
                         )
                     }
@@ -136,11 +136,11 @@ struct RootTabView: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 9) {
-                AttuneHeaderMark()
+                PonderaBrandMark()
                     .frame(width: 22, height: 22)
                     .accessibilityHidden(true)
 
-                Text("Attune")
+                Text("Pondera")
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .tracking(1.1)
                     .foregroundStyle(
@@ -185,7 +185,7 @@ struct RootTabView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Settings")
-            .accessibilityHint("Opens Attune settings")
+            .accessibilityHint("Opens Pondera settings")
         }
         .padding(.horizontal, AttuneTheme.horizontalPadding)
         .padding(.vertical, 6)
@@ -217,44 +217,6 @@ struct RootTabView: View {
         TranscriptionQueue.shared.enqueueAllEligibleSegmentsOnLaunch()
         
         print("[RootTabView] Recovery complete")
-    }
-}
-
-private struct AttuneHeaderMark: View {
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [Color.white.opacity(0.95), AttuneTheme.accent.opacity(0.88), .clear],
-                        center: UnitPoint(x: 0.36, y: 0.30),
-                        startRadius: 0,
-                        endRadius: 12
-                    )
-                )
-                .blur(radius: 0.35)
-
-            Circle()
-                .stroke(
-                    AngularGradient(
-                        colors: [
-                            Color.white.opacity(0.78),
-                            AttuneTheme.accent.opacity(0.34),
-                            AttuneTheme.accentSecondary.opacity(0.58),
-                            Color.white.opacity(0.78)
-                        ],
-                        center: .center
-                    ),
-                    lineWidth: 1
-                )
-
-            Circle()
-                .trim(from: 0.12, to: 0.70)
-                .stroke(Color.white.opacity(0.72), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
-                .frame(width: 12, height: 12)
-                .rotationEffect(.degrees(-18))
-        }
-        .shadow(color: AttuneTheme.accent.opacity(0.28), radius: 7)
     }
 }
 

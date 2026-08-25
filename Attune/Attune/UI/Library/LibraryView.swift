@@ -128,7 +128,7 @@ struct LibraryView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeader(
                         title: recurringTopicCount > 0 ? "Recurring themes" : "Themes forming",
-                        subtitle: recurringTopicCount > 0 ? "Ideas you’ve returned to." : "Related ideas Attune has started grouping.",
+                        subtitle: recurringTopicCount > 0 ? "Ideas you’ve returned to." : "Related ideas Pondera has started grouping.",
                         destination: InsightsListView(initialTab: .themes)
                     )
 
@@ -303,7 +303,7 @@ struct LibraryView: View {
             Text("Your patterns will appear here")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(AttuneTheme.textPrimary)
-            Text("Use Talk it out and speak naturally. Attune will organize clear intentions, commitments, events, and states—and group related ideas over time.")
+            Text("Use Talk it out and speak naturally. Pondera will organize clear intentions, commitments, events, and states—and group related ideas over time.")
                 .font(.subheadline)
                 .foregroundStyle(AttuneTheme.textSecondary)
                 .multilineTextAlignment(.center)

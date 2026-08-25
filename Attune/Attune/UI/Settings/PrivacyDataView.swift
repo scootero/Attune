@@ -33,14 +33,14 @@ struct PrivacyDataView: View {
             } header: {
                 Text("Permissions")
             } footer: {
-                Text("Attune asks for voice access only when you start a voice feature and asks for notifications when you enable the daily reminder.")
+                Text("Pondera asks for voice access only when you start a voice feature and asks for notifications when you enable the daily reminder.")
             }
 
             Section {
                 privacyPoint(
                     icon: "record.circle",
                     title: "Recording is always user-started",
-                    detail: "Attune records only after you start a Voice Check-In or tap Start talking in Talk it out."
+                    detail: "Pondera records only after you start a Voice Check-In or tap Start talking in Talk it out."
                 )
                 privacyPoint(
                     icon: "text.bubble.fill",
@@ -50,7 +50,7 @@ struct PrivacyDataView: View {
                 privacyPoint(
                     icon: "calendar.badge.exclamationmark",
                     title: "Events stay suggestions",
-                    detail: "Attune can recognize event-like information for review, but it does not currently create calendar appointments or event reminders."
+                    detail: "Pondera can recognize event-like information for review, but it does not currently create calendar appointments or event reminders."
                 )
             } header: {
                 Text("How Voice Data Is Used")
@@ -59,8 +59,8 @@ struct PrivacyDataView: View {
             Section {
                 privacyPoint(
                     icon: "iphone",
-                    title: "Your Attune records",
-                    detail: "Intentions, progress, sessions, captured items, themes, and available audio are stored inside Attune’s app container on this device."
+                    title: "Your Pondera records",
+                    detail: "Intentions, progress, sessions, captured items, themes, and available audio are stored inside Pondera’s app container on this device."
                 )
                 privacyPoint(
                     icon: "square.and.arrow.up",
@@ -70,7 +70,7 @@ struct PrivacyDataView: View {
             } header: {
                 Text("Your Data")
             } footer: {
-                Text("Deleting the app can remove locally stored Attune data. Export anything you want to keep first.")
+                Text("Deleting the app can remove locally stored Pondera data. Export anything you want to keep first.")
             }
 
             Section("Privacy & Help") {

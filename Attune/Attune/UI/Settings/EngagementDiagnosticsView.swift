@@ -83,7 +83,7 @@ struct EngagementDiagnosticsView: View {
                     snapshot = EngagementMetricsStore.shared.loadSnapshot()
                 }
             } footer: {
-                Text("Counts and dates only. Attune does not place transcripts, intention names, quotes, moods, or other personal content in this file.")
+                Text("Counts and dates only. Pondera does not place transcripts, intention names, quotes, moods, or other personal content in this file.")
             }
         }
         .navigationTitle("Engagement Diagnostics")

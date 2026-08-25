@@ -18,19 +18,19 @@ struct OnboardingView: View {
             icon: "waveform.and.mic",
             eyebrow: "VOICE CHECK-INS",
             title: "Speak it. See it move.",
-            detail: "An intention is a measurable daily or weekly focus you choose. Tell Attune what you completed and by how much, and a Voice Check-In updates its progress and can capture an optional mood."
+            detail: "An intention is a measurable daily or weekly focus you choose. Tell Pondera what you completed and by how much, and a Voice Check-In updates its progress and can capture an optional mood."
         ),
         OnboardingPage(
             icon: "sparkles",
             eyebrow: "TALK IT OUT",
             title: "Notice what keeps coming up.",
-            detail: "Talk through what’s on your mind. As themes repeat, Attune may turn one into a small, editable next step chosen to be realistic—not merely repeat what you said. Nothing is added unless you choose it."
+            detail: "Talk through what’s on your mind. As themes repeat, Pondera may turn one into a small, editable next step chosen to be realistic—not merely repeat what you said. Nothing is added unless you choose it."
         ),
         OnboardingPage(
             icon: "chart.line.uptrend.xyaxis",
             eyebrow: "MOMENTUM",
             title: "Stay focused and in control.",
-            detail: "See today's progress and use a free daily reminder. Attune Pro adds history, Week and Month views, Insights, and portable data export."
+            detail: "See today's progress and use a free daily reminder. Pondera Pro adds history, Week and Month views, Insights, and portable data export."
         )
     ]
 
@@ -41,7 +41,7 @@ struct OnboardingView: View {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("Attune")
+                        Text("Pondera")
                             .font(.title2.bold())
                             .foregroundStyle(AttuneTheme.textPrimary)
                         Spacer()

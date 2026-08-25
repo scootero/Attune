@@ -26,7 +26,7 @@ final class AIUsageLimitTests: XCTestCase {
     func testLimitNoticeKeepsSavedDataReassurance() {
         let notice = AIUsageNotice(kind: .limited, resetDate: nil)
         XCTAssertEqual(notice.title, "Monthly AI limit reached")
-        XCTAssertTrue(notice.message.contains("Everything already saved in Attune is still available"))
+        XCTAssertTrue(notice.message.contains("Everything already saved in Pondera is still available"))
         XCTAssertTrue(notice.message.contains("refreshes next month"))
     }
 

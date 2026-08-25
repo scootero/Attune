@@ -23,7 +23,7 @@
       "localizations" : [
 
       ],
-      "name" : "Attune Premium",
+      "name" : "Pondera Premium",
       "subscriptions" : [
         {
           "adHocOffers" : [
@@ -33,19 +33,19 @@
 
           ],
           "displayPrice" : "4.99",
-          "familyShareable" : false,
+          "familyShareable" : true,
           "groupNumber" : 1,
           "internalID" : "21400002",
           "localizations" : [
             {
               "description" : "Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.",
-              "displayName" : "Attune Pro Monthly",
+              "displayName" : "Pondera Pro Monthly",
               "locale" : "en_US"
             }
           ],
           "productID" : "com.scottoliver.Attune.monthly",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Attune Pro Monthly",
+          "referenceName" : "Pondera Pro Monthly",
           "type" : "RecurringSubscription"
         }
       ]

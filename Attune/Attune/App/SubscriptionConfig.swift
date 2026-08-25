@@ -23,7 +23,7 @@ enum SubscriptionConfig {
     static let maximumActiveIntentions = 10
 
     /// Consumer-facing plan name. The underlying App Store product remains monthly.
-    static let displayName = "Attune Pro"
+    static let displayName = "Pondera Pro"
 
     /// Short marketing line for the paywall.
     static let displayPriceFallback = "$4.99/month"

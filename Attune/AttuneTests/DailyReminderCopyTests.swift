@@ -3,7 +3,7 @@ import XCTest
 
 final class DailyReminderCopyTests: XCTestCase {
     func testReminderUsesRequestedBrandAndProgressPrompt() {
-        XCTAssertEqual(DailyReminderCopy.title, "Attune — Let’s make some progress")
+        XCTAssertEqual(DailyReminderCopy.title, "Pondera — Let’s make some progress")
         XCTAssertEqual(
             DailyReminderCopy.body(intentionTitles: ["Walk", "Read", "Meditate"]),
             "What would you like to move forward? Walk • Read"

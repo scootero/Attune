@@ -302,7 +302,7 @@ struct EditIntentionsView: View {
                 Text("Delete \(pendingDeleteDraftTitle)?")
             }
             .sheet(isPresented: $showIntentionLimitPaywall) {
-                PaywallView(reason: "Free includes one active intention. Upgrade to Attune Pro to track more goals at once.")
+                PaywallView(reason: "Free includes one active intention. Upgrade to Pondera Pro to track more goals at once.")
                     .environmentObject(subscriptionManager)
             }
         }
@@ -342,7 +342,7 @@ struct EditIntentionsView: View {
         if subscriptionManager.hasPremiumAccess {
             return "Choose a measurable target and whether it resets daily or weekly. You can track up to \(DraftIntention.maxCount)."
         }
-        return "Free includes one active intention. Attune Pro lets you track up to \(DraftIntention.maxCount) at once."
+        return "Free includes one active intention. Pondera Pro lets you track up to \(DraftIntention.maxCount) at once."
     }
 
     private func handleDisabledAddTap() {
@@ -898,7 +898,7 @@ private struct AddIntentionCard: View {
                 VStack(spacing: 10) { // tighter spacing keeps expanded add editor compact
                     RecordIntentionsSection(onIntentionsParsed: { parsed in // embed record UI
                         onParsed(parsed) // populate add draft fields
-                        recordStatus = parsed.isEmpty ? "No intentions found." : "Attune filled this in. Review it, then save." // status message
+                        recordStatus = parsed.isEmpty ? "No intentions found." : "Pondera filled this in. Review it, then save." // status message
                         onDirty() // mark dirty
                     })
                     
@@ -1112,7 +1112,7 @@ private struct RecordIntentionsSection: View { // encapsulates record flow UI
             .padding(.bottom, 4)
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView(reason: "Creating tracked intentions by voice is included with Attune Pro. You can still add intentions manually on Free.")
+            PaywallView(reason: "Creating tracked intentions by voice is included with Pondera Pro. You can still add intentions manually on Free.")
                 .environmentObject(subscriptionManager)
         }
     } // end body

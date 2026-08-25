@@ -25,13 +25,13 @@ enum SubscriptionActionState: Equatable {
         case .idle, .purchasing, .restoring:
             return nil
         case .purchased:
-            return "Attune Pro is active."
+            return "Pondera Pro is active."
         case .pending:
             return "Purchase is pending approval. Pro will unlock when Apple completes it."
         case .cancelled:
-            return "Purchase cancelled. You can continue using Attune Free."
+            return "Purchase cancelled. You can continue using Pondera Free."
         case .restored:
-            return "Attune Pro was restored."
+            return "Pondera Pro was restored."
         case .noActiveSubscription:
             return "No active subscription was found for this Apple ID."
         case .failed(let message):
@@ -160,7 +160,7 @@ final class SubscriptionManager: ObservableObject {
     func purchase() async {
         guard !isBusy else { return }
         guard isProductAvailable else {
-            actionState = .failed("Attune Pro isn’t available right now. Check your connection and try again.")
+            actionState = .failed("Pondera Pro isn’t available right now. Check your connection and try again.")
             await loadProduct()
             return
         }
@@ -227,11 +227,11 @@ final class SubscriptionManager: ObservableObject {
         do {
             productDetails = try await storeClient.loadMonthlyProduct()
             if productDetails == nil {
-                actionState = .failed("Attune Pro is temporarily unavailable. Please try again later.")
+                actionState = .failed("Pondera Pro is temporarily unavailable. Please try again later.")
             }
         } catch {
             productDetails = nil
-            actionState = .failed("Attune Pro couldn’t be loaded. Check your connection and try again.")
+            actionState = .failed("Pondera Pro couldn’t be loaded. Check your connection and try again.")
             AppLogger.log(AppLogger.ERR, "StoreKit product load failed: \(error.localizedDescription)")
         }
     }
@@ -244,7 +244,7 @@ enum SubscriptionError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .productUnavailable: return "Attune Pro is unavailable."
+        case .productUnavailable: return "Pondera Pro is unavailable."
         case .unverified: return "Could not verify the App Store purchase."
         case .unknownPurchaseResult: return "StoreKit returned an unknown purchase result."
         }
