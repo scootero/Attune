@@ -3,7 +3,7 @@
 //  Pondera
 //
 //  Requests microphone, speech recognition, and notification permissions
-//  at the moment the user starts the related feature (not on Home appear).
+//  after an explicit onboarding choice or when the user starts the related feature.
 //
 
 import AVFoundation
@@ -11,7 +11,7 @@ import Speech
 import UserNotifications
 
 /// Requests system permissions only when status is still undetermined.
-/// Call from recording start (mic/speech) or when enabling reminders (notifications).
+/// Call after voice setup, from recording start, or when enabling reminders.
 enum PermissionsHelper {
 
     enum RecordingPermissionState {
@@ -32,6 +32,24 @@ enum PermissionsHelper {
             return .ready
         }
         return .needsRequest
+    }
+
+    /// Human-readable denied/restricted permissions for recovery messaging.
+    static var unavailableRecordingPermissionsDescription: String {
+        let microphoneUnavailable = AVAudioApplication.shared.recordPermission == .denied
+        let speechStatus = SFSpeechRecognizer.authorizationStatus()
+        let speechUnavailable = speechStatus == .denied || speechStatus == .restricted
+
+        switch (microphoneUnavailable, speechUnavailable) {
+        case (true, true):
+            return "Microphone and Speech Recognition"
+        case (true, false):
+            return "Microphone"
+        case (false, true):
+            return "Speech Recognition"
+        case (false, false):
+            return "Microphone or Speech Recognition"
+        }
     }
 
     /// Requests any missing recording permissions and returns whether both are available.

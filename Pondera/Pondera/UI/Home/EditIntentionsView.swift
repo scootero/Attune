@@ -157,8 +157,7 @@ struct EditIntentionsView: View {
                                 onDisabledTap: handleDisabledAddTap,
                                 onExpand: { collapseAllForAdd() }, // ensure only one expanded at a time
                                 onParsed: { parsed in applyParsedToAddDraft(parsed) }, // route record parse into add draft
-                                hapticEngine: hapticEngine, // share haptic generator
-                                onDirty: { triggerDirtyCheck() } // recompute dirty when add card changes
+                                hapticEngine: hapticEngine // share haptic generator
                             )
                             .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // keep card breathing room
                             .listRowSeparator(.hidden) // hide separators for glass cards
@@ -187,8 +186,6 @@ struct EditIntentionsView: View {
                                         InlineIntentionEditor( // inline editor with slider + fields
                                             draft: $draft, // bind to this row
                                             variation: IntentionCardVariation.forId(draft.id), // palette reuse
-                                            onValueChanged: { triggerDirtyCheck() }, // recompute dirty when edits occur
-                                            onUnitChanged: { triggerDirtyCheck() }, // recompute dirty on unit changes
                                             hapticEngine: hapticEngine // shared generator
                                         )
                                         .padding(10) // keep one clean primary panel around expanded edit controls
@@ -225,10 +222,6 @@ struct EditIntentionsView: View {
                         .scrollContentBackground(.hidden) // allow custom background
                         .listStyle(.plain) // plain list keeps spacing predictable and lighter to render while typing
                         .scrollDismissesKeyboard(.interactively) // let drag gestures dismiss keyboard smoothly // reduces abrupt keyboard/layout interactions
-                        .background(
-                            CyberBackground() // keep Home dark teal fog backdrop behind the list
-                                .ignoresSafeArea() // extend background under safe areas for seamless sheet edges
-                        )
                     }
                 }
             }
@@ -428,7 +421,6 @@ struct EditIntentionsView: View {
         draftIntentions.removeAll { $0.id == pendingDeleteDraftId }
         self.pendingDeleteDraftId = nil
         self.pendingDeleteDraftTitle = ""
-        triggerDirtyCheck() // mark dirty after deletion
     }
     
     /// Ensures only the Add card is expanded.
@@ -461,14 +453,7 @@ struct EditIntentionsView: View {
         addDraft.title = first.title.trimmingCharacters(in: .whitespacesAndNewlines) // set parsed title
         addDraft.unit = (first.unit?.isEmpty == false ? first.unit! : "times") // default to times
         addDraft.targetValue = max(0, first.target ?? 1) // default to 1 if missing
-        triggerDirtyCheck() // recompute dirty state after population
     } // end applyParsedToAddDraft
-    
-    /// Forces a refresh of dirty-state dependent UI.
-    private func triggerDirtyCheck() {
-        // No-op body; accessing hasChanges recomputes via state reads.
-        _ = hasChanges // touch computed property to mark dependency
-    } // end triggerDirtyCheck
     
     /// Restores drafts to baseline and dismisses without saving.
     private func cancelChanges() {
@@ -636,20 +621,24 @@ private struct IntentionValueConfig {
 private struct InlineIntentionEditor: View {
     @Binding var draft: DraftIntention // binding to mutate draft in parent
     let variation: IntentionCardVariation // color palette
-    let onValueChanged: () -> Void // notifies parent to recompute dirty state
-    let onUnitChanged: () -> Void // notifies parent to recompute dirty state on unit changes
     let hapticEngine: UIImpactFeedbackGenerator // shared haptic generator
     
     @State private var manualValueText: String // text backing for manual entry
     @State private var isSyncingManualText: Bool = false // guards feedback loops
+    @FocusState private var isTitleFocused: Bool // coordinates keyboard presentation with card expansion
+    let automaticallyFocusTitle: Bool // Add waits for its expansion before presenting the keyboard
     private let snapThreshold: Double = 2 // within 2 units of multiple-of-10 triggers snap
     
-    init(draft: Binding<DraftIntention>, variation: IntentionCardVariation, onValueChanged: @escaping () -> Void, onUnitChanged: @escaping () -> Void, hapticEngine: UIImpactFeedbackGenerator) {
+    init(
+        draft: Binding<DraftIntention>,
+        variation: IntentionCardVariation,
+        hapticEngine: UIImpactFeedbackGenerator,
+        automaticallyFocusTitle: Bool = false
+    ) {
         self._draft = draft // store binding
         self.variation = variation // store palette
-        self.onValueChanged = onValueChanged // store callback
-        self.onUnitChanged = onUnitChanged // store callback
         self.hapticEngine = hapticEngine // store haptic generator
+        self.automaticallyFocusTitle = automaticallyFocusTitle
         _manualValueText = State(initialValue: Self.displayString(for: draft.wrappedValue.targetValue)) // seed text from value
     }
     
@@ -660,6 +649,7 @@ private struct InlineIntentionEditor: View {
                 .foregroundStyle(PonderaTheme.textSecondary)
             TextField("Title", text: $draft.title) // title input
                 .textFieldStyle(.plain) // plain style for glass aesthetic
+                .focused($isTitleFocused)
                 .foregroundColor(.white) // white text for dark bg
                 .padding(.horizontal, 12) // inset
                 .padding(.vertical, 9) // slightly tighter vertical padding for faster visual rhythm
@@ -671,9 +661,6 @@ private struct InlineIntentionEditor: View {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(Color.white.opacity(0.14), lineWidth: 1) // thin subtle border avoids inset-card appearance
                 )
-                .onChange(of: draft.title) { _, _ in // title change hook
-                    onValueChanged() // mark dirty
-                }
             
             VStack(alignment: .leading, spacing: 8) { // tighter value group reduces empty vertical gaps
                 HStack {
@@ -699,7 +686,6 @@ private struct InlineIntentionEditor: View {
                     .tint(NeonPalette.neonTeal) // reuse Home teal so slider matches global accent
                     .onChange(of: draft.targetValue) { _, newValue in // sync text as slider moves
                         syncManualText(from: newValue) // update manual field
-                        onValueChanged() // propagate dirty state
                     }
                     
                     Text("\(Self.displayString(for: draft.targetValue))") // live value label
@@ -747,7 +733,6 @@ private struct InlineIntentionEditor: View {
                 .pickerStyle(.menu) // compact menu style
                 .onChange(of: draft.unit) { _, _ in // unit changed
                     applyUnitReset() // reset value defaults for unit
-                    onUnitChanged() // notify parent
                 }
 
                 Text("Target period")
@@ -758,9 +743,6 @@ private struct InlineIntentionEditor: View {
                     Text("Weekly").tag("weekly") // weekly option
                 }
                 .pickerStyle(.segmented) // segmented control
-                .onChange(of: draft.timeframe) { _, _ in // timeframe change
-                    onUnitChanged() // still counts as dirty
-                }
 
                 Text(draft.timeframe.lowercased() == "weekly" ? "This target is measured across the full week." : "This target starts fresh each day.")
                     .font(.caption)
@@ -768,6 +750,15 @@ private struct InlineIntentionEditor: View {
             }
         }
         .padding(12) // compact internal padding keeps edit panel dense and fast to read
+        .task {
+            guard automaticallyFocusTitle else { return }
+            // Let the Add card finish its expansion before UIKit creates the
+            // keyboard session. Competing layout and keyboard animations can
+            // otherwise trip the system gesture/input timeout on device.
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            isTitleFocused = true
+        }
     }
     
     /// Config derived from unit.
@@ -804,7 +795,6 @@ private struct InlineIntentionEditor: View {
         draft.targetValue = snapped // apply snap
         syncManualText(from: snapped) // sync text
         hapticEngine.impactOccurred() // light haptic feedback
-        onValueChanged() // notify parent
     }
     
     /// Syncs manual text field from numeric value.
@@ -824,7 +814,6 @@ private struct InlineIntentionEditor: View {
         let clamped = min(valueConfig.maxValue, max(valueConfig.minValue, parsed)) // clamp to range
         draft.targetValue = clamped // apply exact manual value (no snap to allow override)
         syncManualText(from: clamped) // reflect in text
-        onValueChanged() // notify parent
     }
     
     /// Resets value when unit changes to its default, with snap + sync.
@@ -862,7 +851,6 @@ private struct AddIntentionCard: View {
     let onExpand: () -> Void // called when expanding add card
     let onParsed: ([ParsedIntention]) -> Void // routes parsed intentions into add draft
     let hapticEngine: UIImpactFeedbackGenerator // shared haptic
-    let onDirty: () -> Void // dirty-state notifier
     
     @State private var recordStatus: String? = nil // local status message
     
@@ -899,15 +887,13 @@ private struct AddIntentionCard: View {
                     RecordIntentionsSection(onIntentionsParsed: { parsed in // embed record UI
                         onParsed(parsed) // populate add draft fields
                         recordStatus = parsed.isEmpty ? "No intentions found." : "Pondera filled this in. Review it, then save." // status message
-                        onDirty() // mark dirty
                     })
                     
                     InlineIntentionEditor( // reuse editor for add card
                         draft: $draft, // bind to add draft
                         variation: IntentionCardVariation.forId(draft.id), // palette
-                        onValueChanged: { onDirty() }, // dirty on value change
-                        onUnitChanged: { onDirty() }, // dirty on unit change
-                        hapticEngine: hapticEngine // shared haptic
+                        hapticEngine: hapticEngine, // shared haptic
+                        automaticallyFocusTitle: true // wait for expansion, then present keyboard once
                     )
                 }
                 .padding(.top, 2) // keep add-card expansion airy without adding another nested panel layer
@@ -915,7 +901,16 @@ private struct AddIntentionCard: View {
             }
         }
         .padding(16) // slightly larger padding to match glass card thickness
-        .glassCard() // apply shared Home glass look for cohesive blur, texture, and edge lighting
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(NeonPalette.darkOverlay.opacity(0.72))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                .allowsHitTesting(false)
+        )
+        .shadow(color: NeonPalette.darkShadow.opacity(0.32), radius: 7, x: 0, y: 4)
     }
 }
 

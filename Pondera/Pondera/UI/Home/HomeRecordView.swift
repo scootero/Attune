@@ -356,7 +356,7 @@ struct HomeRecordView: View {
             statusPanel(
                 icon: "mic.slash.fill",
                 title: "Recording access is off",
-                detail: "Allow Microphone and Speech Recognition in Settings to use Talk it out.",
+                detail: "Allow \(PermissionsHelper.unavailableRecordingPermissionsDescription) in Settings to use Talk it out.",
                 color: PonderaTheme.warning
             )
             Button("Open Settings") {

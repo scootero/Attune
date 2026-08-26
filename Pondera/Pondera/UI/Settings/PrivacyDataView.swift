@@ -33,7 +33,7 @@ struct PrivacyDataView: View {
             } header: {
                 Text("Permissions")
             } footer: {
-                Text("Pondera asks for voice access only when you start a voice feature and asks for notifications when you enable the daily reminder.")
+                Text("Pondera offers voice setup during onboarding. If you skip it, Pondera asks when you start a voice feature. Notification access is requested when you enable the daily reminder.")
             }
 
             Section {

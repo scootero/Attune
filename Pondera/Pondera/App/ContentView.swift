@@ -19,6 +19,8 @@ struct ContentView: View {
     @State private var showOnboarding = false
     /// Drives the first-launch AI disclosure; starts false if consent already saved.
     @State private var showAIPrivacySheet = false
+    /// Requests iOS voice permissions only after the disclosure has fully dismissed.
+    @State private var enableVoiceAfterPrivacyDisclosure = false
 
     var body: some View {
         ZStack {
@@ -42,13 +44,15 @@ struct ContentView: View {
                 }
                 .interactiveDismissDisabled(true)
             }
-            .sheet(isPresented: $showAIPrivacySheet) {
-                AIPrivacyDisclosureSheet {
-                    // Persist acceptance so OpenAIClient may send transcripts.
-                    AIPrivacyConsent.hasAccepted = true
-                    PonderaHaptics.saved()
-                    showAIPrivacySheet = false
-                }
+            .sheet(isPresented: $showAIPrivacySheet, onDismiss: requestVoicePermissionsAfterDisclosureIfNeeded) {
+                AIPrivacyDisclosureSheet(
+                    onEnableVoice: {
+                        completePrivacyDisclosure(enableVoice: true)
+                    },
+                    onSetUpLater: {
+                        completePrivacyDisclosure(enableVoice: false)
+                    }
+                )
                 .interactiveDismissDisabled(true) // Require an explicit Accept tap.
             }
             .alert(item: $aiUsageNoticeCenter.notice) { notice in
@@ -74,6 +78,23 @@ struct ContentView: View {
 
     private func presentPrivacyDisclosureIfNeeded() {
         showAIPrivacySheet = !AIPrivacyConsent.hasAccepted
+    }
+
+    private func completePrivacyDisclosure(enableVoice: Bool) {
+        // Persist acknowledgement so OpenAIClient may send transcripts.
+        AIPrivacyConsent.hasAccepted = true
+        enableVoiceAfterPrivacyDisclosure = enableVoice
+        PonderaHaptics.saved()
+        showAIPrivacySheet = false
+    }
+
+    private func requestVoicePermissionsAfterDisclosureIfNeeded() {
+        guard enableVoiceAfterPrivacyDisclosure else { return }
+        enableVoiceAfterPrivacyDisclosure = false
+
+        Task {
+            _ = await PermissionsHelper.requestRecordingPermissions()
+        }
     }
 }
 
