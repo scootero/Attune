@@ -7,15 +7,18 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 struct RootTabView: View {
     @EnvironmentObject var appRouter: AppRouter
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
+    @Environment(\.scenePhase) private var scenePhase
 
     // Track whether recovery has been performed to avoid running it multiple times
     @State private var hasPerformedRecovery = false
     @State private var showSettings = false
     @State private var reminderConfirmation: String?
+    @State private var showNotificationNudge = false
 
     init() {
         // Wire up dependency: inject TranscriptionQueue into RecorderService
@@ -27,6 +30,13 @@ struct RootTabView: View {
         VStack(spacing: 0) {
             appHeader
                 .zIndex(1)
+
+            if showNotificationNudge {
+                notificationNudge
+                    .padding(.horizontal, PonderaTheme.horizontalPadding)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
 
             TabView(selection: rootTabSelection) {
                 // Tab 1: Today — check-ins, intentions, mood, and weekly summary.
@@ -116,6 +126,82 @@ struct RootTabView: View {
                 hasPerformedRecovery = true
             }
             handlePendingReminderRoute()
+            evaluateNotificationNudge()
+        }
+        .onChange(of: showSettings) { _, isShowing in
+            if !isShowing { evaluateNotificationNudge() }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active { evaluateNotificationNudge() }
+        }
+    }
+
+    private var notificationNudge: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "bell.badge.fill")
+                .foregroundStyle(PonderaTheme.accent)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Daily reminders are turned on")
+                    .font(.subheadline.weight(.semibold))
+                Text("Allow notifications so Pondera can remind you at your chosen time.")
+                    .font(.caption)
+                    .foregroundStyle(PonderaTheme.textSecondary)
+            }
+
+            Spacer(minLength: 4)
+
+            Button("Enable") { enableNotificationsFromNudge() }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(PonderaTheme.accent)
+                .buttonStyle(.plain)
+                .accessibilityHint("Requests notification access or opens iOS Settings")
+
+            Button { dismissNotificationNudge() } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(PonderaTheme.textTertiary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Not now")
+        }
+        .padding(14)
+        .background(PonderaTheme.surfaceStrong.opacity(0.96), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(PonderaTheme.accent.opacity(0.22), lineWidth: 1)
+        }
+    }
+
+    private func evaluateNotificationNudge() {
+        Task {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            let lastShownAt = UserDefaults.standard.object(forKey: "attune.notifications.nudge.lastShown") as? Date
+            let shouldShow = NotificationPermissionNudgePolicy.shouldShow(
+                reminderEnabled: ReminderPreferences.isReminderEnabled,
+                authorizationStatus: settings.authorizationStatus,
+                lastShownAt: lastShownAt
+            )
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.2)) { showNotificationNudge = shouldShow }
+                if shouldShow { UserDefaults.standard.set(Date(), forKey: "attune.notifications.nudge.lastShown") }
+            }
+        }
+    }
+
+    private func dismissNotificationNudge() {
+        showNotificationNudge = false
+    }
+
+    private func enableNotificationsFromNudge() {
+        showNotificationNudge = false
+        Task {
+            let status = await PermissionsHelper.requestNotificationPermissions()
+            if status == .denied || status == .restricted {
+                PermissionsHelper.openAppSettings()
+            }
+            DailyReminderNotificationService.shared.refreshReminderForToday()
         }
     }
 

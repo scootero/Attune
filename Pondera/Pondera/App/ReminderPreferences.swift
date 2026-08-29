@@ -6,6 +6,7 @@
 //
 
 import Foundation // Needed for Date and DateComponents types used by reminder time preferences.
+import UserNotifications
 
 /// Centralized storage for reminder settings so UI and services stay in sync.
 enum ReminderPreferences {
@@ -77,5 +78,23 @@ enum ReminderPreferences {
             let components = calendar.dateComponents([.hour, .minute], from: newValue) // Extract hour/minute chosen by user.
             reminderTimeComponents = components // Persist extracted reminder components.
         }
+    }
+}
+
+enum NotificationPermissionNudgePolicy {
+    static let minimumInterval: TimeInterval = 60 * 60 * 24 * 2
+
+    static func shouldShow(
+        reminderEnabled: Bool,
+        authorizationStatus: UNAuthorizationStatus,
+        lastShownAt: Date?,
+        now: Date = Date()
+    ) -> Bool {
+        guard reminderEnabled,
+              authorizationStatus != .authorized,
+              authorizationStatus != .provisional,
+              authorizationStatus != .ephemeral else { return false }
+        guard let lastShownAt else { return true }
+        return now.timeIntervalSince(lastShownAt) >= minimumInterval
     }
 }

@@ -53,25 +53,29 @@ struct HomeRecordView: View {
         ZStack {
             PonderaScreenBackground()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    header
-                    sessionHero
-                    historyCard
-                }
-                .padding(.horizontal, PonderaTheme.horizontalPadding)
-                .padding(.top, 12)
-                .padding(.bottom, 104)
+            VStack(alignment: .leading, spacing: 12) {
+                header
+                sessionHero
+                historyCard
+                Spacer(minLength: 0)
             }
-            .scrollIndicators(.hidden)
+            .padding(.horizontal, PonderaTheme.horizontalPadding)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
 
             if let recapPreview {
-                Button {
-                    openRecapDetails(sessionId: recapPreview.sessionId)
-                } label: {
-                    SessionRecapPreviewCard(recap: recapPreview.recap)
-                }
-                .buttonStyle(.plain)
+                SessionRecapPreviewCard(
+                    recap: recapPreview.recap,
+                    onOpenDetails: { openRecapDetails(sessionId: recapPreview.sessionId) },
+                    onOpenInsights: {
+                        dismissRecapPreview()
+                        openInsights()
+                    },
+                    onOpenSessions: {
+                        dismissRecapPreview()
+                        showSessionsSheet = true
+                    }
+                )
                 .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.bottom, 88)
                 .frame(maxHeight: .infinity, alignment: .bottom)
@@ -84,8 +88,6 @@ struct HomeRecordView: View {
                         )
                 )
                 .zIndex(2)
-                .accessibilityLabel("Session highlight. \(recapPreview.recap.headline)")
-                .accessibilityHint("Opens the full session details")
             }
 
             if let suggestion = suggestionToastCenter.talkSuggestion {
@@ -127,6 +129,7 @@ struct HomeRecordView: View {
             processingCheckTimer = nil
             talkingPromptToken = UUID()
             showsTalkingPrompt = false
+            dismissRecapPreview()
         }
         .onChange(of: recorder.isRecording) { wasRecording, isRecording in
             recorderStateChanged(wasRecording: wasRecording, isRecording: isRecording)
@@ -583,6 +586,7 @@ struct HomeRecordView: View {
         activeSessionId = sessionId
         processingSessionId = nil
         isProcessing = false
+        dismissRecapPreview()
         showsRecentSessionCompletion = false
         recentInsightsAddedCount = 0
         loadTodayCounts()
@@ -776,14 +780,6 @@ struct HomeRecordView: View {
 
         withAnimation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.82)) {
             recapPreview = (sessionId, recap)
-        }
-
-        // Keep transient content available while VoiceOver is reading it.
-        guard !UIAccessibility.isVoiceOverRunning else { return }
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            guard recapPreviewToken == token else { return }
-            dismissRecapPreview()
         }
     }
 

@@ -146,9 +146,13 @@ struct SettingsView: View {
                 .onChange(of: isReminderEnabled) { _, newValue in
                     ReminderPreferences.isReminderEnabled = newValue
                     if newValue {
-                        PermissionsHelper.requestNotificationPermissionsIfNeeded()
+                        Task {
+                            _ = await PermissionsHelper.requestNotificationPermissions()
+                            DailyReminderNotificationService.shared.refreshReminderForToday()
+                        }
+                    } else {
+                        DailyReminderNotificationService.shared.refreshReminderForToday()
                     }
-                    DailyReminderNotificationService.shared.refreshReminderForToday()
                 }
 
             DatePicker("Reminder Time", selection: $reminderTime, displayedComponents: .hourAndMinute)
@@ -156,7 +160,6 @@ struct SettingsView: View {
                 .disabled(!isReminderEnabled)
                 .onChange(of: reminderTime) { _, newValue in
                     ReminderPreferences.reminderTimeDate = newValue
-                    PermissionsHelper.requestNotificationPermissionsIfNeeded()
                     DailyReminderNotificationService.shared.refreshReminderForToday()
                 }
         } header: {

@@ -51,6 +51,9 @@ struct SessionRecapView: View {
 /// confirmation rather than a second destination.
 struct SessionRecapPreviewCard: View {
     let recap: SessionRecap
+    let onOpenDetails: () -> Void
+    let onOpenInsights: () -> Void
+    let onOpenSessions: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -67,26 +70,59 @@ struct SessionRecapPreviewCard: View {
             }
             .foregroundStyle(PonderaTheme.accent)
 
-            Text(recap.headline)
+            Text("Worth remembering")
                 .font(.title3.weight(.bold))
                 .foregroundStyle(PonderaTheme.textPrimary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
 
-            if let quote = recap.quote {
-                Text("“\(quote)”")
+            if recap.highlights.isEmpty {
+                Text(recap.headline)
                     .font(.subheadline)
-                    .italic()
                     .foregroundStyle(PonderaTheme.textSecondary)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach(recap.highlights) { highlight in
+                    Button(action: onOpenDetails) {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "sparkle")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(PonderaTheme.accent)
+                                .frame(width: 20)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(highlight.typeLabel)
+                                    .font(.caption2.weight(.bold))
+                                    .tracking(0.8)
+                                    .foregroundStyle(PonderaTheme.accent)
+                                Text(highlight.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(PonderaTheme.textPrimary)
+                                    .lineLimit(1)
+                                if !highlight.summary.isEmpty && highlight.summary != highlight.title {
+                                    Text(highlight.summary)
+                                        .font(.caption)
+                                        .foregroundStyle(PonderaTheme.textSecondary)
+                                        .lineLimit(2)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(PonderaTheme.textTertiary)
+                        }
+                        .padding(10)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
-            HStack(spacing: 6) {
-                Text("Tap to see more")
-                Image(systemName: "arrow.up.right")
+            HStack(spacing: 8) {
+                Button("See all Insights", action: onOpenInsights)
+                Spacer(minLength: 0)
+                Button("Past session", action: onOpenSessions)
             }
             .font(.caption.weight(.semibold))
-            .foregroundStyle(Color.white.opacity(0.86))
+            .foregroundStyle(Color.white.opacity(0.88))
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)

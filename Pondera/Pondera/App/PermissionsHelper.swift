@@ -8,6 +8,7 @@
 
 import AVFoundation
 import Speech
+import UIKit
 import UserNotifications
 
 /// Requests system permissions only when status is still undetermined.
@@ -66,7 +67,7 @@ enum PermissionsHelper {
     }
     
     /// Requests local notification permission if status is .notDetermined.
-    /// Call when the user enables daily reminders in Settings.
+    /// Call after an explicit user action, such as onboarding's Enable Notifications button.
     static func requestNotificationPermissionsIfNeeded() {
         let notificationCenter = UNUserNotificationCenter.current() // Use the shared notification center to read/request notification permissions.
         notificationCenter.getNotificationSettings { settings in // Read current notification authorization status before requesting anything.
@@ -75,6 +76,22 @@ enum PermissionsHelper {
                 // Result is intentionally ignored here because reminder scheduling separately checks permission status.
             }
         }
+    }
+
+    static func requestNotificationPermissions() async -> UNAuthorizationStatus {
+        let notificationCenter = UNUserNotificationCenter.current()
+        let settings = await notificationCenter.notificationSettings()
+        guard settings.authorizationStatus == .notDetermined else {
+            return settings.authorizationStatus
+        }
+
+        _ = try? await notificationCenter.requestAuthorization(options: [.alert, .sound, .badge])
+        return await notificationCenter.notificationSettings().authorizationStatus
+    }
+
+    static func openAppSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 
     /// Requests microphone permission if status is .undetermined.

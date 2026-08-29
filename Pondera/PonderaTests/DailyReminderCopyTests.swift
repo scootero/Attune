@@ -37,4 +37,42 @@ final class DailyReminderCopyTests: XCTestCase {
         XCTAssertEqual(DailyReminderCopy.followUpBody(intentionTitle: "Walk"), "Ready to update Walk?")
         XCTAssertEqual(DailyReminderCopy.followUpBody(intentionTitle: nil), "Ready to update one of today’s intentions?")
     }
+
+    func testNotificationNudgeOnlyShowsForEnabledReminderWithoutAccess() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        XCTAssertTrue(NotificationPermissionNudgePolicy.shouldShow(
+            reminderEnabled: true,
+            authorizationStatus: .denied,
+            lastShownAt: nil,
+            now: now
+        ))
+        XCTAssertFalse(NotificationPermissionNudgePolicy.shouldShow(
+            reminderEnabled: false,
+            authorizationStatus: .denied,
+            lastShownAt: nil,
+            now: now
+        ))
+        XCTAssertFalse(NotificationPermissionNudgePolicy.shouldShow(
+            reminderEnabled: true,
+            authorizationStatus: .authorized,
+            lastShownAt: nil,
+            now: now
+        ))
+    }
+
+    func testNotificationNudgeWaitsTwoDaysAfterBeingShown() {
+        let shown = Date(timeIntervalSince1970: 10_000)
+        XCTAssertFalse(NotificationPermissionNudgePolicy.shouldShow(
+            reminderEnabled: true,
+            authorizationStatus: .notDetermined,
+            lastShownAt: shown,
+            now: shown.addingTimeInterval(60 * 60 * 24 * 2 - 1)
+        ))
+        XCTAssertTrue(NotificationPermissionNudgePolicy.shouldShow(
+            reminderEnabled: true,
+            authorizationStatus: .notDetermined,
+            lastShownAt: shown,
+            now: shown.addingTimeInterval(60 * 60 * 24 * 2)
+        ))
+    }
 }

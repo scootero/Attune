@@ -10,6 +10,14 @@ import Foundation
 struct SessionRecap: Equatable {
     let headline: String
     let quote: String?
+    let highlights: [SessionRecapHighlight]
+}
+
+struct SessionRecapHighlight: Equatable, Identifiable {
+    let id: String
+    let title: String
+    let summary: String
+    let typeLabel: String
 }
 
 enum SessionRecapBuilder {
@@ -43,8 +51,44 @@ enum SessionRecapBuilder {
 
         return SessionRecap(
             headline: headline,
-            quote: selectedQuote(from: currentItems, corrections: corrections)
+            quote: selectedQuote(from: currentItems, corrections: corrections),
+            highlights: highlights(from: eligibleCurrentItems, corrections: corrections)
         )
+    }
+
+    private static func highlights(
+        from items: [ExtractedItem],
+        corrections: [String: ItemCorrection]
+    ) -> [SessionRecapHighlight] {
+        items
+            .sorted { lhs, rhs in
+                let lhsScore = lhs.strength * 0.65 + lhs.confidence * 0.35
+                let rhsScore = rhs.strength * 0.65 + rhs.confidence * 0.35
+                if lhsScore != rhsScore { return lhsScore > rhsScore }
+                return lhs.id < rhs.id
+            }
+            .prefix(3)
+            .compactMap { item in
+                let title = normalizeWhitespace(item.title)
+                guard !title.isEmpty else { return nil }
+                let summary = normalizeWhitespace(item.summary)
+                return SessionRecapHighlight(
+                    id: item.id,
+                    title: title,
+                    summary: summary,
+                    typeLabel: displayTypeLabel(item.applyingCorrection(corrections[item.id]).displayType)
+                )
+            }
+    }
+
+    private static func displayTypeLabel(_ type: String) -> String {
+        switch type {
+        case ExtractedItem.ItemType.commitment: return "COMMITMENT"
+        case ExtractedItem.ItemType.intention: return "INTENTION"
+        case ExtractedItem.ItemType.event: return "EVENT"
+        case ExtractedItem.ItemType.state: return "STATE"
+        default: return "CAPTURED"
+        }
     }
 
     static func selectedQuote(

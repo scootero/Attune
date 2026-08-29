@@ -37,7 +37,7 @@ struct ContentView: View {
             EngagementMetricsStore.shared.recordAppLaunchOnce()
         }
             .fullScreenCover(isPresented: $showOnboarding, onDismiss: presentPrivacyDisclosureIfNeeded) {
-                OnboardingView {
+                OnboardingView(includesNotificationPermissionStep: true) {
                     PonderaOnboardingState.hasCompleted = true
                     PonderaHaptics.saved()
                     showOnboarding = false

@@ -35,6 +35,12 @@ enum PonderaTheme {
         endPoint: .bottomTrailing
     )
 
+    static let brandGradient = LinearGradient(
+        colors: [accent, Color(red: 0.35, green: 0.68, blue: 0.96)],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
+
     @MainActor
     static func configureAppearance() {
         let tabAppearance = UITabBarAppearance()
@@ -81,13 +87,64 @@ struct PonderaBrandMark: View {
 
 struct PonderaHeaderTitle: View {
     var body: some View {
-        Text("Pondera: Intentions")
-            .font(.system(size: 19, weight: .semibold, design: .rounded))
-            .tracking(0.25)
-            .foregroundStyle(Color.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.78)
+        PonderaWordmark(size: .header)
             .accessibilityAddTraits(.isHeader)
+    }
+}
+
+struct PonderaWordmark: View {
+    enum Size {
+        case header
+        case onboarding
+
+        var titleFont: Font {
+            switch self {
+            case .header:
+                return .system(size: 19, weight: .semibold, design: .rounded)
+            case .onboarding:
+                return .system(size: 30, weight: .bold, design: .rounded)
+            }
+        }
+
+        var subtitleFont: Font {
+            switch self {
+            case .header:
+                return .system(size: 12, weight: .semibold, design: .rounded)
+            case .onboarding:
+                return .system(size: 15, weight: .semibold, design: .rounded)
+            }
+        }
+
+        var spacing: CGFloat {
+            switch self {
+            case .header:
+                return 1
+            case .onboarding:
+                return 2
+            }
+        }
+    }
+
+    let size: Size
+    var alignment: HorizontalAlignment = .center
+
+    var body: some View {
+        VStack(alignment: alignment, spacing: size.spacing) {
+            Text("Pondera")
+                .font(size.titleFont)
+                .foregroundStyle(PonderaTheme.brandGradient)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+
+            Text("Intentions")
+                .font(size.subtitleFont)
+                .foregroundStyle(PonderaTheme.brandGradient)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .shadow(color: PonderaTheme.accent.opacity(0.22), radius: 8, x: 0, y: 3)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Pondera: Intentions")
     }
 }
 
@@ -240,11 +297,7 @@ struct PonderaPrimaryButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(
-                LinearGradient(
-                    colors: [PonderaTheme.accent, Color(red: 0.35, green: 0.68, blue: 0.96)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ),
+                PonderaTheme.brandGradient,
                 in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous)
             )
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
