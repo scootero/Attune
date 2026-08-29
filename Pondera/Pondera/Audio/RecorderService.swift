@@ -226,7 +226,8 @@ class RecorderService: NSObject, ObservableObject {
         // Compute final transcript by concatenating segment transcripts in order
         let finalTranscript = session.segments
             .sorted { $0.index < $1.index }
-            .compactMap { $0.transcriptText }
+            .map { $0.extractionTranscriptText }
+            .filter { !$0.isEmpty }
             .joined(separator: " ")
         
         // Update session to complete status

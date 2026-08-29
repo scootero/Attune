@@ -85,7 +85,10 @@ extension Session {
         let sortedSegments = segments.sorted { $0.index < $1.index }
         
         let transcriptParts = sortedSegments.map { segment in
-            if let text = segment.transcriptText, !text.isEmpty {
+            let trusted = segment.extractionTranscriptText
+            if !trusted.isEmpty {
+                return trusted
+            } else if let text = segment.transcriptText, !text.isEmpty {
                 return text
             } else {
                 return "[Missing transcript for segment \(segment.index)]"

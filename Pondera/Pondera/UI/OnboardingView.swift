@@ -8,17 +8,29 @@
 import SwiftUI
 
 struct OnboardingView: View {
+    let finalButtonTitle: String
     let onComplete: () -> Void
+
+    init(finalButtonTitle: String = "Continue", onComplete: @escaping () -> Void) {
+        self.finalButtonTitle = finalButtonTitle
+        self.onComplete = onComplete
+    }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedPage = 0
 
     private let pages: [OnboardingPage] = [
         OnboardingPage(
+            icon: "target",
+            eyebrow: "TODAY",
+            title: "Choose what matters now.",
+            detail: "Create clear daily or weekly intentions on Today, then update them manually or with a Voice Check-In. Keep each one specific enough that you can recognize real progress."
+        ),
+        OnboardingPage(
             icon: "waveform.and.mic",
             eyebrow: "VOICE CHECK-INS",
             title: "Speak it. See it move.",
-            detail: "An intention is a measurable daily or weekly focus you choose. Tell Pondera what you completed and by how much, and a Voice Check-In updates its progress and can capture an optional mood."
+            detail: "Tell Pondera what you completed and by how much. A Voice Check-In updates the intentions you chose and can capture an optional mood."
         ),
         OnboardingPage(
             icon: "sparkles",
@@ -41,7 +53,7 @@ struct OnboardingView: View {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("Pondera")
+                        Text("Pondera: Intentions")
                             .font(.title2.bold())
                             .foregroundStyle(PonderaTheme.textPrimary)
                         Spacer()
@@ -81,12 +93,12 @@ struct OnboardingView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button(action: advance) {
-                Text(selectedPage == pages.count - 1 ? "Continue" : "Next")
+                Text(selectedPage == pages.count - 1 ? finalButtonTitle : "Next")
             }
             .buttonStyle(PonderaPrimaryButtonStyle())
             .padding(.horizontal, 24)
             .padding(.bottom, 16)
-            .accessibilityHint(selectedPage == pages.count - 1 ? "Continues to voice and privacy information" : "Shows the next introduction page")
+            .accessibilityHint(selectedPage == pages.count - 1 ? finalButtonAccessibilityHint : "Shows the next introduction page")
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -146,6 +158,12 @@ struct OnboardingView: View {
         } else {
             onComplete()
         }
+    }
+
+    private var finalButtonAccessibilityHint: String {
+        finalButtonTitle == "Done"
+            ? "Closes the Pondera walkthrough"
+            : "Continues to voice and privacy information"
     }
 
     /// Adds the same light feedback when onboarding pages change by swiping.

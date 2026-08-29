@@ -128,65 +128,23 @@ struct RootTabView: View {
     }
 
     private var appHeader: some View {
-        HStack(spacing: 12) {
-            Color.clear
-                .frame(width: 44, height: 44)
-                .accessibilityHidden(true)
+        ZStack {
+            PonderaHeaderTitle()
+                .padding(.horizontal, 52)
 
-            Spacer(minLength: 0)
-
-            HStack(spacing: 9) {
+            HStack(spacing: 12) {
                 PonderaBrandMark()
-                    .frame(width: 22, height: 22)
+                    .frame(width: 32, height: 32)
+                    .frame(width: 44, height: 44, alignment: .leading)
                     .accessibilityHidden(true)
 
-                Text("Pondera")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .tracking(1.1)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [
-                                PonderaTheme.textPrimary,
-                                Color.white.opacity(0.88),
-                                PonderaTheme.accent.opacity(0.94)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .accessibilityElement(children: .combine)
+                Spacer(minLength: 0)
 
-            Spacer(minLength: 0)
-
-            Button {
-                PonderaHaptics.selection()
-                showSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(PonderaTheme.textPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .background(PonderaTheme.surface.opacity(0.72), in: Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.28), PonderaTheme.border],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1
-                            )
-                    )
-                    .shadow(color: PonderaTheme.accent.opacity(0.08), radius: 12, y: 5)
+                PonderaSettingsButton {
+                    PonderaHaptics.selection()
+                    showSettings = true
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Settings")
-            .accessibilityHint("Opens Pondera settings")
         }
         .padding(.horizontal, PonderaTheme.horizontalPadding)
         .padding(.vertical, 6)
@@ -230,63 +188,6 @@ struct RootTabView: View {
         TranscriptionQueue.shared.enqueueAllEligibleSegmentsOnLaunch()
         
         print("[RootTabView] Recovery complete")
-    }
-}
-
-private struct PonderaHeaderGlassBackground: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    var body: some View {
-        ZStack {
-            if reduceTransparency {
-                PonderaTheme.background.opacity(0.98)
-            } else {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-
-                LinearGradient(
-                    colors: [
-                        PonderaTheme.background.opacity(0.76),
-                        PonderaTheme.background.opacity(0.38),
-                        PonderaTheme.background.opacity(0.08)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                Ellipse()
-                    .fill(PonderaTheme.accent.opacity(0.10))
-                    .frame(width: 210, height: 48)
-                    .blur(radius: 22)
-                    .offset(x: -95, y: -14)
-
-                Ellipse()
-                    .fill(PonderaTheme.accentSecondary.opacity(0.08))
-                    .frame(width: 170, height: 42)
-                    .blur(radius: 24)
-                    .offset(x: 120, y: -10)
-            }
-        }
-        .overlay(alignment: .bottom) {
-            LinearGradient(
-                colors: [.clear, Color.white.opacity(reduceTransparency ? 0.05 : 0.14), .clear],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(height: 0.5)
-        }
-        .mask(
-            LinearGradient(
-                stops: [
-                    .init(color: .black, location: 0),
-                    .init(color: .black, location: 0.72),
-                    .init(color: .black.opacity(0.82), location: 0.88),
-                    .init(color: .clear, location: 1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
     }
 }
 

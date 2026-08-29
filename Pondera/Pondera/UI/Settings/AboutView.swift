@@ -119,10 +119,7 @@ struct AboutView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
         } else {
-            Image(systemName: "waveform.circle.fill")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .foregroundColor(.blue)
+            PonderaBrandMark()
         }
     }
 

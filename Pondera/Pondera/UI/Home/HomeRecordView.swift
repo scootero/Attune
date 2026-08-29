@@ -220,6 +220,12 @@ struct HomeRecordView: View {
                 .foregroundStyle(PonderaTheme.accent)
                 .fixedSize(horizontal: false, vertical: true)
 
+            Text("Pondera checks transcript confidence and skips unclear audio instead of turning it into Insights.")
+                .font(.footnote)
+                .italic()
+                .foregroundStyle(PonderaTheme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
             if let startErrorMessage {
                 Label(startErrorMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
@@ -304,6 +310,16 @@ struct HomeRecordView: View {
             LiveVoiceWaveform(level: recorder.audioLevel)
                 .frame(height: 48)
                 .accessibilityHidden(true)
+
+            if showsQuietAudioHint {
+                Label("Audio seems quiet or covered", systemImage: "mic.slash")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(.orange.opacity(0.14), in: Capsule())
+                    .accessibilityHint("Move the phone closer or uncover the microphone for a clearer transcript.")
+            }
 
             Button(action: stopListeningSession) {
                 Label("Finish", systemImage: "stop.fill")
@@ -506,6 +522,10 @@ struct HomeRecordView: View {
             return String(format: "%d:%02d:%02d", hours, minutes, seconds)
         }
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    private var showsQuietAudioHint: Bool {
+        recorder.elapsedSec >= 8 && recorder.audioLevel < 0.08
     }
 
     private func startListeningSession() {

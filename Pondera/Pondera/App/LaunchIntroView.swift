@@ -22,7 +22,7 @@ struct LaunchIntroView: View {
 
             VStack(spacing: 18) {
                 PonderaBrandMark()
-                    .frame(width: 58, height: 58)
+                    .frame(width: 64, height: 64)
 
                 Text("Pondera")
                     .font(.system(size: 34, weight: .semibold, design: .rounded))

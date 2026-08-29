@@ -7,6 +7,33 @@
 
 import Foundation
 
+/// Time-aligned transcript span from speech recognition.
+/// Confidence comes from Apple's speech recognizer when available.
+struct TranscriptSpan: Codable, Identifiable {
+    let id: String
+    let text: String
+    let startTime: TimeInterval
+    let duration: TimeInterval
+    let confidence: Double
+    let trust: String
+
+    init(
+        id: String = UUID().uuidString,
+        text: String,
+        startTime: TimeInterval,
+        duration: TimeInterval,
+        confidence: Double,
+        trust: String
+    ) {
+        self.id = id
+        self.text = text
+        self.startTime = startTime
+        self.duration = duration
+        self.confidence = confidence
+        self.trust = trust
+    }
+}
+
 /// Represents a single segment of audio within a recording session.
 /// Each segment corresponds to one audio file and its associated transcription.
 struct Segment: Codable, Identifiable {
@@ -35,6 +62,22 @@ struct Segment: Codable, Identifiable {
     
     /// Transcribed text from the audio (nil until transcription completes)
     var transcriptText: String?
+
+    /// Trusted portion of the transcript, excluding low-confidence spans.
+    /// Extraction uses this text instead of transcriptText when present.
+    var trustedTranscriptText: String?
+
+    /// Time-aligned spans used to make transcript quality visible and auditable.
+    var transcriptSpans: [TranscriptSpan]?
+
+    /// Average recognizer confidence across spans, 0.0...1.0.
+    var transcriptConfidence: Double?
+
+    /// Segment transcript quality: "trusted", "mixed", "lowTrust", or "silent".
+    var transcriptQuality: String?
+
+    /// Machine-readable reasons supporting transcriptQuality.
+    var transcriptQualityReasons: [String]?
     
     /// Error message if status is "failed"
     var error: String?
@@ -52,6 +95,11 @@ struct Segment: Codable, Identifiable {
         audioFileName: String,
         status: String = "writing",
         transcriptText: String? = nil,
+        trustedTranscriptText: String? = nil,
+        transcriptSpans: [TranscriptSpan]? = nil,
+        transcriptConfidence: Double? = nil,
+        transcriptQuality: String? = nil,
+        transcriptQualityReasons: [String]? = nil,
         error: String? = nil,
         audioDeletedAt: Date? = nil
     ) {
@@ -63,6 +111,11 @@ struct Segment: Codable, Identifiable {
         self.audioFileName = audioFileName
         self.status = status
         self.transcriptText = transcriptText
+        self.trustedTranscriptText = trustedTranscriptText
+        self.transcriptSpans = transcriptSpans
+        self.transcriptConfidence = transcriptConfidence
+        self.transcriptQuality = transcriptQuality
+        self.transcriptQualityReasons = transcriptQualityReasons
         self.error = error
         self.audioDeletedAt = audioDeletedAt
     }
@@ -74,5 +127,22 @@ extension Segment {
     /// Returns a short ID (first 6 characters) for display purposes
     var shortId: String {
         String(id.prefix(6))
+    }
+
+    var extractionTranscriptText: String {
+        let trusted = trustedTranscriptText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trusted.isEmpty {
+            return trusted
+        }
+        if transcriptQuality == "lowTrust" || transcriptQuality == "silent" {
+            return ""
+        }
+        return transcriptText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    var shouldAllowExtraction: Bool {
+        guard status == "done" else { return false }
+        guard !extractionTranscriptText.isEmpty else { return false }
+        return transcriptQuality != "lowTrust" && transcriptQuality != "silent"
     }
 }

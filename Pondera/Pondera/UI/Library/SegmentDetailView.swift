@@ -82,6 +82,15 @@ struct SegmentMetadataSection: View {
             MetadataRow(label: "Segment Index", value: "\(segment.index)")
             MetadataRow(label: "ID", value: segment.id)
             MetadataRow(label: "Status", value: segment.status)
+            if let quality = segment.transcriptQuality {
+                MetadataRow(label: "Transcript Quality", value: displayQuality(quality))
+            }
+            if let confidence = segment.transcriptConfidence {
+                MetadataRow(label: "Transcript Confidence", value: "\(Int((confidence * 100).rounded()))%")
+            }
+            if let reasons = segment.transcriptQualityReasons, !reasons.isEmpty {
+                MetadataRow(label: "Quality Notes", value: reasons.map(displayReason).joined(separator: ", "))
+            }
             MetadataRow(label: "Started", value: segment.startedAt.formatted(date: .abbreviated, time: .shortened))
             
             if let endedAt = segment.endedAt {
@@ -130,6 +139,20 @@ struct SegmentMetadataSection: View {
             }
         }
     }
+
+    private func displayQuality(_ quality: String) -> String {
+        switch quality {
+        case "trusted": return "High confidence"
+        case "mixed": return "Mixed confidence"
+        case "lowTrust": return "Low confidence"
+        case "silent": return "No clear speech"
+        default: return quality
+        }
+    }
+
+    private func displayReason(_ reason: String) -> String {
+        reason.replacingOccurrences(of: "_", with: " ").capitalized
+    }
 }
 
 // MARK: - Transcript Section
@@ -141,6 +164,19 @@ struct TranscriptSection: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Transcript")
                 .font(.headline)
+
+            if let confidence = segment.transcriptConfidence {
+                HStack(spacing: 6) {
+                    Image(systemName: qualityIcon)
+                    Text("\(qualityLabel) · \(Int((confidence * 100).rounded()))%")
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(qualityColor)
+            } else if let quality = segment.transcriptQuality {
+                Label(displayQuality(quality), systemImage: qualityIcon)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(qualityColor)
+            }
             
             if let transcript = segment.transcriptText, !transcript.isEmpty {
                 Text(transcript)
@@ -158,6 +194,91 @@ struct TranscriptSection: View {
                     .background(Color.secondary.opacity(0.1))
                     .cornerRadius(8)
             }
+
+            if let trusted = segment.trustedTranscriptText, !trusted.isEmpty, trusted != segment.transcriptText {
+                Text("Trusted portion")
+                    .font(.subheadline.weight(.semibold))
+                Text(trusted)
+                    .font(.body)
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(8)
+            } else if segment.transcriptQuality == "lowTrust" {
+                Text("Insights were skipped because the trusted portion was too weak.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            if let spans = segment.transcriptSpans, !spans.isEmpty {
+                Text("Word confidence")
+                    .font(.subheadline.weight(.semibold))
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], alignment: .leading, spacing: 8) {
+                    ForEach(spans.prefix(80)) { span in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(span.text)
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                            Text("\(Int((span.confidence * 100).rounded()))%")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(spanColor(span).opacity(0.14))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                }
+                if spans.count > 80 {
+                    Text("Showing first 80 words.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+
+    private var qualityLabel: String {
+        displayQuality(segment.transcriptQuality ?? "unknown")
+    }
+
+    private var qualityIcon: String {
+        switch segment.transcriptQuality {
+        case "trusted": return "checkmark.circle.fill"
+        case "mixed": return "waveform.badge.exclamationmark"
+        case "lowTrust": return "exclamationmark.triangle.fill"
+        case "silent": return "waveform.slash"
+        default: return "questionmark.circle"
+        }
+    }
+
+    private var qualityColor: Color {
+        switch segment.transcriptQuality {
+        case "trusted": return .green
+        case "mixed": return .yellow
+        case "lowTrust": return .orange
+        case "silent": return .secondary
+        default: return .secondary
+        }
+    }
+
+    private func displayQuality(_ quality: String) -> String {
+        switch quality {
+        case "trusted": return "High confidence"
+        case "mixed": return "Mixed confidence"
+        case "lowTrust": return "Low confidence"
+        case "silent": return "No clear speech"
+        default: return quality
+        }
+    }
+
+    private func spanColor(_ span: TranscriptSpan) -> Color {
+        switch span.trust {
+        case "trusted": return .green
+        case "uncertain": return .yellow
+        default: return .orange
         }
     }
 }

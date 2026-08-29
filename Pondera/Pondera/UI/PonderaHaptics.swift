@@ -7,16 +7,16 @@ import UIKit
 enum PonderaHaptics {
     /// A quiet pulse as the branded launch handoff reveals the app.
     static func welcome() {
-        let generator = UIImpactFeedbackGenerator(style: .soft)
+        let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.prepare()
-        generator.impactOccurred(intensity: 0.6)
+        generator.impactOccurred(intensity: 0.9)
     }
 
     /// Lightweight feedback for changing pages, tabs, or opening app chrome.
     static func selection() {
-        let generator = UISelectionFeedbackGenerator()
+        let generator = UIImpactFeedbackGenerator(style: .light)
         generator.prepare()
-        generator.selectionChanged()
+        generator.impactOccurred(intensity: 0.85)
     }
 
     static func action() {

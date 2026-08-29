@@ -241,6 +241,7 @@ struct HomeView: View {
     @State private var isGeneratingSuggestion = false
     @State private var showSuggestionEditor = false
     @State private var showSuggestionEvidence = false
+    @State private var showEmptyIntentionsWelcome = false
     @ObservedObject private var suggestionToastCenter = IntentionSuggestionToastCenter.shared
     @State private var oneThingMode = OneThingModeState.empty
     @State private var showFocusModeInfo = false
@@ -258,6 +259,10 @@ struct HomeView: View {
                 VStack(spacing: 0) {
                     // Keep the primary action and today's complete status visible with minimal scrolling.
                     VStack(spacing: 8) {
+                        if shouldShowEmptyIntentionsWelcome {
+                            emptyIntentionsWelcomeCard
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
                         recordCheckInCTAArea
                         todaysProgressCard
                         moodAndFeelingCard
@@ -338,6 +343,7 @@ struct HomeView: View {
         }
         .onAppear {
             refreshAll()
+            animateEmptyIntentionsWelcomeIfNeeded()
             // Pre-create directories so they don't need to be created on button tap (reduces lag)
             try? AppPaths.ensureDirectoriesExist()
             Task { await evaluateIntentionSuggestion() }
@@ -345,6 +351,7 @@ struct HomeView: View {
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             refreshAll()
+            animateEmptyIntentionsWelcomeIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             refreshAll()
@@ -506,12 +513,18 @@ struct HomeView: View {
                         .foregroundStyle(PonderaTheme.textSecondary)
                 }
                 HStack {
-                    Button("Why this?") { showSuggestionEvidence = true }
+                    Button("Why this?") {
+                        PonderaHaptics.selection()
+                        showSuggestionEvidence = true
+                    }
                         .buttonStyle(.borderless)
                     Spacer()
                     Button("Not for me") { declineSuggestion(suggestion) }
                         .buttonStyle(.borderless)
-                    Button(suggestedReplacement == nil ? "Add this" : "Review swap") { showSuggestionEditor = true }
+                    Button(suggestedReplacement == nil ? "Add this" : "Review swap") {
+                        PonderaHaptics.selection()
+                        showSuggestionEditor = true
+                    }
                         .buttonStyle(.borderedProminent)
                 }
             }
@@ -543,7 +556,7 @@ struct HomeView: View {
     /// One compact glass row: "5 Check-ins • Mood +3 • 2 In Progress • 1 Done • 1 Not Started"
     /// Uses HomeStyle glassCard for modern crisp glassy look with bloom shadows.
     private var dailySummaryStrip: some View {
-        Button(action: { showEditIntentions = true }) {
+        Button(action: openIntentionsEditor) {
             Text(compactSnapshotText)
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.95))
@@ -601,13 +614,24 @@ struct HomeView: View {
             }
             
             if todaysProgress.isEmpty {
-                HStack(spacing: 10) {
-                    Text("Add something you want to move forward today.")
-                        .font(.subheadline)
-                        .foregroundStyle(PonderaTheme.textSecondary)
-                    Spacer()
+                Button(action: openIntentionsEditor) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "sparkle.magnifyingglass")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(PonderaTheme.accent)
+
+                        Text("Add something you want to move forward today.")
+                            .font(.system(.subheadline, design: .serif).italic().weight(.semibold))
+                            .foregroundStyle(PonderaTheme.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 7)
+                    .contentShape(Rectangle())
                 }
-                .padding(.vertical, 4)
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens the intentions editor")
             } else {
                 ForEach(Array(visibleProgressRows.enumerated()), id: \.element.id) { index, row in // render each intention row
                     let neonTextColor = intentionNeonTextColor(at: index)
@@ -673,6 +697,7 @@ struct HomeView: View {
                            !oneThingMode.isActive,
                            todaysProgress.count > Self.collapsedIntentionLimit {
                             Button {
+                                PonderaHaptics.selection()
                                 withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
                                     showsAllIntentionsOnHome.toggle()
                                 }
@@ -729,6 +754,7 @@ struct HomeView: View {
                 Spacer()
 
                 Button {
+                    PonderaHaptics.selection()
                     showFocusModeInfo.toggle()
                 } label: {
                     Image(systemName: "info.circle")
@@ -929,14 +955,103 @@ struct HomeView: View {
                     action: saveUpdateProgressMode
                 )
             } else {
-                Button(action: { showEditIntentions = true }) {
-                    Text("Manage")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(PonderaTheme.accent)
-                        .frame(minWidth: 44, minHeight: 44)
+                if todaysProgress.isEmpty {
+                    Button(action: openIntentionsEditor) {
+                        Label("Add Intentions", systemImage: "plus")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(PonderaTheme.background)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.86)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 36)
+                            .background(PonderaTheme.accent, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens the intentions editor")
+                } else {
+                    Button(action: openIntentionsEditor) {
+                        Text("Manage")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(PonderaTheme.textPrimary)
+                            .lineLimit(1)
+                            .padding(.horizontal, 13)
+                            .frame(minHeight: 36)
+                            .background(PonderaTheme.surfaceStrong, in: Capsule())
+                            .overlay(Capsule().stroke(PonderaTheme.border, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Edit or remove intentions")
+
+                    Button(action: openIntentionsEditor) {
+                        Image(systemName: "plus")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(PonderaTheme.background)
+                            .frame(width: 36, height: 36)
+                            .background(PonderaTheme.accent, in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add Intention")
+                    .accessibilityHint("Opens the intentions editor")
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint("Add, edit, or remove intentions")
+            }
+        }
+    }
+
+    private var shouldShowEmptyIntentionsWelcome: Bool {
+        todaysProgress.isEmpty && showEmptyIntentionsWelcome
+    }
+
+    private var emptyIntentionsWelcomeCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "target")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(PonderaTheme.accent)
+                    .frame(width: 34, height: 34)
+                    .background(PonderaTheme.accent.opacity(0.14), in: Circle())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Welcome to Pondera")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(PonderaTheme.textPrimary)
+                    Text("Start with one intention, choose a simple target, then update it manually or with a Voice Check-In.")
+                        .font(.caption)
+                        .foregroundStyle(PonderaTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Button(action: openIntentionsEditor) {
+                Label("Add your first intention", systemImage: "plus")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(PonderaTheme.background)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 38)
+                    .background(PonderaTheme.accent, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .ponderaCard()
+    }
+
+    private func openIntentionsEditor() {
+        PonderaHaptics.selection()
+        showEditIntentions = true
+    }
+
+    private func animateEmptyIntentionsWelcomeIfNeeded() {
+        guard todaysProgress.isEmpty else {
+            showEmptyIntentionsWelcome = false
+            return
+        }
+        showEmptyIntentionsWelcome = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 5_500_000_000)
+            guard todaysProgress.isEmpty else { return }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.55)) {
+                showEmptyIntentionsWelcome = false
             }
         }
     }
@@ -1077,6 +1192,7 @@ struct HomeView: View {
     /// percentage, while color and fill act only as supporting cues.
     private var weeklyMomentumDayTileCard: some View {
         Button(action: {
+            PonderaHaptics.selection()
             appRouter.navigateToMomentum(date: Date())
         }) {
             ZStack {
@@ -1179,6 +1295,7 @@ struct HomeView: View {
     /// fixed baseline for calm, uniform scanning.
     private var weeklyMomentumDepthDialCard: some View {
         Button(action: {
+            PonderaHaptics.selection()
             appRouter.navigateToMomentum(date: Date())
         }) {
             ZStack {
@@ -1282,6 +1399,7 @@ struct HomeView: View {
     /// behavior so the redesign can be reverted via HomeWeeklyMomentumDesign.
     private var classicWeeklyMomentumCard: some View {
         Button(action: {
+            PonderaHaptics.selection()
             appRouter.navigateToMomentum(date: Date())  // Jump to Library → Momentum showing today
         }) {
             VStack(alignment: .leading, spacing: 5) {
@@ -1370,6 +1488,7 @@ struct HomeView: View {
     /// Free shows only today's aggregate, matching the today-only Momentum tab.
     private var freeTodayMomentumCard: some View {
         Button {
+            PonderaHaptics.selection()
             appRouter.navigateToMomentum(date: Date())
         } label: {
             HStack(spacing: 12) {
@@ -1453,6 +1572,7 @@ struct HomeView: View {
     
     /// Cancels update mode and restores original displayed totals without saving.
     private func cancelUpdateProgressMode() {
+        PonderaHaptics.selection()
         isUpdateProgressMode = false // exit mode
         sliderValues = [:]
         originalTotals = [:]
@@ -1810,6 +1930,7 @@ struct HomeView: View {
 
     private var feelingControl: some View {
         Button {
+            PonderaHaptics.selection()
             showFeelingPicker.toggle()
         } label: {
             HStack(spacing: 9) {
@@ -1954,8 +2075,10 @@ struct HomeView: View {
             )
             showFeelingPicker = false
             refreshMoodAndStreak()
+            PonderaHaptics.saved()
         } catch {
             AppLogger.log(AppLogger.ERR, "Feeling save failed error=\"\(error.localizedDescription)\"")
+            PonderaHaptics.error()
         }
     }
 
@@ -1974,7 +2097,7 @@ struct HomeView: View {
 
     private var recordCheckInCTAArea: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Quick Check-In")
+            Text("Voice Check-In")
                 .font(.headline)
                 .foregroundStyle(PonderaTheme.textPrimary)
 
@@ -2004,25 +2127,46 @@ struct HomeView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .ponderaCard()
+        .overlay {
+            RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            PonderaTheme.accent.opacity(0.58),
+                            PonderaTheme.warning.opacity(0.34)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+                .allowsHitTesting(false)
+        }
     }
 
     private var recordCheckInSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Update progress or mood by voice")
+            Text("Speak a quick progress or mood update.")
                 .foregroundStyle(PonderaTheme.textSecondary)
                 .font(.subheadline)
+
+            Text(checkInGuidanceText)
+                .foregroundStyle(PonderaTheme.textTertiary)
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
 
             Button(action: {
                 PonderaHaptics.action()
                 startCheckIn()
             }) {
-                Label("Record Check-In", systemImage: "mic.fill")
+                Label("Start Voice Check-In", systemImage: "mic.fill")
             }
             .buttonStyle(PonderaPrimaryButtonStyle())
             .accessibilityHint("Starts a short voice update for tracked intentions and mood")
 
             if !todayCheckIns.isEmpty {
                 Button("\(todayCheckIns.count) \(todayCheckIns.count == 1 ? "check-in" : "check-ins") today") {
+                    PonderaHaptics.selection()
                     showAllCheckInsSheet = true
                 }
                 .font(.caption.weight(.semibold))
@@ -2120,7 +2264,10 @@ struct HomeView: View {
                 detail: checkInReceiptText(checkInId: checkInId),
                 color: PonderaTheme.success
             )
-            Button("Record another") { state = .idle }
+            Button("Record another") {
+                PonderaHaptics.selection()
+                state = .idle
+            }
                 .buttonStyle(.bordered)
                 .tint(PonderaTheme.accent)
         }
@@ -2175,7 +2322,10 @@ struct HomeView: View {
                     .font(.caption2)
                     .foregroundStyle(PonderaTheme.textTertiary)
                 Spacer()
-                Button("Try Again") { state = .idle }
+                Button("Try Again") {
+                    PonderaHaptics.selection()
+                    state = .idle
+                }
                     .font(.caption.weight(.semibold))
                     .buttonStyle(.bordered)
                     .tint(PonderaTheme.accent)
@@ -2192,12 +2342,16 @@ struct HomeView: View {
                 color: PonderaTheme.warning
             )
             Button("Open Settings") {
+                PonderaHaptics.selection()
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     openURL(url)
                 }
             }
             .buttonStyle(PonderaPrimaryButtonStyle())
-            Button("Not now") { state = .idle }
+            Button("Not now") {
+                PonderaHaptics.selection()
+                state = .idle
+            }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(PonderaTheme.textSecondary)
         }
@@ -2459,8 +2613,10 @@ struct HomeView: View {
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.34)) {
                 suggestionToastCenter.resolveSuggestion(id: suggestion.id)
             }
+            PonderaHaptics.saved()
         } catch {
             AppLogger.log(AppLogger.ERR, "Suggestion decline failed error=\"\(error.localizedDescription)\"")
+            PonderaHaptics.error()
         }
     }
 
@@ -2546,8 +2702,10 @@ struct HomeView: View {
         do {
             try OneThingModeStore.shared.select(intentionId)
             oneThingMode = OneThingModeStore.shared.load()
+            PonderaHaptics.selection()
         } catch {
             AppLogger.log(AppLogger.ERR, "One Thing Mode selection failed error=\"\(error.localizedDescription)\"")
+            PonderaHaptics.error()
         }
     }
 
@@ -2555,8 +2713,10 @@ struct HomeView: View {
         do {
             try OneThingModeStore.shared.exit()
             oneThingMode = OneThingModeStore.shared.load()
+            PonderaHaptics.saved()
         } catch {
             AppLogger.log(AppLogger.ERR, "One Thing Mode exit failed error=\"\(error.localizedDescription)\"")
+            PonderaHaptics.error()
         }
     }
 

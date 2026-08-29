@@ -22,6 +22,7 @@ struct SettingsView: View {
     @State private var showPaywall = false
     @State private var paywallReason: String?
     @State private var showManageSubscriptions = false
+    @State private var showOnboardingReplay = false
     #if DEBUG && targetEnvironment(simulator)
     @State private var momentumDemoStatus = MomentumDemoDataManager.status()
     @State private var momentumDemoMessage: String?
@@ -63,6 +64,12 @@ struct SettingsView: View {
                     .environmentObject(subscriptionManager)
             }
             .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
+            .fullScreenCover(isPresented: $showOnboardingReplay) {
+                OnboardingView(finalButtonTitle: "Done") {
+                    showOnboardingReplay = false
+                }
+                .interactiveDismissDisabled(true)
+            }
             .alert("Export Failed", isPresented: $showingExportError) {
                 Button("OK", role: .cancel) { }
             } message: {
@@ -185,6 +192,14 @@ struct SettingsView: View {
 
     private var supportSection: some View {
         Section("Support") {
+            Button {
+                PonderaHaptics.selection()
+                showOnboardingReplay = true
+            } label: {
+                settingsLabel("How Pondera Works", icon: "book.pages.fill", color: PonderaTheme.accent)
+            }
+            .buttonStyle(.plain)
+
             NavigationLink(destination: AboutView()) {
                 settingsLabel("About Pondera", icon: "info.circle.fill", color: .blue)
             }

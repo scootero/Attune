@@ -357,12 +357,18 @@ class TranscriptionQueue: ObservableObject {
         
         // Perform transcription
         do {
-            let transcript = try await worker.transcribeFile(url: audioURL, sessionId: workItem.sessionId, segmentIndex: segment.index)
+            let transcription = try await worker.transcribeFileWithQuality(url: audioURL, sessionId: workItem.sessionId, segmentIndex: segment.index)
+            let transcript = transcription.transcriptText
             
             print("[TranscriptionQueue] Transcription successful: \(transcript.prefix(50))...")
             
             // Update segment with transcript and mark as done
             segment.transcriptText = transcript
+            segment.trustedTranscriptText = transcription.trustedTranscriptText
+            segment.transcriptSpans = transcription.spans
+            segment.transcriptConfidence = transcription.averageConfidence
+            segment.transcriptQuality = transcription.quality
+            segment.transcriptQualityReasons = transcription.qualityReasons
             segment.status = "done"
             segment.error = nil
             session.segments[segmentIndex] = segment
@@ -388,14 +394,21 @@ class TranscriptionQueue: ObservableObject {
             
             print("[TranscriptionQueue] Audio file deleted: \(audioURL.lastPathComponent)")
             
-            // Enqueue extraction for this segment (async, non-blocking)
-            enqueueExtractionForSegment(
-                sessionId: workItem.sessionId,
-                segmentId: workItem.segmentId,
-                segmentIndex: segment.index,
-                transcriptText: transcript,
-                session: session
-            )
+            if transcription.allowsExtraction {
+                // Enqueue extraction for trusted speech only (async, non-blocking)
+                enqueueExtractionForSegment(
+                    sessionId: workItem.sessionId,
+                    segmentId: workItem.segmentId,
+                    segmentIndex: segment.index,
+                    transcriptText: transcription.trustedTranscriptText,
+                    session: session
+                )
+            } else {
+                AppLogger.log(
+                    AppLogger.AI,
+                    "extraction_skipped_low_transcript_trust session=\(AppLogger.shortId(workItem.sessionId)) seg=\(segment.index) quality=\(transcription.quality) trustedChars=\(transcription.trustedTranscriptText.count) reasons=[\(transcription.qualityReasons.joined(separator: ","))]"
+                )
+            }
             
         } catch {
             // Check if this is a "no speech detected" error (expected for silence)
@@ -412,6 +425,11 @@ class TranscriptionQueue: ObservableObject {
                 
                 // Silence is expected - mark as done with empty transcript
                 segment.transcriptText = "" // Empty transcript for silent segment
+                segment.trustedTranscriptText = ""
+                segment.transcriptSpans = []
+                segment.transcriptConfidence = nil
+                segment.transcriptQuality = "silent"
+                segment.transcriptQualityReasons = ["no_speech"]
                 segment.status = "done"
                 segment.error = nil
                 session.segments[segmentIndex] = segment
@@ -509,7 +527,8 @@ class TranscriptionQueue: ObservableObject {
             if session.finalTranscriptText == nil {
                 let finalTranscript = session.segments
                     .sorted { $0.index < $1.index }
-                    .compactMap { $0.transcriptText }
+                    .map { $0.extractionTranscriptText }
+                    .filter { !$0.isEmpty }
                     .joined(separator: " ")
                 session.finalTranscriptText = finalTranscript
             }
@@ -554,8 +573,9 @@ class TranscriptionQueue: ObservableObject {
                 return nil
             }
             
-            // Check if previous segment has transcript
-            guard let prevTranscript = prevSegment.transcriptText, !prevTranscript.isEmpty else {
+            // Check if previous segment has trusted transcript context
+            let prevTranscript = prevSegment.extractionTranscriptText
+            guard !prevTranscript.isEmpty else {
                 return nil
             }
             

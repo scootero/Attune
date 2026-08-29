@@ -64,39 +64,104 @@ enum PonderaTheme {
 /// Shared customer-facing Pondera mark used by the persistent header and launch intro.
 struct PonderaBrandMark: View {
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [Color.white.opacity(0.95), PonderaTheme.accent.opacity(0.88), .clear],
-                        center: UnitPoint(x: 0.36, y: 0.30),
-                        startRadius: 0,
-                        endRadius: 12
+        GeometryReader { proxy in
+            Image("PonderaBrandIcon")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: min(proxy.size.width, proxy.size.height) * 0.2237,
+                        style: .continuous
                     )
                 )
-                .blur(radius: 0.35)
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
+}
 
-            Circle()
-                .stroke(
-                    AngularGradient(
-                        colors: [
-                            Color.white.opacity(0.78),
-                            PonderaTheme.accent.opacity(0.34),
-                            PonderaTheme.accentSecondary.opacity(0.58),
-                            Color.white.opacity(0.78)
-                        ],
-                        center: .center
-                    ),
-                    lineWidth: 1
+struct PonderaHeaderTitle: View {
+    var body: some View {
+        Text("Pondera: Intentions")
+            .font(.system(size: 19, weight: .semibold, design: .rounded))
+            .tracking(0.25)
+            .foregroundStyle(Color.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+struct PonderaSettingsButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "gearshape")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(PonderaTheme.textPrimary)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Settings")
+        .accessibilityHint("Opens Pondera settings")
+    }
+}
+
+struct PonderaHeaderGlassBackground: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        ZStack {
+            if reduceTransparency {
+                PonderaTheme.background.opacity(0.98)
+            } else {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+
+                LinearGradient(
+                    colors: [
+                        PonderaTheme.background.opacity(0.76),
+                        PonderaTheme.background.opacity(0.38),
+                        PonderaTheme.background.opacity(0.08)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
 
-            Circle()
-                .trim(from: 0.12, to: 0.70)
-                .stroke(Color.white.opacity(0.72), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
-                .frame(width: 12, height: 12)
-                .rotationEffect(.degrees(-18))
+                Ellipse()
+                    .fill(PonderaTheme.accent.opacity(0.10))
+                    .frame(width: 210, height: 48)
+                    .blur(radius: 22)
+                    .offset(x: -95, y: -14)
+
+                Ellipse()
+                    .fill(PonderaTheme.accentSecondary.opacity(0.08))
+                    .frame(width: 170, height: 42)
+                    .blur(radius: 24)
+                    .offset(x: 120, y: -10)
+            }
         }
-        .shadow(color: PonderaTheme.accent.opacity(0.28), radius: 7)
+        .overlay(alignment: .bottom) {
+            LinearGradient(
+                colors: [.clear, Color.white.opacity(reduceTransparency ? 0.05 : 0.14), .clear],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: 0.5)
+        }
+        .mask(
+            LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: 0.72),
+                    .init(color: .black.opacity(0.82), location: 0.88),
+                    .init(color: .clear, location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
     }
 }
 

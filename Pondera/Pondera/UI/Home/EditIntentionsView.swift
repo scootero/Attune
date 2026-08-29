@@ -79,6 +79,7 @@ struct EditIntentionsView: View {
     @State private var baselineAddDraft: DraftIntention = DraftIntention.empty() // original add-card state (empty)
     /// Presents Pro when a Free user tries to create a second intention.
     @State private var showIntentionLimitPaywall = false
+    @State private var showSettings = false
     private let initialAddDraft: DraftIntention?
     private let onSuggestedIntentionSaved: (() -> Void)?
     private let replacementIntentionId: String?
@@ -117,30 +118,21 @@ struct EditIntentionsView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        List {
-                            intentionGuideCard
-                                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 6, trailing: 12))
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
+                        VStack(spacing: 0) {
+                            editorHeader
 
-                            if let replacementIntentionTitle, initialAddDraft != nil {
-                                Label(
-                                    "Ready to replace “\(replacementIntentionTitle)” with this suggestion. Nothing changes until you tap Save.",
-                                    systemImage: "arrow.triangle.swap"
-                                )
-                                .font(.footnote.weight(.medium))
-                                .foregroundStyle(PonderaTheme.warning)
-                                .padding(12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(PonderaTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
-                            }
+                            List {
+                                intentionGuideCard
+                                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 6, trailing: 12))
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
 
-                            if hasValidationIssue {
-                                Label("Each intention needs a name and a target greater than zero.", systemImage: "exclamationmark.circle.fill")
-                                    .font(.footnote)
+                                if let replacementIntentionTitle, initialAddDraft != nil {
+                                    Label(
+                                        "Ready to replace “\(replacementIntentionTitle)” with this suggestion. Nothing changes until you tap Save.",
+                                        systemImage: "arrow.triangle.swap"
+                                    )
+                                    .font(.footnote.weight(.medium))
                                     .foregroundStyle(PonderaTheme.warning)
                                     .padding(12)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -148,128 +140,109 @@ struct EditIntentionsView: View {
                                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                                     .listRowSeparator(.hidden)
                                     .listRowBackground(Color.clear)
-                            }
-
-                            AddIntentionCard( // inline Add card per spec
-                                draft: $addDraft, // bind to add draft state
-                                isExpanded: $isAddExpanded, // controls expansion
-                                disableAdd: !subscriptionManager.canAddIntention(currentCount: draftIntentions.count), // enforce plan + app caps
-                                onDisabledTap: handleDisabledAddTap,
-                                onExpand: { collapseAllForAdd() }, // ensure only one expanded at a time
-                                onParsed: { parsed in applyParsedToAddDraft(parsed) }, // route record parse into add draft
-                                hapticEngine: hapticEngine // share haptic generator
-                            )
-                            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // keep card breathing room
-                            .listRowSeparator(.hidden) // hide separators for glass cards
-                            .listRowBackground(Color.clear) // let glass card show
-                            
-                            ForEach($draftIntentions) { $draft in // iterate with binding so inline edits write through
-                                VStack(spacing: 6) { // tighter spacing keeps expanded rows visually compact for faster scanning
-                                    Button(action: { toggleEditExpansion(for: draft.id) }) { // tap to expand/collapse edit card
-                                        IntentionSummaryRow( // summary row retained for quick scan
-                                            draft: draft, // pass current draft
-                                            variation: IntentionCardVariation.forId(draft.id) // deterministic palette
-                                        )
-                                    }
-                                    .buttonStyle(.plain) // keep custom styling
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) { // deletion affordance
-                                        Button(role: .destructive) {
-                                            pendingDeleteDraftId = draft.id // track row for alert
-                                            let trimmedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines) // normalize title
-                                            pendingDeleteDraftTitle = trimmedTitle.isEmpty ? "this intention" : "\"\(trimmedTitle)\"" // friendly prompt
-                                        } label: {
-                                            Label("Delete", systemImage: "trash") // icon for delete
-                                        }
-                                    }
-                                    
-                                    if expandedEditId == draft.id { // show editor only for active row
-                                        InlineIntentionEditor( // inline editor with slider + fields
-                                            draft: $draft, // bind to this row
-                                            variation: IntentionCardVariation.forId(draft.id), // palette reuse
-                                            hapticEngine: hapticEngine // shared generator
-                                        )
-                                        .padding(10) // keep one clean primary panel around expanded edit controls
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 16, style: .continuous) // single rounded glass panel for the expanded editor
-                                                .fill(NeonPalette.darkOverlay.opacity(0.38)) // subtle dark fill avoids heavy stacked-card look
-                                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) // keep lightweight glass blur for consistency
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 16, style: .continuous) // thin border gives definition without neon framing
-                                                .stroke(Color.white.opacity(0.12), lineWidth: 1) // soft edge line keeps panel readable on dark background
-                                        )
-                                        .shadow(color: NeonPalette.darkShadow.opacity(0.2), radius: 4, x: 0, y: 2) // very soft shadow to avoid expensive/heavy depth effects
-                                        .transition(.opacity.combined(with: .move(edge: .top))) // smooth show/hide
-
-                                        Button(role: .destructive) {
-                                            pendingDeleteDraftId = draft.id
-                                            let trimmedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
-                                            pendingDeleteDraftTitle = trimmedTitle.isEmpty ? "this intention" : "\"\(trimmedTitle)\""
-                                        } label: {
-                                            Label("Delete Intention", systemImage: "trash")
-                                                .font(.subheadline.weight(.semibold))
-                                                .frame(maxWidth: .infinity)
-                                        }
-                                        .buttonStyle(.bordered)
-                                        .tint(PonderaTheme.recording)
-                                    }
                                 }
-                                .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // spacing for glass cards
-                                .listRowSeparator(.hidden) // hide separators under glass
-                                .listRowBackground(Color.clear) // transparent background for gradient
+
+                                if hasValidationIssue {
+                                    Label("Each intention needs a name and a target greater than zero.", systemImage: "exclamationmark.circle.fill")
+                                        .font(.footnote)
+                                        .foregroundStyle(PonderaTheme.warning)
+                                        .padding(12)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(PonderaTheme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                                        .listRowSeparator(.hidden)
+                                        .listRowBackground(Color.clear)
+                                }
+
+                                AddIntentionCard( // inline Add card per spec
+                                    draft: $addDraft, // bind to add draft state
+                                    isExpanded: $isAddExpanded, // controls expansion
+                                    disableAdd: !subscriptionManager.canAddIntention(currentCount: draftIntentions.count), // enforce plan + app caps
+                                    onDisabledTap: handleDisabledAddTap,
+                                    onExpand: { collapseAllForAdd() }, // ensure only one expanded at a time
+                                    onParsed: { parsed in applyParsedToAddDraft(parsed) }, // route record parse into add draft
+                                    hapticEngine: hapticEngine // share haptic generator
+                                )
+                                .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // keep card breathing room
+                                .listRowSeparator(.hidden) // hide separators for glass cards
+                                .listRowBackground(Color.clear) // let glass card show
+                                
+                                ForEach($draftIntentions) { $draft in // iterate with binding so inline edits write through
+                                    VStack(spacing: 6) { // tighter spacing keeps expanded rows visually compact for faster scanning
+                                        Button(action: { toggleEditExpansion(for: draft.id) }) { // tap to expand/collapse edit card
+                                            IntentionSummaryRow( // summary row retained for quick scan
+                                                draft: draft, // pass current draft
+                                                variation: IntentionCardVariation.forId(draft.id) // deterministic palette
+                                            )
+                                        }
+                                        .buttonStyle(.plain) // keep custom styling
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: false) { // deletion affordance
+                                            Button(role: .destructive) {
+                                                pendingDeleteDraftId = draft.id // track row for alert
+                                                let trimmedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines) // normalize title
+                                                pendingDeleteDraftTitle = trimmedTitle.isEmpty ? "this intention" : "\"\(trimmedTitle)\"" // friendly prompt
+                                            } label: {
+                                                Label("Delete", systemImage: "trash") // icon for delete
+                                            }
+                                        }
+                                        
+                                        if expandedEditId == draft.id { // show editor only for active row
+                                            InlineIntentionEditor( // inline editor with slider + fields
+                                                draft: $draft, // bind to this row
+                                                variation: IntentionCardVariation.forId(draft.id), // palette reuse
+                                                hapticEngine: hapticEngine // shared generator
+                                            )
+                                            .padding(10) // keep one clean primary panel around expanded edit controls
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 16, style: .continuous) // single rounded glass panel for the expanded editor
+                                                    .fill(NeonPalette.darkOverlay.opacity(0.38)) // subtle dark fill avoids heavy stacked-card look
+                                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) // keep lightweight glass blur for consistency
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 16, style: .continuous) // thin border gives definition without neon framing
+                                                    .stroke(Color.white.opacity(0.12), lineWidth: 1) // soft edge line keeps panel readable on dark background
+                                            )
+                                            .shadow(color: NeonPalette.darkShadow.opacity(0.2), radius: 4, x: 0, y: 2) // very soft shadow to avoid expensive/heavy depth effects
+                                            .transition(.opacity.combined(with: .move(edge: .top))) // smooth show/hide
+
+                                            Button(role: .destructive) {
+                                                pendingDeleteDraftId = draft.id
+                                                let trimmedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                                                pendingDeleteDraftTitle = trimmedTitle.isEmpty ? "this intention" : "\"\(trimmedTitle)\""
+                                            } label: {
+                                                Label("Delete Intention", systemImage: "trash")
+                                                    .font(.subheadline.weight(.semibold))
+                                                    .frame(maxWidth: .infinity)
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .tint(PonderaTheme.recording)
+                                        }
+                                    }
+                                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // spacing for glass cards
+                                    .listRowSeparator(.hidden) // hide separators under glass
+                                    .listRowBackground(Color.clear) // transparent background for gradient
+                                }
                             }
+                            .scrollContentBackground(.hidden) // allow custom background
+                            .listStyle(.plain) // plain list keeps spacing predictable and lighter to render while typing
+                            .scrollDismissesKeyboard(.interactively) // let drag gestures dismiss keyboard smoothly // reduces abrupt keyboard/layout interactions
                         }
-                        .scrollContentBackground(.hidden) // allow custom background
-                        .listStyle(.plain) // plain list keeps spacing predictable and lighter to render while typing
-                        .scrollDismissesKeyboard(.interactively) // let drag gestures dismiss keyboard smoothly // reduces abrupt keyboard/layout interactions
                     }
                 }
             }
-            .navigationTitle("Intentions")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(action: { cancelChanges() }) { // cancel action preserves existing logic while letting us restyle label
-                        Text("Cancel") // cancel label to be styled as pill
-                            .font(.system(size: 14, weight: .semibold, design: .rounded)) // rounded font to mirror Home buttons
-                            .foregroundColor(.white) // white text for high contrast on dark pill
-                            .padding(.horizontal, 14) // horizontal padding to form pill shape
-                            .padding(.vertical, 8) // vertical padding for tap comfort
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(NeonPalette.darkOverlay.opacity(0.75)) // dark pill fill to keep cancel subtle but visible
-                            )
-                            .overlay(
-                                Capsule(style: .continuous)
-                                    .stroke(Color.white.opacity(0.25), lineWidth: 1) // light stroke for definition on glass backdrop
-                            )
-                            .shadow(color: NeonPalette.darkShadow.opacity(0.4), radius: 6, x: 0, y: 2) // soft shadow to lift pill off nav bar
-                    }
+                    Button("Cancel", action: cancelChanges)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(PonderaTheme.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(action: { saveAndDismiss() }) { // save action kept identical while restyling pill
-                        Text("Save Changes") // save label styled as primary pill
-                            .font(.system(size: 14, weight: .semibold, design: .rounded)) // rounded font to align with Home CTAs
-                            .foregroundColor(.white) // white text for max contrast
-                            .padding(.horizontal, 14) // horizontal padding for pill
-                            .padding(.vertical, 8) // vertical padding for tap area
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(
-                                        LinearGradient(gradient: Gradient(colors: [
-                                            NeonPalette.neonTeal, // bright leading teal for primary emphasis
-                                            NeonPalette.neonTeal.opacity(0.8) // slightly darker trailing teal for depth
-                                        ]), startPoint: .leading, endPoint: .trailing)
-                                    ) // gradient pill fill matching Home accent
-                            )
-                            .overlay(
-                                Capsule(style: .continuous)
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 1) // subtle highlight stroke for premium pill edge
-                            )
-                            .shadow(color: NeonPalette.neonTeal.opacity(0.35), radius: 8, x: 0, y: 3) // teal glow shadow to make primary pill feel alive
-                            .opacity(canSave ? 1.0 : 0.45) // dim pill when disabled to signal state without altering logic
-                    }
-                    .disabled(!canSave) // preserve original save gate
+                    Button("Save Changes", action: saveAndDismiss)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(canSave ? PonderaTheme.accent : PonderaTheme.textTertiary)
+                        .disabled(!canSave) // preserve original save gate
                 }
             }
             .onAppear {
@@ -298,6 +271,35 @@ struct EditIntentionsView: View {
                 PaywallView(reason: "Free includes one active intention. Upgrade to Pondera Pro to track more goals at once.")
                     .environmentObject(subscriptionManager)
             }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+                    .environmentObject(subscriptionManager)
+            }
+        }
+    }
+
+    private var editorHeader: some View {
+        HStack(spacing: 12) {
+            Color.clear
+                .frame(width: 44, height: 44)
+                .accessibilityHidden(true)
+
+            Spacer(minLength: 0)
+            PonderaHeaderTitle()
+            Spacer(minLength: 0)
+
+            PonderaSettingsButton {
+                PonderaHaptics.selection()
+                showSettings = true
+            }
+        }
+        .padding(.horizontal, PonderaTheme.horizontalPadding)
+        .padding(.vertical, 6)
+        .background {
+            PonderaHeaderGlassBackground()
+                .frame(height: 72)
+                .offset(y: 8)
+                .ignoresSafeArea(edges: .top)
         }
     }
     
@@ -340,6 +342,7 @@ struct EditIntentionsView: View {
 
     private func handleDisabledAddTap() {
         guard !subscriptionManager.hasPremiumAccess else { return }
+        PonderaHaptics.warning()
         showIntentionLimitPaywall = true
     }
 
@@ -418,6 +421,7 @@ struct EditIntentionsView: View {
     /// Deletes the draft selected by swipe action after user confirms the alert.
     private func deletePendingDraft() {
         guard let pendingDeleteDraftId else { return }
+        PonderaHaptics.warning()
         draftIntentions.removeAll { $0.id == pendingDeleteDraftId }
         self.pendingDeleteDraftId = nil
         self.pendingDeleteDraftTitle = ""
@@ -425,6 +429,7 @@ struct EditIntentionsView: View {
     
     /// Ensures only the Add card is expanded.
     private func collapseAllForAdd() {
+        PonderaHaptics.selection()
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { // smooth expand animation
             expandedEditId = nil // collapse any open edit row
             isAddExpanded = true // expand add card
@@ -433,6 +438,7 @@ struct EditIntentionsView: View {
     
     /// Toggles expansion for a specific intention id while collapsing others.
     private func toggleEditExpansion(for id: String) {
+        PonderaHaptics.selection()
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { // animate expand/collapse
             if expandedEditId == id { // if already open
                 expandedEditId = nil // collapse
@@ -457,6 +463,7 @@ struct EditIntentionsView: View {
     
     /// Restores drafts to baseline and dismisses without saving.
     private func cancelChanges() {
+        PonderaHaptics.selection()
         draftIntentions = baselineDrafts // revert existing drafts
         addDraft = baselineAddDraft // revert add card
         expandedEditId = nil // collapse editors
