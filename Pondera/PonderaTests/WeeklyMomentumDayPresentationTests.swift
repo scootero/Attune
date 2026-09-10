@@ -111,6 +111,30 @@ final class WeeklyMomentumDayPresentationTests: XCTestCase {
         )
     }
 
+    func testRecordedProgressUsesActualPerIntentionPercentages() {
+        let calendar = fixedCalendar()
+        let now = date(day: 20, hour: 12, calendar: calendar)
+        let dateKey = ProgressCalculator.dateKey(for: now)
+        let intentions = [
+            Intention(id: "walk", title: "Walk", targetValue: 100, unit: "minutes", timeframe: "daily", createdAt: date(day: 20, hour: 8, calendar: calendar)),
+            Intention(id: "meditate", title: "Meditate", targetValue: 100, unit: "minutes", timeframe: "daily", createdAt: date(day: 20, hour: 8, calendar: calendar)),
+            Intention(id: "read", title: "Read", targetValue: 100, unit: "pages", timeframe: "daily", createdAt: date(day: 20, hour: 8, calendar: calendar))
+        ]
+
+        let week = WeekMomentumCalculator.compute(
+            today: now,
+            intentionSet: IntentionSet(startedAt: date(day: 20, hour: 6, calendar: calendar), intentionIds: intentions.map(\.id)),
+            intentions: intentions,
+            entriesForDate: { _ in [] },
+            overridesForDate: { key in
+                key == dateKey ? ["walk": 90, "meditate": 70, "read": 33] : [:]
+            }
+        )
+
+        let todayIndex = week.days.firstIndex { calendar.isDate($0.date, inSameDayAs: now) }!
+        XCTAssertEqual(week.days[todayIndex].completionRatio ?? -1, (0.90 + 0.70 + 0.33) / 3, accuracy: 0.000_001)
+    }
+
     private func momentumDay(date: Date) -> DayMomentum {
         DayMomentum(
             date: date,

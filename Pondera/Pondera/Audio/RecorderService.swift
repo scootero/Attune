@@ -223,10 +223,10 @@ class RecorderService: NSObject, ObservableObject {
             return
         }
         
-        // Compute final transcript by concatenating segment transcripts in order
+        // Preserve the complete recognizer transcript for the user-facing session.
         let finalTranscript = session.segments
             .sorted { $0.index < $1.index }
-            .map { $0.extractionTranscriptText }
+            .compactMap { $0.transcriptText?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
         

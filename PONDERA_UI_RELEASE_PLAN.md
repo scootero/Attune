@@ -231,7 +231,7 @@ After the approved changes reach the default branch, open GitHub repository **Se
 - Reorganized Settings around Membership, Notifications, Privacy & Data, and Support while preserving Debug-only diagnostics and Momentum cleanup controls.
 - Replaced the old monthly marketing with Pondera Pro and removed consumer-facing “background listening” sales language.
 - Built a branded paywall and then aligned the real feature gates to the approved plan: Free has one active intention, one Voice Check-In per day, today's Momentum only, and the daily reminder; Pro adds more intentions, unlimited check-ins, Listening Sessions, Insights, historical/Week/Month Momentum, voice intention setup, and data export.
-- Explained that Listening Sessions organize clear intentions, commitments, events, and states and group repeated ideas into themes; event-like captures do not currently create calendar appointments or event reminders.
+- Explained that Listening Sessions organize clear intentions, commitments, events, and states and group repeated ideas into themes; timed event-like captures can receive local reminders, while Pondera does not create Apple Calendar appointments.
 - Added first-run benefit onboarding before the existing mandatory processing disclosure.
 - Added microphone, speech, and notification status plus accurate recording, online-processing, local-storage, export, and data-request information.
 - Set the new-install reminder preference to on at 6 PM; iOS notification authorization is still required before delivery.

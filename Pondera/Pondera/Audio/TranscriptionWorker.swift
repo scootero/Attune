@@ -36,8 +36,8 @@ class TranscriptionWorker {
     }
 
     /// Transcribes an audio file and returns recognizer confidence metadata.
-    /// The original transcript remains available, but downstream extraction should
-    /// use trustedTranscriptText and respect allowsExtraction.
+    /// The original transcript remains available for downstream extraction;
+    /// callers should still respect allowsExtraction for unusable recordings.
     func transcribeFileWithQuality(url: URL, sessionId: String, segmentIndex: Int) async throws -> TranscriptionResult {
         // Log transcription start
         let fileName = url.lastPathComponent

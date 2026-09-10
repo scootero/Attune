@@ -87,6 +87,7 @@ final class CorrectionsStore {
         // Save to disk
         try saveCorrections(corrections)
         NotificationCenter.default.post(name: .ponderaCorrectionsDidChange, object: nil)
+        CalendarEventNotificationService.shared.refresh()
         
         AppLogger.log(
             AppLogger.STORE,
@@ -108,6 +109,7 @@ final class CorrectionsStore {
         
         try saveCorrections(corrections)
         NotificationCenter.default.post(name: .ponderaCorrectionsDidChange, object: nil)
+        CalendarEventNotificationService.shared.refresh()
         
         AppLogger.log(
             AppLogger.STORE,

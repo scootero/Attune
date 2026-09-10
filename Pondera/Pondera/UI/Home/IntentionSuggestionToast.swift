@@ -6,8 +6,8 @@ extension Notification.Name {
     static let ponderaIntentionSuggestionDidResolve = Notification.Name("attune.intentionSuggestion.didResolve")
 }
 
-/// Process-local presentation state for the brief suggestion surfaces. The
-/// durable source of truth remains IntentionSuggestionStore.
+/// Process-local presentation state for the suggestion surfaces. The durable
+/// source of truth remains IntentionSuggestionStore.
 @MainActor
 final class IntentionSuggestionToastCenter: ObservableObject {
     static let shared = IntentionSuggestionToastCenter()
@@ -51,6 +51,7 @@ struct IntentionSuggestionToast: View {
     let suggestion: SuggestedIntentionAction
     let onReview: () -> Void
     let onDismiss: () -> Void
+    let onDecline: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -75,7 +76,9 @@ struct IntentionSuggestionToast: View {
             }
 
             HStack(spacing: 10) {
-                Button("Not for me", action: onDismiss)
+                Button("Dismiss", action: onDismiss)
+                    .buttonStyle(.borderless)
+                Button("Not for me", action: onDecline)
                     .buttonStyle(.borderless)
                 Spacer(minLength: 4)
                 Button("Review", action: onReview)

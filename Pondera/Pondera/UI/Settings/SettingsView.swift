@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var showingExportError = false
     @State private var exportErrorMessage = ""
     @State private var isReminderEnabled = ReminderPreferences.isReminderEnabled // Bind toggle to persisted enabled flag so user can turn daily reminders on/off.
+    @State private var areCalendarEventRemindersEnabled = ReminderPreferences.areCalendarEventRemindersEnabled
     @State private var reminderTime = ReminderPreferences.reminderTimeDate // Bind DatePicker to persisted reminder time so user can customize notification time.
     @State private var showPaywall = false
     @State private var paywallReason: String?
@@ -49,6 +50,7 @@ struct SettingsView: View {
             }
             .onAppear {
                 isReminderEnabled = ReminderPreferences.isReminderEnabled
+                areCalendarEventRemindersEnabled = ReminderPreferences.areCalendarEventRemindersEnabled
                 reminderTime = ReminderPreferences.reminderTimeDate
                 #if DEBUG && targetEnvironment(simulator)
                 refreshMomentumDemoStatus()
@@ -149,9 +151,23 @@ struct SettingsView: View {
                         Task {
                             _ = await PermissionsHelper.requestNotificationPermissions()
                             DailyReminderNotificationService.shared.refreshReminderForToday()
+                            CalendarEventNotificationService.shared.refresh()
                         }
                     } else {
                         DailyReminderNotificationService.shared.refreshReminderForToday()
+                    }
+                }
+
+            Toggle("Calendar Event Reminders", isOn: $areCalendarEventRemindersEnabled)
+                .onChange(of: areCalendarEventRemindersEnabled) { _, newValue in
+                    ReminderPreferences.areCalendarEventRemindersEnabled = newValue
+                    if newValue {
+                        Task {
+                            _ = await PermissionsHelper.requestNotificationPermissions()
+                            CalendarEventNotificationService.shared.refresh()
+                        }
+                    } else {
+                        CalendarEventNotificationService.shared.refresh()
                     }
                 }
 
@@ -165,7 +181,7 @@ struct SettingsView: View {
         } header: {
             Text("Notifications")
         } footer: {
-            Text("When enabled, Pondera reminds you at your chosen time only if no intention progress has been updated. You can choose an intention from the alert and get a one-hour follow-up.")
+            Text("Timed event captures receive alerts one hour before and when they start. Alerts use sound and the iPhone's notification vibration settings. Daily reminders remain controlled by the option above.")
         }
     }
 

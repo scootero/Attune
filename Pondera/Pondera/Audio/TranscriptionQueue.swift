@@ -395,12 +395,13 @@ class TranscriptionQueue: ObservableObject {
             print("[TranscriptionQueue] Audio file deleted: \(audioURL.lastPathComponent)")
             
             if transcription.allowsExtraction {
-                // Enqueue extraction for trusted speech only (async, non-blocking)
+                // Enqueue the complete recognizer transcript. Confidence remains a
+                // gate for unusable recordings, not a word-by-word deletion rule.
                 enqueueExtractionForSegment(
                     sessionId: workItem.sessionId,
                     segmentId: workItem.segmentId,
                     segmentIndex: segment.index,
-                    transcriptText: transcription.trustedTranscriptText,
+                    transcriptText: transcription.transcriptText,
                     session: session
                 )
             } else {
@@ -527,7 +528,7 @@ class TranscriptionQueue: ObservableObject {
             if session.finalTranscriptText == nil {
                 let finalTranscript = session.segments
                     .sorted { $0.index < $1.index }
-                    .map { $0.extractionTranscriptText }
+                    .compactMap { $0.transcriptText?.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .filter { !$0.isEmpty }
                     .joined(separator: " ")
                 session.finalTranscriptText = finalTranscript
@@ -573,8 +574,12 @@ class TranscriptionQueue: ObservableObject {
                 return nil
             }
             
-            // Check if previous segment has trusted transcript context
-            let prevTranscript = prevSegment.extractionTranscriptText
+            // Preserve the hard low-trust/silence gate, but otherwise give the
+            // extractor the complete previous transcript for context.
+            guard prevSegment.transcriptQuality != "lowTrust", prevSegment.transcriptQuality != "silent" else {
+                return nil
+            }
+            let prevTranscript = prevSegment.transcriptText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !prevTranscript.isEmpty else {
                 return nil
             }

@@ -76,7 +76,7 @@ struct AboutView: View {
             }
 
             Section("Important to Know") {
-                Text("Pondera records in Talk it out only after you tap Start talking. Event-like details remain reviewable captures; Pondera does not currently add calendar appointments or event reminders.")
+                    Text("Pondera records in Talk it out only after you tap Start talking. Event-like details remain reviewable captures; timed event captures can send local reminders one hour before and when they start.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

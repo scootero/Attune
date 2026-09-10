@@ -79,6 +79,11 @@ struct EditIntentionsView: View {
     @State private var baselineAddDraft: DraftIntention = DraftIntention.empty() // original add-card state (empty)
     /// Presents Pro when a Free user tries to create a second intention.
     @State private var showIntentionLimitPaywall = false
+    /// Presents the voice recorder in a centered, dismissible popup.
+    @State private var showRecordIntentions = false
+    /// Presents the manual add editor in the same centered popup treatment.
+    @State private var showManualAddIntention = false
+    @State private var showVoicePaywall = false
     @State private var showSettings = false
     private let initialAddDraft: DraftIntention?
     private let onSuggestedIntentionSaved: (() -> Void)?
@@ -154,14 +159,37 @@ struct EditIntentionsView: View {
                                         .listRowBackground(Color.clear)
                                 }
 
-                                AddIntentionCard( // inline Add card per spec
-                                    draft: $addDraft, // bind to add draft state
-                                    isExpanded: $isAddExpanded, // controls expansion
+                                Button {
+                                    guard subscriptionManager.canUseVoiceIntentions else {
+                                        showVoicePaywall = true
+                                        return
+                                    }
+                                    PonderaHaptics.selection()
+                                    showRecordIntentions = true
+                                } label: {
+                                    Label("Record an Intention", systemImage: "mic.fill")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 13)
+                                        .background(
+                                            LinearGradient(
+                                                colors: [PonderaTheme.recording, PonderaTheme.recording.opacity(0.72)],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            ),
+                                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 2, trailing: 12))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+
+                                AddIntentionCard( // centered manual-entry popup trigger
                                     disableAdd: !subscriptionManager.canAddIntention(currentCount: draftIntentions.count), // enforce plan + app caps
                                     onDisabledTap: handleDisabledAddTap,
-                                    onExpand: { collapseAllForAdd() }, // ensure only one expanded at a time
-                                    onParsed: { parsed in applyParsedToAddDraft(parsed) }, // route record parse into add draft
-                                    hapticEngine: hapticEngine // share haptic generator
+                                    onExpand: { collapseAllForAdd() } // ensure only one expanded at a time
                                 )
                                 .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)) // keep card breathing room
                                 .listRowSeparator(.hidden) // hide separators for glass cards
@@ -245,6 +273,95 @@ struct EditIntentionsView: View {
                         .disabled(!canSave) // preserve original save gate
                 }
             }
+            .overlay {
+                if showRecordIntentions {
+                    ZStack {
+                        Color.black.opacity(0.52)
+                            .ignoresSafeArea()
+                            .onTapGesture { showRecordIntentions = false }
+
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack {
+                                Text("Record an Intention")
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Button("Cancel") {
+                                    showRecordIntentions = false
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(PonderaTheme.textSecondary)
+                            }
+
+                            RecordIntentionsSection(onIntentionsParsed: { parsed in
+                                applyParsedToAddDraft(parsed)
+                                showRecordIntentions = false
+                            })
+                        }
+                        .padding(18)
+                        .frame(maxWidth: 360)
+                        .background(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(NeonPalette.darkOverlay.opacity(0.94))
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.38), radius: 22, y: 10)
+                        .padding(.horizontal, 24)
+                    }
+                    .transition(.opacity)
+                    .zIndex(10)
+                }
+                if showManualAddIntention {
+                    ZStack {
+                        Color.black.opacity(0.52)
+                            .ignoresSafeArea()
+                            .onTapGesture { showManualAddIntention = false }
+
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack {
+                                Text("Add Intention")
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Button("Cancel") {
+                                    addDraft = baselineAddDraft
+                                    showManualAddIntention = false
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(PonderaTheme.textSecondary)
+                            }
+
+                            InlineIntentionEditor(
+                                draft: $addDraft,
+                                variation: IntentionCardVariation.forId(addDraft.id),
+                                hapticEngine: hapticEngine,
+                                automaticallyFocusTitle: true
+                            )
+                        }
+                        .padding(18)
+                        .frame(maxWidth: 360)
+                        .background(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(NeonPalette.darkOverlay.opacity(0.94))
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.38), radius: 22, y: 10)
+                        .padding(.horizontal, 24)
+                    }
+                    .transition(.opacity)
+                    .zIndex(10)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: showRecordIntentions)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: showManualAddIntention)
             .onAppear {
                 loadDraftFromCurrent()
             }
@@ -269,6 +386,10 @@ struct EditIntentionsView: View {
             }
             .sheet(isPresented: $showIntentionLimitPaywall) {
                 PaywallView(reason: "Free includes one active intention. Upgrade to Pondera Pro to track more goals at once.")
+                    .environmentObject(subscriptionManager)
+            }
+            .sheet(isPresented: $showVoicePaywall) {
+                PaywallView(reason: "Creating tracked intentions by voice is included with Pondera Pro. You can still add intentions manually on Free.")
                     .environmentObject(subscriptionManager)
             }
             .sheet(isPresented: $showSettings) {
@@ -430,9 +551,10 @@ struct EditIntentionsView: View {
     /// Ensures only the Add card is expanded.
     private func collapseAllForAdd() {
         PonderaHaptics.selection()
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { // smooth expand animation
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
             expandedEditId = nil // collapse any open edit row
-            isAddExpanded = true // expand add card
+            isAddExpanded = false // the editor lives in the centered popup
+            showManualAddIntention = true
         }
     } // end collapseAllForAdd
     
@@ -453,8 +575,9 @@ struct EditIntentionsView: View {
     private func applyParsedToAddDraft(_ parsed: [ParsedIntention]) {
         guard let first = parsed.first else { return } // nothing to apply
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { // animate opening add card when populated
-            isAddExpanded = true // open add card to show populated fields
+            isAddExpanded = false
             expandedEditId = nil // ensure exclusivity
+            showManualAddIntention = true
         }
         addDraft.title = first.title.trimmingCharacters(in: .whitespacesAndNewlines) // set parsed title
         addDraft.unit = (first.unit?.isEmpty == false ? first.unit! : "times") // default to times
@@ -495,7 +618,8 @@ struct EditIntentionsView: View {
                 addDraft = initialAddDraft ?? DraftIntention.empty() // optionally review a suggested intention
                 baselineAddDraft = DraftIntention.empty() // suggestion remains an explicit unsaved change
                 expandedEditId = nil // collapse edits on load
-                isAddExpanded = initialAddDraft != nil // show every suggested field before Save
+                isAddExpanded = false
+                showManualAddIntention = initialAddDraft != nil // show every suggested field before Save
                 isLoadingDraft = false
             }
         }
@@ -849,17 +973,11 @@ private struct InlineIntentionEditor: View {
     }
 }
 
-/// Inline Add card that hosts Record + manual entry.
+/// Inline Add card for manual intention entry.
 private struct AddIntentionCard: View {
-    @Binding var draft: DraftIntention // add draft binding
-    @Binding var isExpanded: Bool // expansion flag
     let disableAdd: Bool // disables interaction when at cap
     let onDisabledTap: () -> Void // routes Free plan limit taps to Pro
-    let onExpand: () -> Void // called when expanding add card
-    let onParsed: ([ParsedIntention]) -> Void // routes parsed intentions into add draft
-    let hapticEngine: UIImpactFeedbackGenerator // shared haptic
-    
-    @State private var recordStatus: String? = nil // local status message
+    let onExpand: () -> Void // opens the centered manual editor
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -875,7 +993,7 @@ private struct AddIntentionCard: View {
                         .font(.headline) // emphasize
                         .foregroundColor(.white) // white text
                     Spacer()
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down") // expand indicator
+                    Image(systemName: "plus.circle.fill")
                         .foregroundColor(.white.opacity(0.8)) // softer icon
                 }
                 .padding(.vertical, 8) // padding for tap target
@@ -883,29 +1001,6 @@ private struct AddIntentionCard: View {
             .buttonStyle(.plain) // keep custom styling
             .opacity(disableAdd ? 0.65 : 1) // keep tappable so Free users get an explanation
             
-            if let recordStatus { // show status when present
-                Text(recordStatus) // status text
-                    .font(.footnote) // small font
-                    .foregroundColor(.white.opacity(0.7)) // subtle on dark
-            }
-            
-            if isExpanded { // show body when expanded
-                VStack(spacing: 10) { // tighter spacing keeps expanded add editor compact
-                    RecordIntentionsSection(onIntentionsParsed: { parsed in // embed record UI
-                        onParsed(parsed) // populate add draft fields
-                        recordStatus = parsed.isEmpty ? "No intentions found." : "Pondera filled this in. Review it, then save." // status message
-                    })
-                    
-                    InlineIntentionEditor( // reuse editor for add card
-                        draft: $draft, // bind to add draft
-                        variation: IntentionCardVariation.forId(draft.id), // palette
-                        hapticEngine: hapticEngine, // shared haptic
-                        automaticallyFocusTitle: true // wait for expansion, then present keyboard once
-                    )
-                }
-                .padding(.top, 2) // keep add-card expansion airy without adding another nested panel layer
-                .transition(.opacity.combined(with: .move(edge: .top))) // smooth expand/collapse
-            }
         }
         .padding(16) // slightly larger padding to match glass card thickness
         .background(
@@ -1116,6 +1211,11 @@ private struct RecordIntentionsSection: View { // encapsulates record flow UI
         .sheet(isPresented: $showPaywall) {
             PaywallView(reason: "Creating tracked intentions by voice is included with Pondera Pro. You can still add intentions manually on Free.")
                 .environmentObject(subscriptionManager)
+        }
+        .onDisappear {
+            if phase == .recording {
+                _ = recorder.stopRecording()
+            }
         }
     } // end body
     

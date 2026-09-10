@@ -8,11 +8,9 @@
 import Foundation
 
 enum CalendarFeature {
-    #if DEBUG
+    // Calendar captures and their local reminders are now part of the normal
+    // product flow, not only a simulator/debug experiment.
     static let isEnabled = true
-    #else
-    static let isEnabled = false
-    #endif
 }
 
 struct CalendarCapture: Identifiable {

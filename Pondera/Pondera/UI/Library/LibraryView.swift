@@ -33,6 +33,9 @@ struct LibraryView: View {
                         if visibleItems.isEmpty && visibleTopics.isEmpty {
                             emptyState
                         } else {
+                            if !lifeAreas.isEmpty {
+                                LifeAreaConstellationCard(items: items, corrections: corrections)
+                            }
                             summaryCard
                             themesSection
                             recentSection
@@ -334,6 +337,10 @@ struct LibraryView: View {
 
     private var recurringTopicCount: Int {
         visibleTopics.filter { $0.mentionCount > 1 }.count
+    }
+
+    private var lifeAreas: [LifeAreaSummary] {
+        LifeAreaSummaryBuilder.make(from: items, corrections: corrections)
     }
 
     private var featuredTopics: [ConsumerTopicSummary] {

@@ -217,3 +217,85 @@ struct ReminderNotificationRoute: Equatable {
     let intentionId: String?
     let showsFollowUpConfirmation: Bool
 }
+
+/// Schedules local reminders for timed event captures shown in Pondera's Calendar.
+/// Notification authorization is intentionally never requested here; Settings owns
+/// that explicit user action.
+@MainActor
+final class CalendarEventNotificationService {
+    static let shared = CalendarEventNotificationService()
+
+    private let notificationCenter = UNUserNotificationCenter.current()
+    private let requestPrefix = "attune.calendar.event."
+    private let categoryIdentifier = "attune.calendar.event.category"
+    private let itemIDKey = "calendarItemId"
+    private let maximumEvents = 32 // iOS allows at most 64 pending local requests.
+
+    private init() {}
+
+    func refresh(now: Date = Date()) {
+        guard ReminderPreferences.areCalendarEventRemindersEnabled else {
+            removePendingEventRequests()
+            return
+        }
+        let items = ExtractionStore.shared.loadAllExtractions()
+        let corrections = CorrectionsStore.shared.loadCorrections()
+        let captures = CalendarCaptureParser.captures(from: items, corrections: corrections)
+            .filter { !$0.isAllDay && $0.hasSpecifiedTime && $0.start > now }
+            .sorted { $0.start < $1.start }
+            .prefix(maximumEvents)
+
+        let center = notificationCenter
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+
+            center.getPendingNotificationRequests { pending in
+                let oldIDs = pending.map(\.identifier).filter { $0.hasPrefix(self.requestPrefix) }
+                center.removePendingNotificationRequests(withIdentifiers: oldIDs)
+
+                let requests = captures.flatMap { self.requests(for: $0, now: now) }
+                for request in requests {
+                    center.add(request)
+                }
+            }
+        }
+    }
+
+    func isCalendarNotification(_ notification: UNNotification) -> Bool {
+        notification.request.identifier.hasPrefix(requestPrefix)
+    }
+
+    private func removePendingEventRequests() {
+        notificationCenter.getPendingNotificationRequests { pending in
+            let IDs = pending.map(\.identifier).filter { $0.hasPrefix(self.requestPrefix) }
+            self.notificationCenter.removePendingNotificationRequests(withIdentifiers: IDs)
+        }
+    }
+
+    private func requests(for capture: CalendarCapture, now: Date) -> [UNNotificationRequest] {
+        let body = "\(capture.title) starts \(capture.start.formatted(date: .omitted, time: .shortened))."
+        let reminderTimes: [(String, Date)] = [
+            ("hour", capture.start.addingTimeInterval(-60 * 60)),
+            ("now", capture.start)
+        ].filter { $0.1 > now }
+
+        return reminderTimes.map { kind, date in
+            let content = UNMutableNotificationContent()
+            content.title = kind == "hour" ? "Pondera — In 1 hour" : "Pondera — Starting now"
+            content.body = body
+            content.sound = .default
+            content.categoryIdentifier = categoryIdentifier
+            content.userInfo = [itemIDKey: capture.item.id]
+
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: max(1, date.timeIntervalSinceNow),
+                repeats: false
+            )
+            return UNNotificationRequest(
+                identifier: "\(requestPrefix)\(capture.item.id).\(kind)",
+                content: content,
+                trigger: trigger
+            )
+        }
+    }
+}

@@ -25,6 +25,20 @@ enum PonderaHaptics {
         generator.impactOccurred(intensity: 0.55)
     }
 
+    /// Deeper tactile focus for selecting an Insight life area.
+    static func insightSelection() {
+        let generator = UIImpactFeedbackGenerator(style: .rigid)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.95)
+    }
+
+    /// A compact handoff pulse as an Insight detail page opens.
+    static func insightHandoff() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.82)
+    }
+
     static func saved() {
         let generator = UINotificationFeedbackGenerator()
         generator.prepare()

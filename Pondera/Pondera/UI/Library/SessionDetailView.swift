@@ -123,19 +123,10 @@ struct SessionDetailView: View {
                     .background(quality.color.opacity(0.14), in: Capsule())
             }
 
-            if let tokens = redactedTranscriptTokens(for: session) {
-                RedactedTranscriptFlow(tokens: tokens)
-                Text("Black marks show unclear audio that Pondera skipped.")
-                    .font(.caption)
-                    .italic()
-                    .foregroundStyle(PonderaTheme.textTertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text(transcript)
-                    .font(.body)
-                    .foregroundStyle(PonderaTheme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(transcript)
+                .font(.body)
+                .foregroundStyle(PonderaTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
             Text(transcriptTrustNote(for: session))
                 .font(.caption)
                 .italic()
@@ -185,61 +176,15 @@ struct SessionDetailView: View {
     }
 
     private func transcriptText(for session: Session) -> String? {
-        let stored = session.finalTranscriptText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !stored.isEmpty { return stored }
-
-        let joined = session.segments
+        let rawTranscript = session.segments
             .sorted { $0.index < $1.index }
-            .map { $0.extractionTranscriptText }
+            .compactMap { $0.transcriptText?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
-        return joined.isEmpty ? nil : joined
-    }
+        if !rawTranscript.isEmpty { return rawTranscript }
 
-    private func redactedTranscriptTokens(for session: Session) -> [TranscriptDisplayToken]? {
-        var tokens: [TranscriptDisplayToken] = []
-        var trustedWords: [String] = []
-        var sawRedaction = false
-
-        func flushTrustedWords() {
-            guard !trustedWords.isEmpty else { return }
-            tokens.append(TranscriptDisplayToken(text: trustedWords.joined(separator: " "), isRedaction: false))
-            trustedWords.removeAll()
-        }
-
-        for segment in session.segments.sorted(by: { $0.index < $1.index }) {
-            guard let spans = segment.transcriptSpans, !spans.isEmpty else { continue }
-            var pendingRedaction = false
-
-            for span in spans {
-                let text = span.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !text.isEmpty else { continue }
-
-                if span.trust == "trusted" {
-                    if pendingRedaction {
-                        flushTrustedWords()
-                        tokens.append(TranscriptDisplayToken(text: "...", isRedaction: true))
-                        sawRedaction = true
-                        pendingRedaction = false
-                    }
-                    trustedWords.append(text)
-                    if trustedWords.count >= 6 {
-                        flushTrustedWords()
-                    }
-                } else {
-                    pendingRedaction = true
-                }
-            }
-
-            if pendingRedaction {
-                flushTrustedWords()
-                tokens.append(TranscriptDisplayToken(text: "...", isRedaction: true))
-                sawRedaction = true
-            }
-            flushTrustedWords()
-        }
-
-        return sawRedaction && tokens.contains(where: { !$0.isRedaction }) ? tokens : nil
+        let stored = session.finalTranscriptText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return stored.isEmpty ? nil : stored
     }
 
     private func transcriptTrustNote(for session: Session) -> String {
@@ -248,9 +193,9 @@ struct SessionDetailView: View {
         case "High confidence":
             return "Pondera uses this transcript to create Insights when the words are clear enough."
         case "Mixed confidence":
-            return "Pondera only uses the clearer parts of this transcript for Insights."
+            return "Pondera keeps the full transcript and checks confidence before creating Insights."
         case "Low confidence":
-            return "Pondera skipped unclear parts so they do not become Insights."
+            return "Pondera kept this transcript for review but skipped Insights from the least reliable recording."
         case "No clear speech":
             return "Pondera did not find enough clear speech to create Insights."
         default:
@@ -309,83 +254,6 @@ struct SessionDetailView: View {
             topics: SessionRecapTopicSnapshotReader.load(),
             corrections: corrections
         )
-    }
-}
-
-private struct TranscriptDisplayToken: Identifiable {
-    let id = UUID()
-    let text: String
-    let isRedaction: Bool
-}
-
-private struct RedactedTranscriptFlow: View {
-    let tokens: [TranscriptDisplayToken]
-
-    var body: some View {
-        TranscriptFlowLayout(spacing: 6) {
-            ForEach(tokens) { token in
-                if token.isRedaction {
-                    Text(token.text)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.62))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.82), in: Capsule())
-                        .accessibilityLabel("Unclear audio skipped")
-                } else {
-                    Text(token.text)
-                        .font(.body)
-                        .foregroundStyle(PonderaTheme.textSecondary)
-                        .lineLimit(2)
-                }
-            }
-        }
-    }
-}
-
-private struct TranscriptFlowLayout: Layout {
-    var spacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? 320
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > 0 && x + size.width > maxWidth {
-                y += rowHeight + spacing
-                x = 0
-                rowHeight = 0
-            }
-            x += min(size.width, maxWidth) + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-
-        return CGSize(width: maxWidth, height: y + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX
-        var y = bounds.minY
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            let width = min(size.width, bounds.width)
-            if x > bounds.minX && x + width > bounds.maxX {
-                y += rowHeight + spacing
-                x = bounds.minX
-                rowHeight = 0
-            }
-            subview.place(
-                at: CGPoint(x: x, y: y),
-                proposal: ProposedViewSize(width: width, height: size.height)
-            )
-            x += width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
     }
 }
 

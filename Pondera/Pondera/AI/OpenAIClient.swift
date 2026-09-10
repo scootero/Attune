@@ -81,6 +81,7 @@ struct OpenAIClient {
         case checkIn = "/v2/check-ins/extract"
         case listening = "/v2/listening/extract"
         case intentionSuggestion = "/v2/intentions/suggest-action"
+        case insights = "/v2/insights/analyze"
     }
     
     // MARK: - Configuration
@@ -104,6 +105,7 @@ struct OpenAIClient {
         let useV2CheckIns = false
         let useV2Listening = false
         let useV2IntentionSuggestions = false
+        let useV2Insights = false
 
         switch task {
         case .intentions:
@@ -114,6 +116,8 @@ struct OpenAIClient {
             return useV2Listening
         case .intentionSuggestion:
             return useV2IntentionSuggestions
+        case .insights:
+            return useV2Insights
         }
         #else
         return false

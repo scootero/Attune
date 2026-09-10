@@ -116,6 +116,25 @@ final class DailyMoodStore {
     func loadTodayMood() -> DailyMood? {
         loadDailyMood(dateKey: AppPaths.dateKey(from: Date()))
     }
+
+    /// Loads all available daily mood records, newest first.
+    /// This is a read-only view of the existing mood store for Insights.
+    func loadAllDailyMoods() -> [DailyMood] {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: AppPaths.dailyMoodDir,
+            includingPropertiesForKeys: nil
+        ) else { return [] }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return files
+            .filter { $0.pathExtension == "json" }
+            .compactMap { url in
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                return try? decoder.decode(DailyMood.self, from: data)
+            }
+            .sorted { $0.dateKey > $1.dateKey }
+    }
     
     // MARK: - Saving
     

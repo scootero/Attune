@@ -50,7 +50,7 @@ struct PrivacyDataView: View {
                 privacyPoint(
                     icon: "calendar.badge.exclamationmark",
                     title: "Events stay suggestions",
-                    detail: "Pondera can recognize event-like information for review, but it does not currently create calendar appointments or event reminders."
+                    detail: "Pondera can recognize event-like information for review and schedule local reminders for timed event captures. It does not create Apple Calendar appointments."
                 )
             } header: {
                 Text("How Voice Data Is Used")

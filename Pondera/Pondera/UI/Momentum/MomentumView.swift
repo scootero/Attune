@@ -335,7 +335,7 @@ struct MomentumView: View {
                 SummaryItem(value: "\(intentionCount)", label: intentionCount == 1 ? "intention" : "intentions")
             ])
 
-            LegacyMomentumWeekChartView(days: legacyWeekDaysChart, yAxisMax: legacyWeekYAxisMax)
+            LegacyMomentumWeekChartView(days: weekDaysChart, yAxisMax: 100)
                 .momentumSectionOutline(tint: viewMode.tintColor)
 
             if !allBars.isEmpty {
@@ -539,41 +539,42 @@ struct MomentumView: View {
     /// including zero-height bars on days without a numeric progress entry.
     private func loadLegacyWeekData() {
         let days = MomentumPointAdapter.weekDays(containing: selectedDate)
-        guard let monday = days.first else {
+        guard !days.isEmpty else {
             legacyWeekDaysChart = []
             legacyWeekYAxisMax = 100
             return
         }
 
-        let dateKey = ProgressCalculator.dateKey(for: monday)
         let sets = IntentionSetStore.shared.loadAllIntentionSets()
-        guard let set = StreakCalculator.intentionSetActive(on: dateKey, from: sets) else {
-            legacyWeekDaysChart = []
-            legacyWeekYAxisMax = 100
-            return
-        }
-
-        let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
-        var maxPercent = 0.0
 
         legacyWeekDaysChart = days.map { day in
             let dayKey = ProgressCalculator.dateKey(for: day)
+            guard let set = StreakCalculator.intentionSetActive(on: dayKey, from: sets) else {
+                return LegacyWeekDayChartData(date: day, weekdayLetter: weekdayLetter(for: day), bars: [])
+            }
+
+            let intentions = IntentionStore.shared.loadIntentions(ids: set.intentionIds).filter(\.isActive)
             let checkIns = CheckInStore.shared.loadCheckIns(intentionSetId: set.id, dateKey: dayKey)
             let entries = ProgressStore.shared.loadEntries(dateKey: dayKey, intentionSetId: set.id)
+            let overrides = OverrideStore.shared.loadOverridesForDate(dateKey: dayKey)
             let dayPoints = MomentumPointAdapter.buildPoints(
                 dateKey: dayKey,
                 intentionSet: set,
                 intentions: intentions,
                 checkIns: checkIns,
-                entries: entries
+                entries: entries,
+                overrides: OverrideStore.shared.loadOverrideRecordsForDate(dateKey: dayKey)
             )
 
             let bars = intentions.enumerated().map { index, intention in
                 let lastPoint = dayPoints
                     .filter { $0.intentionId == intention.id }
                     .max { $0.date < $1.date }
-                let percent = lastPoint?.percent ?? 0
-                maxPercent = max(maxPercent, percent)
+                let percent = lastPoint?.percent ?? {
+                    guard let amount = overrides[intention.id], intention.targetValue > 0 else { return 0 }
+                    let target = intention.timeframe.lowercased() == "weekly" ? intention.targetValue / 7 : intention.targetValue
+                    return amount / target * 100
+                }()
                 return LegacyWeekIntentionBar(
                     intentionId: intention.id,
                     intentionTitle: intention.title,
@@ -590,7 +591,7 @@ struct MomentumView: View {
             )
         }
 
-        legacyWeekYAxisMax = maxPercent > 100 ? 150 : 100
+        legacyWeekYAxisMax = 100
     }
 
     private func legacySlot(
@@ -747,7 +748,7 @@ struct MomentumView: View {
             return WeekDayChartData(date: day, weekdayLetter: weekdayLetter(for: day), bars: bars)
         }
 
-        weekYAxisMax = maxPercent > 100 ? 150 : 100
+        weekYAxisMax = 100
     }
 
     private func loadMonthData() {

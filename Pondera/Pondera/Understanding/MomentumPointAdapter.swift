@@ -58,7 +58,23 @@ struct MomentumPointAdapter {
             intentions: intentions,
             overrides: overrides
         )
-        return deduplicateByMinuteBucket(from: entryPoints + manualPoints)
+        // A check-in entry and an override can represent the same final value.
+        // Keep the entry's real occurrence timestamp and avoid adding a second
+        // point at the time the override was saved (usually after recording).
+        let nonRedundantManualPoints = manualPoints.filter { manualPoint in
+            guard let intention = intentions.first(where: { $0.id == manualPoint.intentionId }),
+                  let latestEntryPoint = entryPoints
+                    .filter({ $0.intentionId == manualPoint.intentionId })
+                    .max(by: { $0.date < $1.date }),
+                  intention.targetValue > 0 else {
+                return true
+            }
+
+            // Treat only numerically identical final values as redundant. A
+            // genuine manual correction remains visible in the chart.
+            return abs(latestEntryPoint.percent - manualPoint.percent) > 0.001
+        }
+        return deduplicateByMinuteBucket(from: entryPoints + nonRedundantManualPoints)
     }
 
     /// Represents an authoritative manual total as a real chart event without

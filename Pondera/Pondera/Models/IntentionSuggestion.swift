@@ -2,11 +2,7 @@ import Foundation
 
 enum IntentionSuggestionFeature {
     static var isEnabled: Bool {
-        #if DEBUG
-        true
-        #else
         false
-        #endif
     }
 }
 

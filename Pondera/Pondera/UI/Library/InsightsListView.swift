@@ -12,6 +12,7 @@ import SwiftUI
 enum InsightsTab: String, CaseIterable {
     case captures = "Captured"
     case themes = "Themes"
+    case patterns = "Patterns"
 }
 
 struct ConsumerTopicSummary: Identifiable {
@@ -27,6 +28,8 @@ struct InsightsListView: View {
     @State private var items: [ExtractedItem] = []
     @State private var topics: [TopicAggregate] = []
     @State private var corrections: [String: ItemCorrection] = [:]
+    @State private var patterns: [InsightPattern] = []
+    @State private var aiPatterns: [InsightPattern] = []
     @State private var searchText = ""
     @State private var selectedType = "all"
 
@@ -48,8 +51,10 @@ struct InsightsListView: View {
             if selectedTab == .captures {
                 typeFilters
                 capturesContent
-            } else {
+            } else if selectedTab == .themes {
                 themesContent
+            } else {
+                InsightPatternsView(patterns: aiPatterns.isEmpty ? patterns : aiPatterns, items: items, corrections: corrections)
             }
         }
         .background(PonderaScreenBackground())
@@ -57,6 +62,7 @@ struct InsightsListView: View {
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: selectedTab == .captures ? "Search captures" : "Search themes")
         .onAppear(perform: loadData)
+        .task { await loadAIInsights() }
         .refreshable { loadData() }
     }
 
@@ -192,6 +198,38 @@ struct InsightsListView: View {
         items = ExtractionStore.shared.loadAllExtractions()
         topics = Array(TopicAggregateStore.shared.loadTopics().values)
         corrections = CorrectionsStore.shared.loadCorrections()
+        patterns = InsightPatternBuilder.make(
+            items: items,
+            topics: topics,
+            moods: DailyMoodStore.shared.loadAllDailyMoods(),
+            corrections: corrections
+        )
+        let intentionPatterns = InsightPatternBuilder.makeIntentionPatterns(
+            intentions: IntentionStore.shared.loadAllIntentions(),
+            progressEntries: ProgressStore.shared.loadAllProgressEntries(),
+            moods: DailyMoodStore.shared.loadAllDailyMoods()
+        )
+        patterns = (intentionPatterns + patterns).prefix(3).map { $0 }
+    }
+
+    private func loadAIInsights() async {
+        let intentions = IntentionStore.shared.loadAllIntentions()
+        let progress = ProgressStore.shared.loadAllProgressEntries()
+        let moods = DailyMoodStore.shared.loadAllDailyMoods()
+        guard !progress.isEmpty, !moods.isEmpty, AIPrivacyConsent.hasAccepted else { return }
+        guard let insights = try? await InsightAIService.analyze(intentions: intentions, progressEntries: progress, moods: moods) else { return }
+        aiPatterns = insights.map {
+            InsightPattern(
+                id: "ai-\($0.title)",
+                kind: .moodAndTheme,
+                title: $0.title,
+                detail: $0.detail,
+                evidenceItemIDs: [],
+                sampleSize: $0.dates.count,
+                confidenceLabel: $0.confidence,
+                icon: "sparkles"
+            )
+        }
     }
 }
 

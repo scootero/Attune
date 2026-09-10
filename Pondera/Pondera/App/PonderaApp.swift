@@ -38,11 +38,16 @@ struct PonderaApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    DailyReminderNotificationService.shared.refreshReminderForToday()
+                    CalendarEventNotificationService.shared.refresh()
+                }
         }
         .modelContainer(sharedModelContainer)
         .onChange(of: scenePhase) { _, newPhase in // Refresh reminder when app becomes active so today's state is always up-to-date.
             if newPhase == .active { // Only refresh on active to avoid unnecessary work in background/inactive states.
                 DailyReminderNotificationService.shared.refreshReminderForToday() // Recompute reminder at user-selected time based on latest check-ins/progress.
+                CalendarEventNotificationService.shared.refresh()
                 Task { await SubscriptionManager.shared.refreshEntitlement() }
             }
         }

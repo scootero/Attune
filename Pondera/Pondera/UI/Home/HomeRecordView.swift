@@ -41,6 +41,9 @@ struct HomeRecordView: View {
     @State private var showsRecentSessionCompletion = false
     /// Number of saved captures produced by the just-finished session.
     @State private var recentInsightsAddedCount = 0
+    /// Keeps Insights visibly new until the user actually visits that tab.
+    @AppStorage("attune.home.hasUnseenInsights.v1") private var hasUnseenInsights = false
+    @AppStorage("attune.home.unseenInsightsCount.v1") private var unseenInsightsCount = 0
     /// Ensures an older delayed fade cannot clear newer completion feedback.
     @State private var completionFeedbackToken = UUID()
     @State private var showSessionsSheet = false
@@ -57,53 +60,58 @@ struct HomeRecordView: View {
                 header
                 sessionHero
                 historyCard
-                Spacer(minLength: 0)
+                if let recapPreview {
+                    VStack(spacing: 8) {
+                        Divider()
+                            .overlay(PonderaTheme.border)
+
+                        SessionRecapPreviewCard(
+                            recap: recapPreview.recap,
+                            onOpenDetails: { openRecapDetails(sessionId: recapPreview.sessionId) },
+                            onOpenInsights: {
+                                dismissRecapPreview()
+                                openInsights()
+                            },
+                            onOpenSessions: {
+                                dismissRecapPreview()
+                                showSessionsSheet = true
+                            }
+                        )
+                        .transition(
+                            reduceMotion
+                                ? .opacity
+                                : .asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.96, anchor: .bottom)),
+                                    removal: .move(edge: .bottom).combined(with: .opacity)
+                                )
+                        )
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .zIndex(2)
+                } else {
+                    Spacer(minLength: 0)
+                }
             }
             .padding(.horizontal, PonderaTheme.horizontalPadding)
             .padding(.top, 12)
             .padding(.bottom, 12)
 
-            if let recapPreview {
-                SessionRecapPreviewCard(
-                    recap: recapPreview.recap,
-                    onOpenDetails: { openRecapDetails(sessionId: recapPreview.sessionId) },
-                    onOpenInsights: {
-                        dismissRecapPreview()
-                        openInsights()
-                    },
-                    onOpenSessions: {
-                        dismissRecapPreview()
-                        showSessionsSheet = true
-                    }
-                )
-                .padding(.horizontal, PonderaTheme.horizontalPadding)
-                .padding(.bottom, 88)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .transition(
-                    reduceMotion
-                        ? .opacity
-                        : .asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.96, anchor: .bottom)),
-                            removal: .move(edge: .bottom).combined(with: .opacity)
-                        )
-                )
-                .zIndex(2)
-            }
-
             if let suggestion = suggestionToastCenter.talkSuggestion {
                 IntentionSuggestionToast(
                     suggestion: suggestion,
                     onReview: { reviewSuggestionFromTalk(suggestion) },
-                    onDismiss: { declineSuggestionFromTalk(suggestion) }
+                    onDismiss: {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.34)) {
+                            suggestionToastCenter.dismissTalkSuggestion(id: suggestion.id)
+                        }
+                    },
+                    onDecline: { declineSuggestionFromTalk(suggestion) }
                 )
                 .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.top, 8)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .transition(suggestionToastTransition(edge: .top))
                 .zIndex(3)
-                .task(id: suggestion.id) {
-                    await autoDismissTalkSuggestion(suggestion)
-                }
             }
 
             if showsTalkingPrompt && recorder.isRecording {
@@ -133,6 +141,11 @@ struct HomeRecordView: View {
         }
         .onChange(of: recorder.isRecording) { wasRecording, isRecording in
             recorderStateChanged(wasRecording: wasRecording, isRecording: isRecording)
+        }
+        .onChange(of: appRouter.selectedRootTab) { _, selectedTab in
+            if selectedTab == .library {
+                markInsightsVisited()
+            }
         }
         .sheet(isPresented: $showSessionsSheet, onDismiss: { loadTodayCounts() }) {
             NavigationView {
@@ -414,8 +427,8 @@ struct HomeRecordView: View {
                 historyButton(
                     title: "Insights",
                     icon: "sparkles",
-                    badgeText: recentInsightsAddedCount > 0 ? "+\(recentInsightsAddedCount) new" : nil,
-                    isHighlighted: showsRecentSessionCompletion,
+                    badgeText: hasUnseenInsights && unseenInsightsCount > 0 ? "+\(unseenInsightsCount) new" : nil,
+                    isHighlighted: hasUnseenInsights,
                     action: openInsights
                 )
             }
@@ -441,7 +454,14 @@ struct HomeRecordView: View {
             showPaywall = true
             return
         }
+        markInsightsVisited()
         appRouter.selectedRootTab = .library
+    }
+
+    private func markInsightsVisited() {
+        hasUnseenInsights = false
+        unseenInsightsCount = 0
+        recentInsightsAddedCount = 0
     }
 
     private func historyButton(
@@ -737,6 +757,11 @@ struct HomeRecordView: View {
             object: nil,
             userInfo: ["sessionId": sessionId]
         )
+        CalendarEventNotificationService.shared.refresh()
+        if recentInsightsAddedCount > 0 {
+            hasUnseenInsights = true
+            unseenInsightsCount = recentInsightsAddedCount
+        }
         if SessionRecapFeature.isEnabled {
             showRecapPreview(for: sessionId)
         }
@@ -781,6 +806,12 @@ struct HomeRecordView: View {
         withAnimation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.82)) {
             recapPreview = (sessionId, recap)
         }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard recapPreviewToken == token else { return }
+            dismissRecapPreview()
+        }
     }
 
     private func openRecapDetails(sessionId: String) {
@@ -819,15 +850,6 @@ struct HomeRecordView: View {
             )
         } catch {
             AppLogger.log(AppLogger.ERR, "Suggestion decline failed error=\"\(error.localizedDescription)\"")
-        }
-    }
-
-    private func autoDismissTalkSuggestion(_ suggestion: SuggestedIntentionAction) async {
-        guard !UIAccessibility.isVoiceOverRunning else { return }
-        try? await Task.sleep(nanoseconds: 5_000_000_000)
-        guard !Task.isCancelled else { return }
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.78)) {
-            suggestionToastCenter.dismissTalkSuggestion(id: suggestion.id)
         }
     }
 

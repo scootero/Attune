@@ -115,11 +115,10 @@ struct WeekMomentumCalculator {
                     targetValue: intention.targetValue,
                     timeframe: intention.timeframe
                 )
-                let value: Double
-                if percent >= 1.0 { value = 1.0 }
-                else if percent > 0 { value = 0.5 }
-                else { value = 0.0 }
-                sum += value
+                // Keep the actual completion ratio. Bucketing every partial
+                // intention to 50% made (for example) 90%, 70%, and 33% look
+                // like 50% overall and caused Home to disagree with Momentum.
+                sum += percent
             }
             
             let ratio = sum / Double(max(n, 1))

@@ -18,7 +18,7 @@ private enum LegacyWeekDimension: String, CaseIterable {
 /// Renders a 7-day momentum chart with multiple intention bars per day.
 struct LegacyMomentumWeekChartView: View { // View container for the weekly chart.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let days: [LegacyWeekDayChartData] // Input data: per-day columns with intention bars.
+    let days: [WeekDayChartData] // Input data: per-day columns with intention bars.
     let yAxisMax: Double // Axis cap (100 or 150) to scale bar heights.
     @State private var dimension: LegacyWeekDimension = .threeD
     @State private var barEntranceClock = 0.0
@@ -198,6 +198,34 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
                             layer.addFilter(.shadow(color: color.opacity(0.5), radius: 4, x: 0, y: 2)) // Soft glow/shadow.
                             layer.fill(frontFace, with: .color(color.opacity(0.9))) // Refill front face softly inside shadow layer.
                         }
+
+                        // Keep the plotting domain at 100%, while making
+                        // above-target progress visible like the daily chart.
+                        if bar.percent > yAxisMax && entranceScale > 0.95 {
+                            let arrowHeight: CGFloat = 8
+                            let arrowWidth: CGFloat = 10
+                            let arrowSpacing: CGFloat = 4
+                            let labelSpacing: CGFloat = 6
+                            let arrowTopY = max(y - arrowSpacing - arrowHeight, 0)
+                            let arrowCenterX = x + (barWidth / 2)
+
+                            var arrowPath = Path()
+                            arrowPath.move(to: CGPoint(x: arrowCenterX, y: arrowTopY))
+                            arrowPath.addLine(to: CGPoint(x: arrowCenterX - (arrowWidth / 2), y: arrowTopY + arrowHeight))
+                            arrowPath.addLine(to: CGPoint(x: arrowCenterX + (arrowWidth / 2), y: arrowTopY + arrowHeight))
+                            arrowPath.closeSubpath()
+                            context.fill(arrowPath, with: .color(color))
+
+                            var labelContext = context
+                            labelContext.translateBy(x: arrowCenterX, y: arrowTopY - labelSpacing)
+                            labelContext.draw(
+                                Text(String(format: "%.0f%%", bar.percent))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(color),
+                                at: .zero,
+                                anchor: .center
+                            )
+                        }
                     }
                 }
                 }
@@ -267,7 +295,7 @@ struct LegacyMomentumWeekChartView: View { // View container for the weekly char
         }
     }
 
-    private var allBars: [LegacyWeekIntentionBar] {
+    private var allBars: [WeekIntentionBar] {
         days.flatMap(\.bars)
     }
 

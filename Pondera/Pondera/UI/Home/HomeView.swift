@@ -297,16 +297,18 @@ struct HomeView: View {
                         intentionSuggestion = suggestion
                         showSuggestionEditor = true
                     },
-                    onDismiss: { declineSuggestion(suggestion) }
+                    onDismiss: {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.34)) {
+                            suggestionToastCenter.dismissHomeSuggestion(id: suggestion.id)
+                        }
+                    },
+                    onDecline: { declineSuggestion(suggestion) }
                 )
                 .padding(.horizontal, PonderaTheme.horizontalPadding)
                 .padding(.bottom, 76)
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .transition(suggestionToastTransition(edge: .bottom))
                 .zIndex(4)
-                .task(id: suggestion.id) {
-                    await autoDismissHomeSuggestion(suggestion)
-                }
             }
         }
         .overlayPreferenceValue(FeelingPickerAnchorKey.self) { anchor in
@@ -1836,6 +1838,12 @@ struct HomeView: View {
                         .offset(x: tickX - (score == 5 ? 1 : 0.5), y: score == 5 ? 45 : 47)
                 }
 
+                Text("Hold + drag to adjust")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(PonderaTheme.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .position(x: geometry.size.width / 2, y: 60)
+
                 HStack(spacing: 3) {
                     Text(MoodDisplayScale.emoji(forStoredScore: inlineMoodScore))
                         .font(.system(size: 25))
@@ -1903,7 +1911,7 @@ struct HomeView: View {
                 ? MoodDisplayScale.formattedCenteredValue(forStoredScore: inlineMoodScore)
                 : "Not set, neutral position"
         )
-        .accessibilityHint("Swipe up or down to change the mood one step")
+        .accessibilityHint("Hold and drag to adjust your mood, or swipe up or down to change it one step")
         .accessibilityAdjustableAction { direction in
             let delta = direction == .increment ? 1 : -1
             let nextScore = min(10, max(0, inlineMoodScore + delta))
@@ -2505,7 +2513,10 @@ struct HomeView: View {
     }
 
     private func evaluateIntentionSuggestion(shouldPresentToast: Bool = false) async {
-        guard IntentionSuggestionFeature.isEnabled else { return }
+        guard IntentionSuggestionFeature.isEnabled else {
+            AppLogger.log(AppLogger.AI, "intention_suggestion_skipped feature_disabled")
+            return
+        }
         do {
             try IntentionSuggestionStore.shared.bootstrapExistingInstallIfNeeded()
             let snapshot = IntentionSuggestionStore.shared.load()
@@ -2517,6 +2528,12 @@ struct HomeView: View {
                 corrections: CorrectionsStore.shared.loadCorrections(),
                 rapidTestingEnabled: RapidIntentionSuggestionTestingFeature.isEnabled
             )
+            let completedSessionCount = sessions.filter { $0.status == "complete" }.count
+            let recurringTopicCount = topics.filter { $0.distinctSessionCount >= 2 }.count
+            AppLogger.log(
+                AppLogger.AI,
+                "intention_suggestion_evaluate completed_sessions=\(completedSessionCount) eligible_topics=\(topics.count) recurring_topics=\(recurringTopicCount) rapid_mode=\(RapidIntentionSuggestionTestingFeature.isEnabled) has_outstanding=\(snapshot.outstanding != nil)"
+            )
             let activeSet = IntentionSetStore.shared.loadCurrentIntentionSet()
             let activeIntentions = IntentionStore.shared.loadIntentions(ids: activeSet?.intentionIds ?? [])
             suggestedReplacement = replacementCandidateIfNeeded(
@@ -2526,12 +2543,13 @@ struct HomeView: View {
             let decision = IntentionSuggestionEngine.decide(
                 snapshot: snapshot,
                 topics: topics,
-                completedSessionCount: sessions.filter { $0.status == "complete" }.count,
+                completedSessionCount: completedSessionCount,
                 isAtIntentionLimit: !subscriptionManager.canAddIntention(currentCount: activeIntentions.count),
                 rapidTestingEnabled: RapidIntentionSuggestionTestingFeature.isEnabled
             )
             switch decision {
             case .show(let suggestion):
+                AppLogger.log(AppLogger.AI, "intention_suggestion_decision show")
                 guard !IntentionSuggestionEngine.isCoveredByActiveIntention(
                     suggestionTitle: suggestion.title,
                     activeIntentions: activeIntentions
@@ -2551,13 +2569,21 @@ struct HomeView: View {
                     }
                 }
             case .nudgeToRecord(let key):
+                AppLogger.log(AppLogger.AI, "intention_suggestion_decision nudge key=\(key)")
                 suggestionNudge = "Talk it out a few times so Pondera can notice a recurring theme before suggesting anything."
                 try IntentionSuggestionStore.shared.recordNudge(opportunityKey: key)
             case .consume(let key):
+                AppLogger.log(AppLogger.AI, "intention_suggestion_decision consume key=\(key)")
                 try IntentionSuggestionStore.shared.consume(opportunityKey: key)
             case .none:
+                AppLogger.log(AppLogger.AI, "intention_suggestion_decision none")
                 break
             case .request(let topic, let opportunityKey):
+                let opportunity = opportunityKey ?? "none"
+                AppLogger.log(
+                    AppLogger.AI,
+                    "intention_suggestion_decision request evidence=\(topic.evidence.count) distinct_sessions=\(topic.distinctSessionCount) opportunity=\(opportunity)"
+                )
                 isGeneratingSuggestion = true
                 defer { isGeneratingSuggestion = false }
                 try IntentionSuggestionStore.shared.recordAttempt(opportunityKey: opportunityKey)
@@ -2572,6 +2598,7 @@ struct HomeView: View {
                     rapidTestMode: RapidIntentionSuggestionTestingFeature.isEnabled
                 )
                 guard let suggestion = generatedSuggestion else {
+                    AppLogger.log(AppLogger.AI, "intention_suggestion_generation no_safe_suggestion")
                     if RapidIntentionSuggestionTestingFeature.isEnabled {
                         suggestionNudge = "Rapid test qualified three mentions, but no safe new suggestion was returned."
                     }
@@ -2587,9 +2614,11 @@ struct HomeView: View {
                           title: suggestion.title,
                           history: snapshot.history
                       ) else {
+                    AppLogger.log(AppLogger.AI, "intention_suggestion_generation rejected_covered_or_suppressed")
                     return
                 }
                 try IntentionSuggestionStore.shared.setOutstanding(suggestion)
+                AppLogger.log(AppLogger.AI, "intention_suggestion_generation surfaced")
                 intentionSuggestion = suggestion
                 suggestionNudge = nil
                 if shouldPresentToast {
@@ -2628,15 +2657,6 @@ struct HomeView: View {
             refreshAll()
         } catch {
             AppLogger.log(AppLogger.ERR, "Suggestion acceptance state failed error=\"\(error.localizedDescription)\"")
-        }
-    }
-
-    private func autoDismissHomeSuggestion(_ suggestion: SuggestedIntentionAction) async {
-        guard !UIAccessibility.isVoiceOverRunning else { return }
-        try? await Task.sleep(nanoseconds: 5_000_000_000)
-        guard !Task.isCancelled else { return }
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.78)) {
-            suggestionToastCenter.dismissHomeSuggestion(id: suggestion.id)
         }
     }
 

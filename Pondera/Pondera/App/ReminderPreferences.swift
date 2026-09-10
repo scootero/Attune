@@ -43,6 +43,17 @@ enum ReminderPreferences {
             defaults.set(newValue, forKey: reminderEnabledKey) // Save on/off preference so toggle state survives app restarts.
         }
     }
+
+    private static let calendarEventRemindersKey = "attune.calendar.event.reminders.enabled"
+
+    static var areCalendarEventRemindersEnabled: Bool {
+        get {
+            UserDefaults.standard.object(forKey: calendarEventRemindersKey) == nil
+                ? true
+                : UserDefaults.standard.bool(forKey: calendarEventRemindersKey)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: calendarEventRemindersKey) }
+    }
     
     /// Current reminder time as hour/minute components.
     static var reminderTimeComponents: DateComponents {

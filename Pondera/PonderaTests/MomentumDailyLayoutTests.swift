@@ -132,6 +132,57 @@ final class MomentumDailyLayoutTests: XCTestCase {
         XCTAssertFalse(ManualProgressSavePolicy.crossedTarget(previousPercent: 0.8, currentPercent: 0.9))
     }
 
+    func testMomentumDoesNotDuplicateOverrideWhenCheckInAlreadyHasSameFinalValue() {
+        let intention = Intention(
+            id: "reading",
+            title: "Read",
+            targetValue: 10,
+            unit: "pages",
+            timeframe: "daily"
+        )
+        let intentionSet = IntentionSet(id: "set", intentionIds: [intention.id])
+        let checkInDate = date(year: 2026, month: 8, day: 10, hour: 9, calendar: utcCalendar())
+        let entry = ProgressEntry(
+            createdAt: checkInDate,
+            tookPlaceAt: checkInDate,
+            dateKey: "2026-08-10",
+            intentionSetId: intentionSet.id,
+            intentionId: intention.id,
+            updateType: "TOTAL",
+            amount: 10,
+            unit: "pages",
+            confidence: 1,
+            sourceCheckInId: "check-in"
+        )
+        let checkIn = CheckIn(
+            id: "check-in",
+            createdAt: checkInDate,
+            intentionSetId: intentionSet.id,
+            transcript: "I read ten pages."
+        )
+        let override = ManualProgressOverride(
+            dateKey: "2026-08-10",
+            intentionId: intention.id,
+            amount: 10,
+            unit: "pages",
+            updatedAt: checkInDate.addingTimeInterval(3600)
+        )
+
+        let points = MomentumPointAdapter.buildPoints(
+            dateKey: "2026-08-10",
+            intentionSet: intentionSet,
+            intentions: [intention],
+            checkIns: [checkIn],
+            entries: [entry],
+            overrides: [override]
+        )
+
+        XCTAssertEqual(points.count, 1)
+        let point = try! XCTUnwrap(points.first)
+        XCTAssertEqual(point.date, checkInDate)
+        XCTAssertEqual(point.percent, 100, accuracy: 0.001)
+    }
+
     func testPersistedProgressReplacesStaleSliderDraftAfterEditingEnds() {
         XCTAssertEqual(
             ManualProgressDisplayPolicy.displayedTotal(stored: 10, draft: 2, isEditing: false),

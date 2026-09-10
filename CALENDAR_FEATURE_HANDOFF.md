@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Debug-only in-app Calendar experiment.
+- In-app Calendar capture view with local reminders for timed events.
 - Entry point: Insights -> Calendar.
 - Reads existing `ExtractedItem.calendarCandidate` data.
 - Event-type captures without a usable scheduled date appear under `Needs scheduling` on their recording day; Attune does not claim that recording day is the event date.
@@ -11,7 +11,7 @@
 - New Listening extraction receives the segment recording timestamp and local IANA timezone. `today`, `tomorrow`, and weekdays resolve from that local reference. A recognized clock time without a date uses the recording day.
 - A deterministic on-device fallback covers `today`, `tomorrow`, weekdays, AM/PM clock times, noon, and midnight if the provider returns no date.
 - Does not import EventKit, request Calendar permission, or write to Apple Calendar.
-- Release builds hide the navigation entry through `CalendarFeature.isEnabled`.
+- The Calendar navigation entry is enabled in Release builds through `CalendarFeature.isEnabled`.
 
 ## Removal
 

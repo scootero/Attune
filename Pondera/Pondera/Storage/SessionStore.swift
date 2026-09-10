@@ -233,7 +233,7 @@ class SessionStore {
                         if session.finalTranscriptText == nil {
                             session.finalTranscriptText = session.segments
                                 .sorted { $0.index < $1.index }
-                                .map { $0.extractionTranscriptText }
+                                .compactMap { $0.transcriptText?.trimmingCharacters(in: .whitespacesAndNewlines) }
                                 .filter { !$0.isEmpty }
                                 .joined(separator: " ")
                         }

@@ -64,7 +64,7 @@ struct Segment: Codable, Identifiable {
     var transcriptText: String?
 
     /// Trusted portion of the transcript, excluding low-confidence spans.
-    /// Extraction uses this text instead of transcriptText when present.
+    /// Retained for confidence diagnostics; raw recognizer text is used for extraction.
     var trustedTranscriptText: String?
 
     /// Time-aligned spans used to make transcript quality visible and auditable.

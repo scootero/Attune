@@ -14,7 +14,11 @@ final class PonderaNotificationDelegate: NSObject, UIApplicationDelegate, UNUser
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        if await CalendarEventNotificationService.shared.isCalendarNotification(notification) {
+            // Foreground notifications do not vibrate automatically.
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+        return [.banner, .list, .sound]
     }
 
     func userNotificationCenter(
