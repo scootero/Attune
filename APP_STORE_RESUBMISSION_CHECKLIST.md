@@ -9,7 +9,7 @@ Purpose: one high-level checklist for resolving Apple’s Guideline 2.1 rejectio
 - [x] Code audit: the shared `Pondera` scheme runs Debug with `Products.storekit` attached for local StoreKit testing.
 - [x] Code audit: the scheme archives with Release; Debug-only subscription controls are excluded from Release by `#if DEBUG`.
 - [x] Code audit: local StoreKit product ID and app product ID match `com.scottoliver.Pondera.Intentions.monthly`; local price is `$4.99`.
-- [ ] Run the local StoreKit test; current Mac session cannot access an iOS Simulator runtime, so this is not yet verified here.
+- [ ] Run the local StoreKit test; the project builds, but this Mac session cannot start an iOS Simulator runtime, so the test is not yet verified here.
 - [ ] Confirm the Release/TestFlight build does not show Debug test mode and loads the App Store product.
 - [ ] Confirm `Pondera Pro Monthly` is the product used by the app: `com.scottoliver.Pondera.Intentions.monthly`.
 - [ ] Leave the old `Attune Premium` product untouched unless separately reviewed.
