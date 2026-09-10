@@ -331,7 +331,7 @@ let key = topic.canonicalKey  // Instead of topicKey
 ### Build & Test
 ```bash
 cd /Users/scott/Programming/Attune/Attune-V4/Attune
-xcodebuild -project Attune.xcodeproj -scheme Attune clean build
+xcodebuild -project Pondera.xcodeproj -scheme Pondera clean build
 ```
 
 ### Check Linter

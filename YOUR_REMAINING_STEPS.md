@@ -1,28 +1,28 @@
-# Attune 1.0 — Scott's Manual Launch Checklist
+# Pondera: Intentions 1.0 — Scott's Manual Launch Checklist
 
 Last updated: August 6, 2026
 
 This is the controlling checklist for work Scott must do personally in Apple,
 GitHub, Cloudflare, or on a physical iPhone. Code and engineering status remain
-in `ATTUNE_REMAINING_WORK.md`.
+in `PONDERA_REMAINING_WORK.md`.
 
 ## Fixed release values
 
 | Field | Value |
 |---|---|
-| App Store name | `Attune: Intentions Tracking` |
+| App Store name | `Pondera: Intentions` |
 | Subtitle | `Are you in tune?` |
-| Bundle ID | `com.scottoliver.Attune` |
-| Subscription group | `Attune Premium` |
-| Reference name | `Attune Pro Monthly` |
-| Product ID | `com.scottoliver.Attune.monthly` |
+| Bundle ID | `com.scottoliver.Pondera.Intentions` |
+| Subscription group | `Pondera Pro` |
+| Reference name | `Pondera Pro Monthly` |
+| Product ID | `com.scottoliver.Pondera.Intentions.monthly` |
 | Duration | `1 Month` |
 | United States price | `$4.99/month` |
 | Introductory trial | **None for version 1.0** |
-| Display name | `Attune Pro Monthly` |
+| Display name | `Pondera Pro Monthly` |
 | Description | `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.` |
 
-Do not create or advertise an introductory offer. Free Attune is the ongoing
+Do not create or advertise an introductory offer. Free Pondera is the ongoing
 product trial.
 
 ## Already complete — do not repeat
@@ -33,7 +33,7 @@ product trial.
 - [x] In-App Purchase capability and local StoreKit configuration added.
 - [x] Subscribe, Restore Purchases, entitlement tracking, Free/Pro gates, and
   Debug Free/Pro/System testing implemented.
-- [x] Local product uses `com.scottoliver.Attune.monthly`, $4.99/month, with no trial.
+- [x] Local product uses `com.scottoliver.Pondera.Intentions.monthly`, $4.99/month, with no trial.
 - [x] Phase 1 automated tests passed 16/16; Debug and Release builds passed.
 - [x] GitHub Pages-ready landing, Privacy, Support, and Terms files exist under `/docs`.
 - [x] App legal links point at the intended GitHub Pages locations.
@@ -109,33 +109,32 @@ Recommended choices and checks:
 - GitHub Pages is an acceptable free host, but it is not required by Apple. The
   requirement is that the pages are publicly reachable without a login.
 - After publishing, open every URL in Safari on the physical iPhone. Confirm it
-  does not return 404, needs no sign-in, identifies Attune, contains the chosen
+  does not return 404, needs no sign-in, identifies Pondera: Intentions, contains the chosen
   contact email, and matches the link opened from inside the app.
 - Codex can update the prepared pages and verify them. Scott must approve the
   public email, checkpoint commit/push, and publication decision.
 
-### C. Create the subscription in App Store Connect
+### C. Finalize the subscription in App Store Connect
 
-- [ ] My Apps > Attune > Monetization > Subscriptions.
-- [ ] Rename or confirm subscription group `Attune Premium`.
-- [ ] Create one monthly product using the fixed values above.
-- [ ] Set the United States price to $4.99/month.
+- [x] My Apps > Pondera: Intentions > Monetization > Subscriptions.
+- [x] Confirm subscription group `Pondera Pro`.
+- [x] Create one monthly product using the fixed values above.
+- [x] Set the United States price to $4.99/month.
 - [ ] Add the required localization, description, and review screenshot.
 - [ ] Do **not** configure an introductory offer or free trial.
 - [ ] Confirm the product is in the correct readiness state for Sandbox/TestFlight testing.
 
-How to enter it:
+Confirmed values and remaining steps:
 
-1. App Store Connect > **My Apps** > **Attune** > **Monetization** >
+1. App Store Connect > **My Apps** > **Pondera: Intentions** > **Monetization** >
    **Subscriptions**.
-2. Rename or confirm the group `Attune Premium`.
-3. Create one auto-renewable subscription using the fixed values at the top of
-   this document. Carefully enter the immutable product ID
-   `com.scottoliver.Attune.monthly` exactly as shown.
-4. Select a one-month duration and the United States $4.99 price point.
+2. Confirm the group `Pondera Pro`.
+3. The confirmed auto-renewable subscription uses the immutable Product ID
+   `com.scottoliver.Pondera.Intentions.monthly` exactly as shown.
+4. Its confirmed duration is one month and its United States price is $4.99.
 5. Add at least the primary English localization, customer-visible display
    name and description, review notes if requested, and an App Review screenshot
-   that clearly shows Attune's paywall and what is being purchased.
+   that clearly shows Pondera's paywall and what is being purchased.
 6. Leave introductory offers, promotional trials, and free trials unconfigured.
 
 Codex can verify every value against the repository and prepare the text and
@@ -144,12 +143,12 @@ screenshot inventory. Scott completes or confirms the App Store Connect entries.
 ### D. App listing, privacy, and review preparation
 
 - [ ] Enter the live Privacy Policy URL and Support URL in App Store Connect.
-- [ ] Provide Terms of Use information. First confirm whether Attune will use
+- [ ] Provide Terms of Use information. First confirm whether Pondera will use
   Apple's standard Licensed Application End User License Agreement or a custom
   EULA; do not invent or publish a custom legal agreement without approval.
-- [ ] Complete App Privacy answers for audio, transcripts/user content, optional mood/wellness-related content where Apple asks, and third-party OpenAI processing through Attune's Worker.
-- [ ] Enter app name `Attune: Intentions Tracking` and subtitle `Are you in tune?`, then prepare the description, keywords, category, age rating, copyright, and contact information.
-- [ ] Prepare iPhone screenshots. Attune 1.0 is configured as an iPhone-only app,
+- [ ] Complete App Privacy answers for audio, transcripts/user content, optional mood/wellness-related content where Apple asks, and third-party OpenAI processing through Pondera's Worker.
+- [ ] Enter app name `Pondera: Intentions`, then prepare the subtitle, description, keywords, category, age rating, copyright, and contact information.
+- [ ] Prepare iPhone screenshots. Pondera 1.0 is configured as an iPhone-only app,
   so native iPad screenshots are not required.
 - [ ] Include the paywall/subscription experience in review preparation.
 - [ ] Draft App Review notes explaining user-started recording, Apple Speech, AI processing, Free/Pro limits, Subscribe, Restore, and how to reach the demo flows.
@@ -159,16 +158,16 @@ Recommended choices and checks:
 
 - Use Apple's standard EULA for version 1.0 unless a lawyer or specific
   business requirement calls for a custom EULA. Apple applies its standard EULA
-  automatically when no custom EULA is supplied. Keep Attune's public Terms page
+  automatically when no custom EULA is supplied. Keep Pondera's public Terms page
   for the product/subscription explanation.
 - Let Codex inspect the implementation and draft the App Privacy answers,
   listing metadata, review notes, and screenshot list. Scott reviews and
   approves them because the App Privacy answers and listing are declarations to Apple.
 - Accurately account for user-recorded audio, transcripts/user content,
   mood/wellness-related information where applicable, and processing through
-  Attune's Cloudflare Worker and OpenAI. Separate data kept locally from data
+  Pondera's Cloudflare Worker and OpenAI. Separate data kept locally from data
   transmitted for processing.
-- Attune 1.0 is configured for the iPhone device family only. Apple may still
+- Pondera 1.0 is configured for the iPhone device family only. Apple may still
   offer an iPhone-only app on iPad in compatibility mode, but no native iPad
   listing or iPad screenshot set is planned.
 - Create the Sandbox tester in App Store Connect under **Users and Access** >
@@ -268,16 +267,16 @@ First determine whether the existing key belongs to a dedicated Attune OpenAI
 project or a shared/default project.
 
 - [ ] In <https://platform.openai.com>, select the project used by the Worker.
-- [ ] If it is dedicated to Attune, open **Settings** > **Limits** > **Spend** >
+- [ ] If it is dedicated to Pondera, open **Settings** > **Limits** > **Spend** >
   **Edit spend limit**.
 - [ ] During Sandbox/TestFlight, consider a conservative `$25/month` hard limit
   with alerts at 50%, 75%, and 90%; revisit it after measuring real usage.
 - [ ] Enable hard-limit enforcement so excess API traffic fails instead of
   continuing indefinitely. Understand that enforcement may allow a small
-  propagation overage and that hitting the cap makes Attune AI temporarily unavailable.
+  propagation overage and that hitting the cap makes Pondera AI temporarily unavailable.
 - [ ] If the current project is shared with other applications, do not impose an
-  Attune-sized limit on the shared project. The Phase 3 plan should decide
-  whether to create a dedicated Attune project and then replace only the
+  Pondera-sized limit on the shared project. The Phase 3 plan should decide
+  whether to create a dedicated Pondera project and then replace only the
   Worker's `OPENAI_API_KEY` secret.
 
 The dollar value is a starting recommendation for controlled testing, not the
@@ -327,7 +326,7 @@ tested in Apple's appropriate environments.
 
 ## Exact prompt for the next chat — Phase 2 plus Phase 3 planning
 
-> Continue Attune from `ATTUNE_REMAINING_WORK.md` and
+> Continue Pondera from `PONDERA_REMAINING_WORK.md` and
 > `YOUR_REMAINING_STEPS.md`. Inspect Git status first and preserve every
 > concurrent change. Complete Phase 2 first: verify the existing StoreKit and
 > legal-link configuration, confirm current official Apple requirements, prepare

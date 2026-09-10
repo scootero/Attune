@@ -1,0 +1,93 @@
+{
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Momentum/MomentumWeekChartView.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/MomentumWeekChartView.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/MomentumWeekChartView.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/MomentumWeekChartView.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/MomentumWeekChartView.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/MomentumWeekChartView.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Momentum/WeekdayPicker.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/WeekdayPicker.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/WeekdayPicker.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/WeekdayPicker.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/WeekdayPicker.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/WeekdayPicker.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Progress/AdjustTotalSheet.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/AdjustTotalSheet.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/AdjustTotalSheet.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/AdjustTotalSheet.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/AdjustTotalSheet.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/AdjustTotalSheet.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Progress/CheckInTranscriptView.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/CheckInTranscriptView.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/CheckInTranscriptView.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/CheckInTranscriptView.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/CheckInTranscriptView.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/CheckInTranscriptView.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Progress/DayDetailView.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/DayDetailView.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/DayDetailView.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/DayDetailView.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/DayDetailView.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/DayDetailView.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Progress/IntentionDetailRouteView.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/IntentionDetailRouteView.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/IntentionDetailRouteView.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/IntentionDetailRouteView.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/IntentionDetailRouteView.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/IntentionDetailRouteView.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Progress/IntentionDetailView.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/IntentionDetailView.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/IntentionDetailView.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/IntentionDetailView.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/IntentionDetailView.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/IntentionDetailView.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Progress/ProgressDataHelper.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/ProgressDataHelper.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/ProgressDataHelper.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/ProgressDataHelper.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/ProgressDataHelper.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/ProgressDataHelper.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Progress/ProgressView.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/ProgressView.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/ProgressView.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/ProgressView.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/ProgressView.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/ProgressView.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Settings/AboutView.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/AboutView.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/AboutView.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/AboutView.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/AboutView.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/AboutView.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Settings/EngagementDiagnosticsView.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/EngagementDiagnosticsView.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/EngagementDiagnosticsView.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/EngagementDiagnosticsView.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/EngagementDiagnosticsView.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/EngagementDiagnosticsView.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Settings/LogsView.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/LogsView.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/LogsView.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/LogsView.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/LogsView.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/LogsView.swiftdeps"
+  },
+  "/Users/scott/Desktop/Attune/Attune/Pondera/Pondera/UI/Settings/PaywallView.swift" : {
+    "const-values" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/PaywallView.swiftconstvalues",
+    "dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/PaywallView.d",
+    "diagnostics" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/PaywallView.dia",
+    "object" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/PaywallView.o",
+    "swift-dependencies" : "/Users/scott/Desktop/Attune/Attune/.build/DerivedData/Build/Intermediates.noindex/Pondera.build/Debug-iphonesimulator/Pondera.build/Objects-normal/x86_64/PaywallView.swiftdeps"
+  }
+}

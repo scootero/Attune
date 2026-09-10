@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Debug-only in-app Calendar experiment.
+- In-app Calendar capture view with local reminders for timed events.
 - Entry point: Insights -> Calendar.
 - Reads existing `ExtractedItem.calendarCandidate` data.
 - Event-type captures without a usable scheduled date appear under `Needs scheduling` on their recording day; Attune does not claim that recording day is the event date.
@@ -11,7 +11,7 @@
 - New Listening extraction receives the segment recording timestamp and local IANA timezone. `today`, `tomorrow`, and weekdays resolve from that local reference. A recognized clock time without a date uses the recording day.
 - A deterministic on-device fallback covers `today`, `tomorrow`, weekdays, AM/PM clock times, noon, and midnight if the provider returns no date.
 - Does not import EventKit, request Calendar permission, or write to Apple Calendar.
-- Release builds hide the navigation entry through `CalendarFeature.isEnabled`.
+- The Calendar navigation entry is enabled in Release builds through `CalendarFeature.isEnabled`.
 
 ## Removal
 
@@ -22,7 +22,7 @@ For full source removal:
 1. Remove the `if CalendarFeature.isEnabled { calendarSection }` hook and its two helpers from `LibraryView.swift`.
 2. Remove the two `CalendarFeature.isEnabled` schedule blocks and their helpers/state from `InsightDetailView.swift`.
 3. Remove `CalendarScheduleCorrection` and `ItemCorrection.calendarSchedule` from `ItemCorrection.swift`.
-4. Delete `Attune/Attune/UI/Calendar/` and this handoff file.
+4. Delete `Pondera/Pondera/UI/Calendar/` and this handoff file.
 
 No recording or transcription migration needs to be reversed. Existing correction JSON safely ignores the removed optional scheduling key. Temporal extraction context can remain independently or be removed from `ExtractorService`, `ExtractionQueue`, `TranscriptionQueue`, and the optional Worker Listening fields.
 

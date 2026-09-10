@@ -78,10 +78,10 @@ The `TopicKeyBuilder` filters out three categories of words:
 
 ## Files Modified
 
-1. ✅ **Created**: `Attune/Attune/Understanding/TopicKeyBuilder.swift` (203 lines)
-2. ✅ **Modified**: `Attune/Attune/Models/TopicAggregate.swift` (+5 lines)
-3. ✅ **Modified**: `Attune/Attune/Storage/TopicAggregateStore.swift` (+8 lines)
-4. ✅ **Created**: `Attune/Attune/Understanding/TopicKeyBuilder_VERIFICATION.md` (documentation)
+1. ✅ **Created**: `Pondera/Pondera/Understanding/TopicKeyBuilder.swift` (203 lines)
+2. ✅ **Modified**: `Pondera/Pondera/Models/TopicAggregate.swift` (+5 lines)
+3. ✅ **Modified**: `Pondera/Pondera/Storage/TopicAggregateStore.swift` (+8 lines)
+4. ✅ **Created**: `Pondera/Pondera/Understanding/TopicKeyBuilder_VERIFICATION.md` (documentation)
 
 ## Acceptance Criteria
 

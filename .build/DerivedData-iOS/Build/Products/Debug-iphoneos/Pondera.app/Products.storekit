@@ -1,0 +1,58 @@
+{
+  "identifier" : "A1B2C3D4",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "BLAUCQ8H26",
+    "_failTransactionsEnabled" : false,
+    "_lastStorefrontUpdateDate" : 0,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21400001",
+      "localizations" : [
+
+      ],
+      "name" : "Pondera Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.99",
+          "familyShareable" : true,
+          "groupNumber" : 1,
+          "internalID" : "21400002",
+          "localizations" : [
+            {
+              "description" : "Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.",
+              "displayName" : "Pondera Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.scottoliver.Pondera.Intentions.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pondera Pro Monthly",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

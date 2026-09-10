@@ -153,7 +153,7 @@ A: Check for `Topics.corrupt.<timestamp>.json` backup. System auto-renames and s
 ## Code Locations
 
 ```
-Attune/Attune/
+Pondera/Pondera/
 ├── Understanding/
 │   └── TopicKeyBuilder.swift          ← Core logic
 ├── Models/

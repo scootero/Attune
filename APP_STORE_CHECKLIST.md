@@ -51,10 +51,10 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 
 ## Phase 5 — Manual App Store Connect
 
-- [ ] Set app name to `Attune: Intentions Tracking`
+- [ ] Set app name to `Pondera: Intentions`
 - [ ] Set subtitle to `Are you in tune?`
 - [ ] Host Privacy Policy + Terms + Support pages
-- [ ] Paste live URLs into `LegalLinks.swift` (`Attune/App/LegalLinks.swift`)
+- [ ] Paste live URLs into `LegalLinks.swift` (`Pondera/App/LegalLinks.swift`)
 - [ ] Fill App Privacy nutrition labels (Audio, User Content, OpenAI third party)
 - [ ] Screenshots (iPhone; iPad if keeping iPad)
 - [ ] App Review notes (background audio, demo recording, AI disclosure)
@@ -63,13 +63,13 @@ Working rules: one phase at a time; minimal diffs; update this file after each p
 
 Current release values are $4.99/month with no introductory trial.
 Free includes one active intention and one Voice Check-In per day; use
-`ATTUNE_REMAINING_WORK.md` as the controlling release tracker.
+`PONDERA_REMAINING_WORK.md` as the controlling release tracker.
 
 ### Suggested App Review notes (copy/paste draft)
 
-- Attune records voice only when the user starts a session or check-in.
+- Pondera records voice only when the user starts a session or check-in.
 - Background audio mode is used so an in-progress recording can continue if the app is backgrounded during an active session.
-- Speech may use Apple cloud speech recognition; transcripts are sent to OpenAI via Attune’s Cloudflare Worker proxy for insights (after the user accepts the in-app AI disclosure).
+- Speech may use Apple cloud speech recognition; transcripts are sent to OpenAI via Pondera’s Cloudflare Worker proxy for insights (after the user accepts the in-app AI disclosure).
 - To demo: accept the privacy sheet → tap check-in or record → speak briefly → stop and wait for processing.
 
 ---

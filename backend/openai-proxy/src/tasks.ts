@@ -5,6 +5,7 @@ export const TASK_PATHS = {
   intentions: "/v2/intentions/parse",
   listening: "/v2/listening/extract",
   intentionSuggestion: "/v2/intentions/suggest-action",
+  insights: "/v2/insights/analyze",
 } as const;
 
 export type TaskPath = (typeof TASK_PATHS)[keyof typeof TASK_PATHS];
@@ -26,7 +27,7 @@ export type ServerOwnedChatRequest = {
 
 export type BuiltTask = {
   request: ServerOwnedChatRequest;
-  taskName: "check_in" | "intentions" | "listening" | "intention_suggestion";
+  taskName: "check_in" | "intentions" | "listening" | "intention_suggestion" | "insights";
   inputCharacters: number;
   suggestionContext?: {
     evidenceItemIds: string[];
@@ -71,7 +72,31 @@ export function buildTask(path: TaskPath, rawBody: unknown): ValidationResult {
       return buildListeningTask(rawBody);
     case TASK_PATHS.intentionSuggestion:
       return buildIntentionSuggestionTask(rawBody);
+    case TASK_PATHS.insights:
+      return buildInsightsTask(rawBody);
   }
+}
+
+function buildInsightsTask(rawBody: unknown): ValidationResult {
+  if (!isRecord(rawBody)) return invalid("Request body must be an object");
+  const keyError = validateKeys(rawBody, ["intentionDays", "moodHistory"]);
+  if (keyError) return invalid(keyError);
+  if (!Array.isArray(rawBody.intentionDays) || rawBody.intentionDays.length > 100) return invalid("intentionDays may contain at most 100 items");
+  if (!Array.isArray(rawBody.moodHistory) || rawBody.moodHistory.length > 60) return invalid("moodHistory may contain at most 60 items");
+  for (const value of [...rawBody.intentionDays, ...rawBody.moodHistory]) {
+    if (!isRecord(value)) return invalid("Insight context items must be objects");
+    for (const [key, item] of Object.entries(value)) {
+      if (!["date", "intention", "moodScore", "progress", "target", "unit"].includes(key)) return invalid("Unsupported insight context field");
+      if (typeof item !== "string" && typeof item !== "number") return invalid("Insight context values must be short text or numbers");
+      if (typeof item === "string" && item.length > 120) return invalid("Insight context text is too long");
+    }
+  }
+  const userMessage = JSON.stringify({ intentionDays: rawBody.intentionDays, moodHistory: rawBody.moodHistory });
+  return valid({
+    taskName: "insights",
+    inputCharacters: INSIGHTS_SYSTEM_PROMPT.length + userMessage.length,
+    request: chatRequest(INSIGHTS_SYSTEM_PROMPT, userMessage, INSIGHTS_SCHEMA, 1_200),
+  });
 }
 
 function buildIntentionSuggestionTask(rawBody: unknown): ValidationResult {
@@ -751,6 +776,35 @@ const INTENTION_SUGGESTION_SCHEMA: ServerOwnedChatRequest["response_format"]["js
       evidenceItemIds: { type: "array", items: { type: "string" } },
     },
     required: ["title", "targetValue", "unit", "timeframe", "reason", "actionFingerprint", "actionFamily", "evidenceItemIds"],
+    additionalProperties: false,
+  },
+};
+
+const INSIGHTS_SYSTEM_PROMPT = `Review only the supplied structured intention-progress and mood history. Return up to three concise observations about how mood appears alongside intention activity. Do not diagnose, label personality, or claim causation. Use cautious language such as "appears alongside" or "was higher on". Return JSON only.`;
+
+const INSIGHTS_SCHEMA: ServerOwnedChatRequest["response_format"]["json_schema"] = {
+  name: "insights_analysis",
+  strict: true,
+  schema: {
+    type: "object",
+    properties: {
+      insights: {
+        type: "array",
+        maxItems: 3,
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            detail: { type: "string" },
+            confidence: { type: "string", enum: ["Early signal", "Steady signal", "Observed pattern"] },
+            dates: { type: "array", items: { type: "string" } },
+          },
+          required: ["title", "detail", "confidence", "dates"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["insights"],
     additionalProperties: false,
   },
 };

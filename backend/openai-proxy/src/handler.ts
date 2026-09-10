@@ -50,6 +50,7 @@ const ALLOWED_SCHEMA_NAMES = new Set([
   "checkin_extraction",
   "intentions_parse",
   "items_extraction",
+  "insights_analysis",
 ]);
 const ALLOWED_TOP_LEVEL_KEYS = new Set([
   "model",
@@ -509,6 +510,8 @@ function hasExpectedTaskOutputShape(
         (value.actionFingerprint === null || typeof value.actionFingerprint === "string") &&
         (value.actionFamily === null || typeof value.actionFamily === "string") &&
         Array.isArray(value.evidenceItemIds);
+    case "insights":
+      return hasExactKeys(value, ["insights"]) && Array.isArray(value.insights);
   }
 }
 
