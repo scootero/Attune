@@ -169,19 +169,11 @@ struct EditIntentionsView: View {
                                 } label: {
                                     Label("Record an Intention", systemImage: "mic.fill")
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(Color.black)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 13)
-                                        .background(
-                                            LinearGradient(
-                                                colors: [PonderaTheme.recording, PonderaTheme.recording.opacity(0.72)],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            ),
-                                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(MonochromeIntentionButtonStyle(cornerRadius: 14))
                                 .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 2, trailing: 12))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
@@ -991,28 +983,47 @@ private struct AddIntentionCard: View {
                 HStack {
                     Text("Add Intention") // header title
                         .font(.headline) // emphasize
-                        .foregroundColor(.white) // white text
+                        .foregroundStyle(Color.black) // inverted monochrome treatment
                     Spacer()
                     Image(systemName: "plus.circle.fill")
-                        .foregroundColor(.white.opacity(0.8)) // softer icon
+                        .foregroundStyle(Color.black.opacity(0.72)) // softer icon
                 }
                 .padding(.vertical, 8) // padding for tap target
             }
-            .buttonStyle(.plain) // keep custom styling
+            .buttonStyle(MonochromeIntentionButtonStyle(cornerRadius: 14)) // shared add-button treatment
             .opacity(disableAdd ? 0.65 : 1) // keep tappable so Free users get an explanation
             
         }
-        .padding(16) // slightly larger padding to match glass card thickness
+        .padding(8) // let the monochrome button own the visual weight
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(NeonPalette.darkOverlay.opacity(0.72))
+                .fill(Color.white.opacity(0.10))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
                 .allowsHitTesting(false)
         )
         .shadow(color: NeonPalette.darkShadow.opacity(0.32), radius: 7, x: 0, y: 4)
+    }
+}
+
+/// A quiet black-and-white add control with a visible gray pressed state.
+private struct MonochromeIntentionButtonStyle: ButtonStyle {
+    let cornerRadius: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(configuration.isPressed ? Color.gray.opacity(0.72) : Color.white.opacity(0.92))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.black.opacity(configuration.isPressed ? 0.28 : 0.12), lineWidth: 1)
+            )
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 

@@ -91,6 +91,14 @@ private struct FeelingPickerAnchorKey: PreferenceKey {
     }
 }
 
+private struct HomeContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 /// Prevents opening and saving the manual editor from creating chart events for
 /// intentions whose totals were not actually changed.
 enum ManualProgressSavePolicy {
@@ -249,16 +257,18 @@ struct HomeView: View {
     /// Home is intentionally a fixed dashboard until the user asks to reveal
     /// more than the four intention rows that fit comfortably above the tab bar.
     @State private var showsAllIntentionsOnHome = false
+    @State private var homeCardSpacingValue: CGFloat = 18
     
     var body: some View {
         NavigationView {
         ZStack {
             PonderaScreenBackground()
             
-            ScrollView {
-                VStack(spacing: 0) {
+            GeometryReader { viewport in
+                ScrollView {
+                    VStack(spacing: 0) {
                     // Keep the primary action and today's complete status visible with minimal scrolling.
-                    VStack(spacing: 8) {
+                    VStack(spacing: homeCardSpacingValue) {
                         if shouldShowEmptyIntentionsWelcome {
                             emptyIntentionsWelcomeCard
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -276,13 +286,26 @@ struct HomeView: View {
                         }
                     }
                     .padding(.horizontal, PonderaTheme.horizontalPadding)
-                    .padding(.top, 6)
+                    .padding(.top, 20)
                     // TabView already lays Home out above the tab bar. Keeping a
                     // second tab-bar-sized spacer here made an otherwise fitting
                     // Home screen just tall enough to scroll into empty space.
                     // Retain only a small visual inset; larger accessibility text
                     // can still grow and scroll naturally.
                     .padding(.bottom, dynamicTypeSize.isAccessibilitySize ? 20 : 6)
+                    .background {
+                        GeometryReader { contentGeometry in
+                            Color.clear.preference(
+                                key: HomeContentHeightKey.self,
+                                value: contentGeometry.size.height
+                            )
+                        }
+                    }
+                }
+                }
+                .onPreferenceChange(HomeContentHeightKey.self) { measuredHeight in
+                    guard measuredHeight > 0 else { return }
+                    updateHomeCardSpacing(measuredHeight: measuredHeight, availableHeight: viewport.size.height)
                 }
             }
             .scrollBounceBehavior(.basedOnSize)
@@ -484,6 +507,27 @@ struct HomeView: View {
         }
         }
     }
+
+    private func updateHomeCardSpacing(measuredHeight: CGFloat, availableHeight: CGFloat) {
+        let compactSpacing: CGFloat = 18
+        let relaxedSpacing: CGFloat = 22
+        let cardCount = (shouldShowEmptyIntentionsWelcome ? 1 : 0)
+            + 4
+            + (IntentionSuggestionFeature.isEnabled && intentionSuggestionAreaIsVisible ? 1 : 0)
+        let gapCount = CGFloat(max(0, cardCount - 1))
+
+        guard gapCount > 0 else { return }
+
+        let compactHeight = measuredHeight - (homeCardSpacingValue * gapCount)
+        let relaxedHeight = compactHeight + (relaxedSpacing * gapCount)
+        let nextSpacing = relaxedHeight <= availableHeight ? relaxedSpacing : compactSpacing
+        guard nextSpacing != homeCardSpacingValue else { return }
+        homeCardSpacingValue = nextSpacing
+    }
+
+    private var intentionSuggestionAreaIsVisible: Bool {
+        intentionSuggestion != nil || suggestionNudge != nil || isGeneratingSuggestion
+    }
     
     // MARK: - A) Daily Summary Strip (Slice B: compact single-line)
 
@@ -616,7 +660,7 @@ struct HomeView: View {
             }
             
             if todaysProgress.isEmpty {
-                Button(action: openIntentionsEditor) {
+                VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 10) {
                         Image(systemName: "sparkle.magnifyingglass")
                             .font(.subheadline.weight(.semibold))
@@ -629,11 +673,18 @@ struct HomeView: View {
 
                         Spacer(minLength: 0)
                     }
-                    .padding(.vertical, 7)
-                    .contentShape(Rectangle())
+
+                    Button(action: openIntentionsEditor) {
+                        Label("Add an intention", systemImage: "plus")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(PonderaTheme.background)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
+                            .background(PonderaTheme.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens the intentions editor")
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint("Opens the intentions editor")
             } else {
                 ForEach(Array(visibleProgressRows.enumerated()), id: \.element.id) { index, row in // render each intention row
                     let neonTextColor = intentionNeonTextColor(at: index)
@@ -1200,7 +1251,7 @@ struct HomeView: View {
             ZStack {
                 WeeklyMomentumCardAtmosphere()
 
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
                     if dynamicTypeSize.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: 8) {
                             weeklyMomentumDayTileTitle
@@ -1220,8 +1271,8 @@ struct HomeView: View {
                     )
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 15)
-                .padding(.bottom, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
             }
             .contentShape(Rectangle())
         }
@@ -1517,6 +1568,7 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .ponderaCard()
+        .homeTintedCard(tint: PonderaTheme.warning)
     }
 
     private var todayMomentumPercent: Int {
@@ -1801,6 +1853,7 @@ struct HomeView: View {
             }
         }
         .ponderaCard()
+        .homeTintedCard(tint: PonderaTheme.accentSecondary)
         .anchorPreference(key: FeelingPickerAnchorKey.self, value: .bounds) {
             $0
         }

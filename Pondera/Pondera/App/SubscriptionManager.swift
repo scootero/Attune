@@ -227,6 +227,7 @@ final class SubscriptionManager: ObservableObject {
         do {
             productDetails = try await storeClient.loadMonthlyProduct()
             if productDetails == nil {
+                AppLogger.log(AppLogger.ERR, "StoreKit product load returned no matching product")
                 actionState = .failed("Pondera Pro is temporarily unavailable. Please try again later.")
             }
         } catch {

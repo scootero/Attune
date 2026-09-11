@@ -24,6 +24,9 @@ struct SettingsView: View {
     @State private var paywallReason: String?
     @State private var showManageSubscriptions = false
     @State private var showOnboardingReplay = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var premiumIconIsGlowing = false
+    @State private var premiumTitleIsGlinting = false
     #if DEBUG && targetEnvironment(simulator)
     @State private var momentumDemoStatus = MomentumDemoDataManager.status()
     @State private var momentumDemoMessage: String?
@@ -40,9 +43,13 @@ struct SettingsView: View {
                 developerSection
             }
             .listStyle(.insetGrouped)
+            .listSectionSpacing(.compact)
+            .contentMargins(.top, 0, for: .scrollContent)
             .scrollContentBackground(.hidden)
             .background(PonderaScreenBackground())
             .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -85,55 +92,116 @@ struct SettingsView: View {
 
     private var membershipSection: some View {
         Section {
-            Button {
-                paywallReason = nil
-                showPaywall = true
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "crown.fill")
-                        .font(.headline)
-                        .foregroundStyle(PonderaTheme.warning)
-                        .frame(width: 36, height: 36)
-                        .background(PonderaTheme.warning.opacity(0.14), in: Circle())
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(SubscriptionConfig.displayName)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                        Text(membershipDetail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            VStack(spacing: 16) {
+                VStack(spacing: 14) {
+                    Button {
+                        paywallReason = nil
+                        showPaywall = true
+                    } label: {
+                        VStack(spacing: 10) {
+                            Image(systemName: "crown.fill")
+                                .font(.headline)
+                                .foregroundStyle(PonderaTheme.warning)
+                                .frame(width: 42, height: 42)
+                                .background(PonderaTheme.warning.opacity(0.16), in: Circle())
+                                .scaleEffect(premiumIconIsGlowing ? 1.06 : 1)
+                                .opacity(premiumIconIsGlowing ? 0.88 : 1)
+                            Text(SubscriptionConfig.displayName)
+                                .font(.system(size: 27, weight: .black, design: .rounded))
+                                .foregroundStyle(PonderaTheme.brandGradient)
+                                .opacity(premiumTitleIsGlinting ? 0.82 : 1)
+                                .brightness(premiumTitleIsGlinting ? 0.12 : 0)
+                                .shadow(color: PonderaTheme.accent.opacity(0.38), radius: premiumTitleIsGlinting ? 8 : 3)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    Spacer()
-                    Text(subscriptionManager.isSubscribed ? "Active" : "View")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(PonderaTheme.accent)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
+                    .buttonStyle(.plain)
+
+                    Text("Everything beyond Basic — talk longer, track more, and see the full picture.")
+                        .font(.subheadline.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(PonderaTheme.textPrimary)
+                        .frame(maxWidth: .infinity)
+
+                    Button("Find Out More") {
+                        paywallReason = nil
+                        showPaywall = true
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(PonderaTheme.accent)
+                    .underline()
+                    .padding(.top, 2)
+
+                    Text("\(subscriptionManager.priceText). Cancel anytime.")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(PonderaTheme.textSecondary)
+
+                    Button("Continue") {
+                        paywallReason = nil
+                        showPaywall = true
+                    }
+                    .buttonStyle(PonderaPrimaryButtonStyle())
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous)
+                            .stroke(PonderaTheme.accent.opacity(0.9), lineWidth: 1.5)
+                    )
+                    .shadow(color: PonderaTheme.accent.opacity(0.42), radius: 14, y: 6)
                 }
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                Task { await subscriptionManager.restore() }
-            } label: {
-                settingsLabel("Restore Purchases", icon: "arrow.clockwise", color: PonderaTheme.accent)
-            }
-            .disabled(subscriptionManager.isBusy)
-
-            Button { showManageSubscriptions = true } label: {
-                settingsLabel("Manage Subscription", icon: "person.crop.circle", color: PonderaTheme.accentSecondary)
-            }
-
-            if let message = subscriptionManager.actionState.message {
-                Label(
-                    message,
-                    systemImage: subscriptionManager.actionState.isFailure
-                        ? "exclamationmark.triangle.fill"
-                        : "info.circle.fill"
+                .padding(16)
+                .background(PonderaTheme.backgroundGradient, in: RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
+                        .stroke(PonderaTheme.brandGradient, lineWidth: 1.5)
+                        .shadow(color: PonderaTheme.accent.opacity(0.55), radius: 8)
                 )
-                .font(.footnote)
-                .foregroundStyle(subscriptionManager.actionState.isFailure ? PonderaTheme.warning : Color.secondary)
+                .shadow(color: PonderaTheme.accentSecondary.opacity(0.22), radius: 14, y: 6)
+
+                VStack(spacing: 12) {
+                    Button {
+                        Task { await subscriptionManager.restore() }
+                    } label: {
+                        settingsLabel("Restore Purchases", icon: "arrow.clockwise", color: PonderaTheme.accent)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .disabled(subscriptionManager.isBusy)
+
+                    Divider().overlay(PonderaTheme.border)
+
+                    Button { showManageSubscriptions = true } label: {
+                        settingsLabel("Manage Subscription", icon: "person.crop.circle", color: PonderaTheme.accentSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    if let message = subscriptionManager.actionState.message {
+                        Label(
+                            message,
+                            systemImage: subscriptionManager.actionState.isFailure
+                                ? "exclamationmark.triangle.fill"
+                                : "info.circle.fill"
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(subscriptionManager.actionState.isFailure ? PonderaTheme.warning : Color.secondary)
+                    }
+                }
+                .padding(16)
+                .background(PonderaTheme.backgroundGradient, in: RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
+                        .stroke(PonderaTheme.border, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.20), radius: 10, y: 5)
+            }
+            .onAppear {
+                guard !reduceMotion else {
+                    premiumTitleIsGlinting = false
+                    return
+                }
+                withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) {
+                    premiumIconIsGlowing = true
+                }
+                withAnimation(.easeInOut(duration: 2.2).delay(0.4).repeatForever(autoreverses: true)) {
+                    premiumTitleIsGlinting = true
+                }
             }
         } header: {
             Text("Membership")
@@ -300,24 +368,6 @@ struct SettingsView: View {
             #endif
         }
         #endif
-    }
-
-    private var membershipDetail: String {
-        #if DEBUG
-        switch subscriptionManager.debugMode {
-        case .pro: return "Debug test mode · Pro"
-        case .free: return "Debug test mode · Free"
-        case .system: return isSubscribedDetail
-        }
-        #else
-        return isSubscribedDetail
-        #endif
-    }
-
-    private var isSubscribedDetail: String {
-        subscriptionManager.isSubscribed
-            ? "Active membership · unlimited Pro features"
-            : "Free plan · \(subscriptionManager.priceText)"
     }
 
     private func settingsLabel(_ title: String, icon: String, color: Color) -> some View {

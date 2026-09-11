@@ -14,77 +14,44 @@ struct PaywallView: View {
     /// Optional short reason shown under the title (e.g. daily free limit reached).
     var reason: String? = nil
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hasAppeared = false
+    @State private var isBreathing = false
+
     var body: some View {
         NavigationStack {
             ZStack {
                 PonderaScreenBackground()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        hero
+                VStack(alignment: .leading, spacing: 10) {
+                    hero
 
-                        if let reason, !reason.isEmpty {
-                            Label(reason, systemImage: "sparkles")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(PonderaTheme.textPrimary)
-                                .padding(14)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(PonderaTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous).stroke(PonderaTheme.accent.opacity(0.28)))
-                        }
-
-                        VStack(spacing: 12) {
-                            proFeature(
-                                icon: "target",
-                                title: "Track More Intentions",
-                                detail: "Keep up to \(SubscriptionConfig.maximumActiveIntentions) active intentions moving at the same time."
-                            )
-                            proFeature(
-                                icon: "mic.fill",
-                                title: "Voice Check-Ins",
-                                detail: "Update your tracked intentions and optional mood within Pro’s included monthly AI allowance."
-                            )
-                            proFeature(
-                                icon: "waveform.badge.mic",
-                                title: "Talk it out with Insights",
-                                detail: "Talk through what’s on your mind. Pondera organizes clear intentions, commitments, events, and states, then groups repeated ideas into themes."
-                            )
-                            proFeature(
-                                icon: "chart.line.uptrend.xyaxis",
-                                title: "Full Momentum History",
-                                detail: "Review past days and use Week and Month views to see how your progress changes over time."
-                            )
-                            proFeature(
-                                icon: "square.and.arrow.up",
-                                title: "Voice Setup and Data Export",
-                                detail: "Create intentions by voice with review, and export a portable copy of your Pondera data."
-                            )
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Pondera Free")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(PonderaTheme.textSecondary)
-                                .textCase(.uppercase)
-                                .tracking(0.8)
-                            Text("Track one active intention, record one Voice Check-In per day, see today's Momentum, and use the daily progress reminder.")
-                                .font(.subheadline)
-                                .foregroundStyle(PonderaTheme.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(16)
-                        .ponderaCard()
-
-                        legalFooter
+                    if let reason, !reason.isEmpty {
+                        Label(reason, systemImage: "sparkles")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(PonderaTheme.textPrimary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(PonderaTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous).stroke(PonderaTheme.accent.opacity(0.28)))
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 18)
-                    .padding(.bottom, 30)
+
+                    VStack(spacing: 7) {
+                        proFeature(icon: "target", title: "Track More Intentions", detail: "Keep up to \(SubscriptionConfig.maximumActiveIntentions) active intentions moving at the same time.", tint: PonderaTheme.accent)
+                        proFeature(icon: "mic.fill", title: "Voice Check-Ins", detail: "Update intentions and optional mood within Pro’s included monthly AI allowance.", tint: PonderaTheme.recording)
+                        proFeature(icon: "waveform.badge.mic", title: "Talk it out with Insights", detail: "Organize what’s on your mind into intentions, commitments, events, states, and themes.", tint: PonderaTheme.accentSecondary)
+                        proFeature(icon: "chart.line.uptrend.xyaxis", title: "Full Momentum History", detail: "Review past days plus Week and Month views to see progress over time.", tint: PonderaTheme.warning)
+                        proFeature(icon: "square.and.arrow.up", title: "Voice Setup and Data Export", detail: "Create intentions by voice with review, and export a portable copy of your Pondera data.", tint: PonderaTheme.success)
+                    }
+
+                    purchaseArea
+                    legalFooter
                 }
-                .scrollIndicators(.hidden)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    purchaseBar
-                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -95,63 +62,86 @@ struct PaywallView: View {
             .task {
                 await subscriptionManager.refresh()
             }
+            .onAppear {
+                hasAppeared = reduceMotion
+                guard !reduceMotion else { return }
+                withAnimation(.easeOut(duration: 0.55)) { hasAppeared = true }
+                withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: true)) {
+                    isBreathing = true
+                }
+            }
         }
     }
 
     private var hero: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(PonderaTheme.warning.opacity(0.14))
-                    .frame(width: 82, height: 82)
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 36, weight: .semibold))
-                    .foregroundStyle(PonderaTheme.warning)
+                    .stroke(PonderaTheme.accent.opacity(0.28), lineWidth: 1.5)
+                    .frame(width: 72, height: 72)
+                    .scaleEffect(isBreathing ? 1.14 : 0.94)
+                    .opacity(isBreathing ? 0.18 : 0.72)
+                Circle()
+                    .stroke(PonderaTheme.accentSecondary.opacity(0.32), lineWidth: 1)
+                    .frame(width: 58, height: 58)
+                    .scaleEffect(isBreathing ? 0.92 : 1.08)
+                    .opacity(isBreathing ? 0.7 : 0.18)
+                PonderaBrandMark()
+                    .frame(width: 48, height: 48)
+                    .shadow(color: PonderaTheme.accent.opacity(0.44), radius: 12)
             }
             .accessibilityHidden(true)
 
-            VStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Text(SubscriptionConfig.displayName)
-                    .font(.largeTitle.bold())
-                    .foregroundStyle(PonderaTheme.textPrimary)
-                Text("Track more, see the patterns, and keep your full progress history.")
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(PonderaTheme.textSecondary)
+                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .foregroundStyle(PonderaTheme.brandGradient)
             }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .accessibilityAddTraits(.isHeader)
+
+            Text("Track more, see the patterns, and keep your full progress history.")
+                .font(.caption)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(PonderaTheme.textSecondary)
+                .frame(maxWidth: .infinity)
 
             Text("\(subscriptionManager.priceText). Cancel anytime.")
-                .font(.subheadline.weight(.semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(PonderaTheme.accent)
-            Text("Includes a generous monthly AI processing allowance that refreshes each calendar month.")
-                .font(.footnote)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(PonderaTheme.textTertiary)
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func proFeature(icon: String, title: String, detail: String) -> some View {
+    private func proFeature(icon: String, title: String, detail: String, tint: Color) -> some View {
         HStack(alignment: .top, spacing: 13) {
             Image(systemName: icon)
-                .font(.headline)
-                .foregroundStyle(PonderaTheme.accent)
-                .frame(width: 40, height: 40)
-                .background(PonderaTheme.accent.opacity(0.12), in: Circle())
+                .font(.subheadline)
+                .foregroundStyle(tint)
+                .frame(width: 32, height: 32)
+                .background(tint.opacity(0.14), in: Circle())
+                .scaleEffect(reduceMotion ? 1 : (isBreathing ? 1.05 : 0.97))
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.headline)
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(PonderaTheme.textPrimary)
                 Text(detail)
-                    .font(.subheadline)
+                    .font(.system(size: 11))
                     .foregroundStyle(PonderaTheme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2)
             }
             Spacer(minLength: 0)
         }
-        .padding(16)
-        .ponderaCard()
+        .padding(.vertical, 7)
+        .padding(.horizontal, 9)
+        .background(PonderaTheme.surface, in: RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous)
+                .stroke(tint.opacity(0.30), lineWidth: 1)
+        )
+        .opacity(hasAppeared || reduceMotion ? 1 : 0)
+        .offset(y: hasAppeared || reduceMotion ? 0 : 7)
         .accessibilityElement(children: .combine)
     }
 
@@ -193,14 +183,32 @@ struct PaywallView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 8) {
-                        if subscriptionManager.isBusy {
-                            SwiftUI.ProgressView().tint(Color(red: 0.025, green: 0.12, blue: 0.12))
+                    HStack(spacing: 10) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 17, weight: .bold))
+                        VStack(spacing: 2) {
+                            if subscriptionManager.isBusy {
+                                SwiftUI.ProgressView().tint(Color.black)
+                            }
+                            Text(subscriptionManager.isProductAvailable ? "Subscribe to Pondera Pro" : "Try Again")
+                                .font(.system(size: 18, weight: .black, design: .rounded))
+                            if subscriptionManager.isProductAvailable {
+                                Text(subscriptionManager.priceText)
+                                    .font(.caption.weight(.bold))
+                            }
                         }
-                        Text(subscriptionManager.isProductAvailable ? "Subscribe to Pondera Pro" : "Try Again")
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 17, weight: .bold))
                     }
+                    .foregroundStyle(Color.black)
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PonderaPrimaryButtonStyle())
+                .overlay(
+                    RoundedRectangle(cornerRadius: PonderaTheme.controlRadius, style: .continuous)
+                        .stroke(PonderaTheme.accent.opacity(0.9), lineWidth: 1.5)
+                )
+                .shadow(color: PonderaTheme.accent.opacity(0.42), radius: 15, y: 6)
                 .disabled(subscriptionManager.isBusy)
 
                 if subscriptionManager.isProductAvailable {
@@ -223,19 +231,6 @@ struct PaywallView: View {
             .frame(minHeight: 44)
             .disabled(subscriptionManager.isBusy || subscriptionManager.isLoadingProduct)
         }
-    }
-
-    private var purchaseBar: some View {
-        purchaseArea
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
-            .background(.ultraThinMaterial)
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(PonderaTheme.border)
-                    .frame(height: 1)
-            }
     }
 
     private var legalFooter: some View {

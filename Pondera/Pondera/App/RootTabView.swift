@@ -149,7 +149,7 @@ struct RootTabView: View {
         .padding(.horizontal, PonderaTheme.horizontalPadding)
         .padding(.vertical, 6)
         .background {
-            PonderaHeaderGlassBackground()
+            PonderaScreenBackground()
                 .frame(height: 72)
                 .offset(y: 8)
                 .ignoresSafeArea(edges: .top)

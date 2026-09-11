@@ -311,7 +311,36 @@ extension View {
         modifier(PonderaCardModifier())
     }
 
+    /// Adds a quiet semantic tint while preserving the shared card surface,
+    /// radius, shadow, and typography used throughout the app.
+    func homeTintedCard(tint: Color) -> some View {
+        modifier(HomeTintedCardModifier(tint: tint))
+    }
+
     func insightCaptureCard(isHighlighted: Bool) -> some View {
         modifier(InsightCaptureCardModifier(isHighlighted: isHighlighted))
+    }
+}
+
+private struct HomeTintedCardModifier: ViewModifier {
+    let tint: Color
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: PonderaTheme.cardRadius, style: .continuous)
+
+        content
+            .background(tint.opacity(0.055), in: shape)
+            .overlay(
+                shape
+                    .stroke(
+                        LinearGradient(
+                            colors: [tint.opacity(0.48), PonderaTheme.border],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+                    .allowsHitTesting(false)
+            )
     }
 }

@@ -31,6 +31,14 @@ final class LiveSubscriptionStoreClient: SubscriptionStoreClient {
 
     func loadMonthlyProduct() async throws -> SubscriptionProductDetails? {
         let products = try await Product.products(for: [SubscriptionConfig.monthlyProductID])
+        let returnedProducts = products
+            .map { "\($0.id)=\($0.displayPrice)" }
+            .joined(separator: ",")
+        let displayedProducts = returnedProducts.isEmpty ? "<none>" : returnedProducts
+        AppLogger.log(
+            AppLogger.STORE,
+            "StoreKit product query requested=\(SubscriptionConfig.monthlyProductID) returnedCount=\(products.count) returned=\(displayedProducts)"
+        )
         monthlyProduct = products.first
         return monthlyProduct.map { SubscriptionProductDetails(displayPrice: $0.displayPrice) }
     }
@@ -77,4 +85,3 @@ final class LiveSubscriptionStoreClient: SubscriptionStoreClient {
         }
     }
 }
-
