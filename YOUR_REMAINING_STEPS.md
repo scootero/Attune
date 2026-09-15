@@ -146,6 +146,9 @@ screenshot inventory. Scott completes or confirms the App Store Connect entries.
 - [ ] Provide Terms of Use information. First confirm whether Pondera will use
   Apple's standard Licensed Application End User License Agreement or a custom
   EULA; do not invent or publish a custom legal agreement without approval.
+- [ ] Because Pondera offers an auto-renewable subscription, append this exact
+  line to the App Store Description and verify it is clickable in the product
+  page preview: `Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`
 - [ ] Complete App Privacy answers for audio, transcripts/user content, optional mood/wellness-related content where Apple asks, and third-party OpenAI processing through Pondera's Worker.
 - [ ] Enter app name `Pondera: Intentions`, then prepare the subtitle, description, keywords, category, age rating, copyright, and contact information.
 - [ ] Prepare iPhone screenshots. Pondera 1.0 is configured as an iPhone-only app,
@@ -158,8 +161,9 @@ Recommended choices and checks:
 
 - Use Apple's standard EULA for version 1.0 unless a lawyer or specific
   business requirement calls for a custom EULA. Apple applies its standard EULA
-  automatically when no custom EULA is supplied. Keep Pondera's public Terms page
-  for the product/subscription explanation.
+  automatically when no custom EULA is supplied, but the App Description must
+  still expose a functional Terms of Use link for this subscription submission.
+  Keep Pondera's public Terms page for the product/subscription explanation.
 - Let Codex inspect the implementation and draft the App Privacy answers,
   listing metadata, review notes, and screenshot list. Scott reviews and
   approves them because the App Privacy answers and listing are declarations to Apple.

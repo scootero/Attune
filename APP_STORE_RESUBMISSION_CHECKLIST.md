@@ -1,6 +1,6 @@
 # Pondera App Store Resubmission Checklist
 
-Last updated: 2026-09-09
+Last updated: 2026-09-15
 
 Purpose: one high-level checklist for resolving Apple’s Guideline 2.1 rejection and resubmitting Pondera: Intentions. Do not submit until every required item is checked.
 
@@ -37,6 +37,9 @@ Purpose: one high-level checklist for resolving Apple’s Guideline 2.1 rejectio
 - [ ] Confirm Pondera Pro Monthly and the app version are in the same draft submission.
 - [ ] Confirm Pondera Pro metadata: product ID, one-month duration, $4.99 US price, availability, localization, review notes, and screenshot.
 - [ ] Confirm the app’s Privacy Policy and Support URLs are live.
+- [ ] Add this functional standard-EULA line to the public App Description:
+  `Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`
+- [ ] Save the metadata and verify the link appears clickable in the App Store product-page preview.
 - [ ] Confirm App Privacy declarations match actual audio/transcript/AI processing.
 - [ ] Confirm screenshots show the actual app and contain no debug/test-only UI.
 - [ ] Confirm no placeholder, unavailable, or misleading subscription text appears in the Release/TestFlight build.
@@ -48,6 +51,18 @@ Purpose: one high-level checklist for resolving Apple’s Guideline 2.1 rejectio
 - [ ] Design official Apple offer codes for time-limited free/discounted access for friends or family. Lifetime access is not provided by a normal subscription offer code.
 - [ ] Revisit any promotional subscription image or App Store promotion separately from the required review screenshot.
 
+## Current Apple message — required repair
+
+Apple blocked review because Pondera offers the auto-renewable `Pondera Pro Monthly`
+subscription without a Terms of Use link in the App Store product-page metadata.
+Pondera is using Apple’s standard EULA, so do not create or paste a custom EULA.
+The in-app Terms link and the optional public Pondera Terms page do not replace
+this App Description link.
+
 ## Submission gate
 
-The app is ready to resubmit only when the Release/TestFlight build successfully loads Pondera Pro, the required subscription screenshot is saved, Pondera Pro Monthly is added for review with the new app build, and the final reply/submit actions have been manually reviewed.
+The app is ready to resubmit only when the App Description contains the functional
+standard-EULA link, the Release/TestFlight build successfully loads Pondera Pro,
+the required subscription screenshot is saved, Pondera Pro Monthly is added for
+review with the new app build, and the final reply/submit actions have been
+manually reviewed.
