@@ -33,7 +33,7 @@ struct PrivacyDataView: View {
             } header: {
                 Text("Permissions")
             } footer: {
-                Text("Pondera offers voice setup during onboarding. If you skip it, Pondera asks when you start a voice feature. Notification access is requested when you enable the daily reminder.")
+                Text("Pondera requests Notification, Microphone, and Speech Recognition access during onboarding. If access is denied, you can change it later in iOS Settings.")
             }
 
             Section {

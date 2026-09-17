@@ -12,7 +12,7 @@ import UIKit
 import UserNotifications
 
 /// Requests system permissions only when status is still undetermined.
-/// Call after voice setup, from recording start, or when enabling reminders.
+/// Call after onboarding, from recording start, or when enabling reminders.
 enum PermissionsHelper {
 
     enum RecordingPermissionState {
@@ -56,8 +56,8 @@ enum PermissionsHelper {
     /// Requests any missing recording permissions and returns whether both are available.
     static func requestRecordingPermissions() async -> Bool {
         let microphoneGranted = await requestMicrophoneAuthorization()
-        guard microphoneGranted else { return false }
-        return await requestSpeechAuthorization()
+        let speechGranted = await requestSpeechAuthorization()
+        return microphoneGranted && speechGranted
     }
 
     /// Call right before the user starts recording a session or check-in.
@@ -67,7 +67,7 @@ enum PermissionsHelper {
     }
     
     /// Requests local notification permission if status is .notDetermined.
-    /// Call after an explicit user action, such as onboarding's Enable Notifications button.
+    /// Call after an explicit user action, such as onboarding's Continue button.
     static func requestNotificationPermissionsIfNeeded() {
         let notificationCenter = UNUserNotificationCenter.current() // Use the shared notification center to read/request notification permissions.
         notificationCenter.getNotificationSettings { settings in // Read current notification authorization status before requesting anything.

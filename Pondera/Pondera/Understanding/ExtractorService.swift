@@ -456,7 +456,7 @@ If nothing meets the quality bar, return: {"items": [], "moodLabel": null, "mood
             sourceQuote: classifiedItem.sourceQuote,
             referenceDate: referenceDate
         )
-        if classifiedItem.calendarCandidate?.startISO8601 == nil,
+        if classifiedItem.calendarCandidate?.startISO8601 != normalizedCandidate?.startISO8601,
            let resolvedStart = normalizedCandidate?.startISO8601 {
             AppLogger.log(
                 AppLogger.AI,
@@ -501,21 +501,20 @@ If nothing meets the quality bar, return: {"items": [], "moodLabel": null, "mood
         )
     }
 
-    /// Deterministic safety net for the most important relative phrases. The
-    /// model remains responsible for broader natural-language interpretation,
-    /// while this guarantees today/tomorrow/weekday and explicit AM/PM times
-    /// do not disappear when a provider returns a null calendar candidate.
-    private static func normalizedCalendarCandidate(
+    /// Deterministic safety net for the most important relative phrases. Spoken
+    /// today/tomorrow/weekday and explicit AM/PM values take precedence over a
+    /// provider-suggested start so a plausible-looking but incorrect model date
+    /// cannot bypass normalization.
+    static func normalizedCalendarCandidate(
         _ candidate: CalendarCandidate?,
         itemType: String,
         sourceQuote: String,
-        referenceDate: Date
+        referenceDate: Date,
+        calendar: Calendar = .autoupdatingCurrent
     ) -> CalendarCandidate? {
-        if candidate?.startISO8601 != nil { return candidate }
         guard itemType == ExtractedItem.ItemType.event else { return candidate }
 
         let lowercased = sourceQuote.lowercased()
-        let calendar = Calendar.autoupdatingCurrent
         let referenceDay = calendar.startOfDay(for: referenceDate)
         var scheduledDay: Date?
 
@@ -541,6 +540,7 @@ If nothing meets the quality bar, return: {"items": [], "moodLabel": null, "mood
         }
 
         let spokenTime = parsedSpokenTime(in: lowercased)
+        guard scheduledDay != nil || spokenTime != nil else { return candidate }
         if scheduledDay == nil, spokenTime != nil {
             scheduledDay = referenceDay
         }
@@ -559,15 +559,30 @@ If nothing meets the quality bar, return: {"items": [], "moodLabel": null, "mood
             let formatter = DateFormatter()
             formatter.calendar = Calendar(identifier: .gregorian)
             formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.timeZone = .current
+            formatter.timeZone = calendar.timeZone
             formatter.dateFormat = "yyyy-MM-dd"
             startValue = formatter.string(from: scheduledDay)
+        }
+
+        let adjustedEnd: String?
+        if spokenTime != nil,
+           let originalStartValue = candidate?.startISO8601,
+           let originalEndValue = candidate?.endISO8601,
+           let originalStart = ISO8601DateFormatter().date(from: originalStartValue),
+           let originalEnd = ISO8601DateFormatter().date(from: originalEndValue),
+           originalEnd > originalStart {
+            let normalizedStart = ISO8601DateFormatter().date(from: startValue)
+            adjustedEnd = normalizedStart.map {
+                iso8601Formatter.string(from: $0.addingTimeInterval(originalEnd.timeIntervalSince(originalStart)))
+            }
+        } else {
+            adjustedEnd = nil
         }
 
         return CalendarCandidate(
             suggestedTitle: candidate?.suggestedTitle,
             startISO8601: startValue,
-            endISO8601: candidate?.endISO8601,
+            endISO8601: adjustedEnd,
             isAllDay: false,
             notes: candidate?.notes
         )

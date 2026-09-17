@@ -10,9 +10,8 @@ import SwiftUI
 
 /// Simple disclosure UI shown until AIPrivacyConsent.hasAccepted is true.
 struct AIPrivacyDisclosureSheet: View {
-    /// Both actions acknowledge the disclosure. Voice setup remains optional.
-    var onEnableVoice: () -> Void
-    var onSetUpLater: () -> Void
+    /// Acknowledges the disclosure before iOS presents its permission requests.
+    var onContinue: () -> Void
 
     var body: some View {
         NavigationStack {
@@ -47,7 +46,7 @@ struct AIPrivacyDisclosureSheet: View {
                 .font(.title2.bold())
                 .foregroundStyle(PonderaTheme.textPrimary)
 
-            Text("You stay in control of when recording starts and when voice setup happens.")
+            Text("Review how voice features work before continuing.")
                 .font(.subheadline)
                 .foregroundStyle(PonderaTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -111,24 +110,13 @@ struct AIPrivacyDisclosureSheet: View {
 
     private var actionArea: some View {
         VStack(spacing: 12) {
-            Text("If you enable voice now, iOS will ask for Microphone and Speech Recognition access next.")
+            Text("Pondera uses the microphone to record the voice check-ins you start and Speech Recognition to turn them into text. After you continue, iOS will ask for access to each permission.")
                 .font(.footnote)
                 .foregroundStyle(PonderaTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button("Continue and Enable Voice", action: onEnableVoice)
+            Button("Continue", action: onContinue)
                 .buttonStyle(PonderaPrimaryButtonStyle())
-
-            Button("Set Up Voice Later", action: onSetUpLater)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(PonderaTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 44)
-
-            Text("You can enable voice later when you start a Voice Check-In or use Talk it out.")
-                .font(.caption)
-                .foregroundStyle(PonderaTheme.textTertiary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
         }
     }
 }

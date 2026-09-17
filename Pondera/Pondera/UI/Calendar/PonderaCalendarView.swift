@@ -91,7 +91,7 @@ struct PonderaCalendarView: View {
             .foregroundStyle(PonderaTheme.accent)
 
             LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(weekdaySymbols, id: \.self) { symbol in
+                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                     Text(symbol)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(PonderaTheme.textTertiary)
@@ -114,7 +114,8 @@ struct PonderaCalendarView: View {
     private func dayButton(for date: Date) -> some View {
         let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
         let isToday = calendar.isDateInToday(date)
-        let scheduledCount = captures.lazy.filter { calendar.isDate($0.start, inSameDayAs: date) }.count
+        let scheduledCaptures = captures.filter { calendar.isDate($0.start, inSameDayAs: date) }
+        let scheduledCount = scheduledCaptures.count
         let capturedCount = undatedCaptures.lazy.filter { calendar.isDate($0.capturedAt, inSameDayAs: date) }.count
 
         return Button {
@@ -125,14 +126,26 @@ struct PonderaCalendarView: View {
                     .font(.subheadline.weight(isSelected ? .bold : .medium))
                     .foregroundStyle(isSelected ? PonderaTheme.background : PonderaTheme.textPrimary)
 
-                HStack(spacing: 3) {
-                    Circle()
-                        .fill(scheduledCount > 0 ? (isSelected ? PonderaTheme.background : PonderaTheme.accent) : .clear)
-                        .frame(width: 5, height: 5)
-                    Circle()
-                        .fill(capturedCount > 0 ? (isSelected ? PonderaTheme.background.opacity(0.72) : PonderaTheme.warning) : .clear)
-                        .frame(width: 5, height: 5)
+                HStack(spacing: 2) {
+                    ForEach(Array(scheduledCaptures.prefix(4).indices), id: \.self) { index in
+                        Circle()
+                            .fill(eventDotColors[index])
+                            .frame(width: 5, height: 5)
+                            .overlay {
+                                if isSelected {
+                                    Circle()
+                                        .stroke(PonderaTheme.background.opacity(0.45), lineWidth: 0.5)
+                                }
+                            }
+                    }
+
+                    if capturedCount > 0 {
+                        Circle()
+                            .stroke(PonderaTheme.warning, lineWidth: 1.25)
+                            .frame(width: 5, height: 5)
+                    }
                 }
+                .frame(height: 5)
             }
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(isSelected ? PonderaTheme.accent : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -147,6 +160,15 @@ struct PonderaCalendarView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(date.formatted(date: .complete, time: .omitted))
         .accessibilityValue(dayAccessibilityValue(scheduled: scheduledCount, captured: capturedCount))
+    }
+
+    private var eventDotColors: [Color] {
+        [
+            PonderaTheme.accentSecondary,
+            PonderaTheme.warning,
+            PonderaTheme.success,
+            PonderaTheme.recording
+        ]
     }
 
     private var agendaSection: some View {

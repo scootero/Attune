@@ -120,6 +120,7 @@ struct OnboardingView: View {
                 Text(selectedPage == pages.count - 1 ? finalButtonTitle : "Next")
             }
             .buttonStyle(PonderaPrimaryButtonStyle())
+            .disabled(isRequestingNotifications)
             .padding(.horizontal, 24)
             .padding(.bottom, 16)
             .accessibilityHint(selectedPage == pages.count - 1 ? finalButtonAccessibilityHint : "Shows the next introduction page")
@@ -157,22 +158,6 @@ struct OnboardingView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 28)
-
-                if page.illustration == .notifications {
-                    VStack(spacing: 10) {
-                        Button { requestNotifications() } label: {
-                            Label(isRequestingNotifications ? "Asking…" : "Enable Notifications", systemImage: "bell.badge.fill")
-                        }
-                        .buttonStyle(PonderaPrimaryButtonStyle())
-                        .disabled(isRequestingNotifications)
-
-                        Text("Not now is always okay. You can enable them later in Settings.")
-                            .font(.footnote)
-                            .foregroundStyle(PonderaTheme.textTertiary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.horizontal, 28)
-                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 28)
@@ -184,11 +169,15 @@ struct OnboardingView: View {
 
     @State private var isRequestingNotifications = false
 
-    private func requestNotifications() {
+    private func requestNotificationsAndComplete() {
+        guard !isRequestingNotifications else { return }
         isRequestingNotifications = true
         Task {
             _ = await PermissionsHelper.requestNotificationPermissions()
-            await MainActor.run { isRequestingNotifications = false }
+            await MainActor.run {
+                isRequestingNotifications = false
+                onComplete()
+            }
         }
     }
 
@@ -210,13 +199,18 @@ struct OnboardingView: View {
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
                 selectedPage += 1
             }
+        } else if includesNotificationPermissionStep {
+            requestNotificationsAndComplete()
         } else {
             onComplete()
         }
     }
 
     private var finalButtonAccessibilityHint: String {
-        finalButtonTitle == "Done"
+        if includesNotificationPermissionStep {
+            return "Continues to the iOS notification permission request"
+        }
+        return finalButtonTitle == "Done"
             ? "Closes the Pondera walkthrough"
             : "Continues to voice and privacy information"
     }
