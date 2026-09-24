@@ -14,7 +14,10 @@ struct SubscriptionAccessPolicy: Equatable {
         hasProAccess || todayCheckInCount < SubscriptionConfig.freeCheckInsPerDay
     }
 
-    var canUseListeningSessions: Bool { hasProAccess }
+    func canStartListeningSession(todaySessionCount: Int) -> Bool {
+        hasProAccess || todaySessionCount < SubscriptionConfig.freeListeningSessionsPerDay
+    }
+
     var canUseVoiceIntentions: Bool { hasProAccess }
     var canUseInsights: Bool { hasProAccess }
     var canUseMomentumHistory: Bool { hasProAccess }
@@ -49,4 +52,3 @@ struct SubscriptionAccessPolicy: Equatable {
             : SubscriptionConfig.freeActiveIntentionsLimit
     }
 }
-

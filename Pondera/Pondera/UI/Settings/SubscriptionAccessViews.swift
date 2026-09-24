@@ -59,8 +59,8 @@ struct ProLockedFeatureView: View {
 
 }
 
-/// Free users can see only today's Momentum. Historical navigation, Week,
-/// Month, and progress history remain behind Pondera Pro.
+/// Legacy today-only Momentum presentation retained for possible reuse.
+/// Current Free routing uses `ProLockedFeatureView` for the Momentum tab.
 struct FreeMomentumTodayView: View {
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
 

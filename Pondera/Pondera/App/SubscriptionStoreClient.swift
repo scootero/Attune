@@ -22,7 +22,7 @@ protocol SubscriptionStoreClient: AnyObject {
     func loadMonthlyProduct() async throws -> SubscriptionProductDetails?
     func purchaseMonthlyProduct() async throws -> SubscriptionPurchaseOutcome
     func restorePurchases() async throws
-    func hasCurrentMonthlyEntitlement() async -> Bool
+    func hasCurrentProEntitlement() async -> Bool
 }
 
 @MainActor
@@ -66,10 +66,10 @@ final class LiveSubscriptionStoreClient: SubscriptionStoreClient {
         try await AppStore.sync()
     }
 
-    func hasCurrentMonthlyEntitlement() async -> Bool {
+    func hasCurrentProEntitlement() async -> Bool {
         for await result in Transaction.currentEntitlements {
             guard let transaction = try? verified(result) else { continue }
-            if transaction.productID == SubscriptionConfig.monthlyProductID {
+            if SubscriptionConfig.proProductIDs.contains(transaction.productID) {
                 return true
             }
         }

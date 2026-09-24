@@ -17,6 +17,7 @@ enum SubscriptionActionState: Equatable {
     case cancelled
     case restoring
     case restored
+    case codeRedeemed
     case noActiveSubscription
     case failed(String)
 
@@ -32,8 +33,10 @@ enum SubscriptionActionState: Equatable {
             return "Purchase cancelled. You can continue using Pondera Free."
         case .restored:
             return "Pondera Pro was restored."
+        case .codeRedeemed:
+            return "Your code was redeemed. Pondera Pro is active."
         case .noActiveSubscription:
-            return "No active subscription was found for this Apple ID."
+            return "No active Pondera Pro purchase was found for this Apple ID."
         case .failed(let message):
             return message
         }
@@ -108,6 +111,9 @@ final class SubscriptionManager: ObservableObject {
                     if case .verified(let transaction) = update {
                         await transaction.finish()
                         await self.refreshEntitlement()
+                        if SubscriptionConfig.proProductIDs.contains(transaction.productID), self.isSubscribed {
+                            self.actionState = .purchased
+                        }
                     }
                 }
             }
@@ -154,7 +160,21 @@ final class SubscriptionManager: ObservableObject {
     }
 
     func refreshEntitlement() async {
-        isSubscribed = await storeClient.hasCurrentMonthlyEntitlement()
+        isSubscribed = await storeClient.hasCurrentProEntitlement()
+    }
+
+    /// On iOS 26 and earlier this callback reports whether Apple presented the
+    /// redemption sheet, not whether a code produced a transaction. The
+    /// transaction listener above is the authoritative redemption result.
+    func completeOfferCodeRedemption(_ result: Result<Void, Error>) async {
+        switch result {
+        case .success:
+            await refreshEntitlement()
+            actionState = isSubscribed ? .codeRedeemed : .idle
+        case .failure(let error):
+            actionState = .failed("Apple couldn’t open the offer-code screen. Please try again.")
+            AppLogger.log(AppLogger.ERR, "StoreKit offer code sheet failed: \(error.localizedDescription)")
+        }
     }
 
     func purchase() async {
@@ -201,7 +221,10 @@ final class SubscriptionManager: ObservableObject {
         accessPolicy.canStartCheckIn(todayCheckInCount: todayCheckInCount)
     }
 
-    var canUseAllDayRecording: Bool { accessPolicy.canUseListeningSessions }
+    func canStartListeningSession(todaySessionCount: Int) -> Bool {
+        accessPolicy.canStartListeningSession(todaySessionCount: todaySessionCount)
+    }
+
     var canUseVoiceIntentions: Bool { accessPolicy.canUseVoiceIntentions }
 
     func canAddIntention(currentCount: Int) -> Bool {
@@ -229,6 +252,9 @@ final class SubscriptionManager: ObservableObject {
             if productDetails == nil {
                 AppLogger.log(AppLogger.ERR, "StoreKit product load returned no matching product")
                 actionState = .failed("Pondera Pro is temporarily unavailable. Please try again later.")
+            } else if actionState.isFailure {
+                // Clear a stale load error once StoreKit successfully returns the product.
+                actionState = .idle
             }
         } catch {
             productDetails = nil

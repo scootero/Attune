@@ -4,7 +4,21 @@
 
   ],
   "products" : [
-
+    {
+      "displayPrice" : "99.99",
+      "familyShareable" : false,
+      "internalID" : "21400003",
+      "localizations" : [
+        {
+          "description" : "Permanent access to Pondera Pro features.",
+          "displayName" : "Pondera Pro Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.scottoliver.Pondera.Intentions.lifetime",
+      "referenceName" : "Pondera Pro Lifetime",
+      "type" : "NonConsumable"
+    }
   ],
   "settings" : {
     "_applicationInternalID" : "0",
@@ -32,7 +46,7 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "4.99",
+          "displayPrice" : "3.99",
           "familyShareable" : true,
           "groupNumber" : 1,
           "internalID" : "21400002",

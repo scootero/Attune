@@ -276,11 +276,7 @@ struct HomeView: View {
                         recordCheckInCTAArea
                         todaysProgressCard
                         moodAndFeelingCard
-                        if subscriptionManager.canUseMomentumHistory {
-                            weeklyMomentumCard
-                        } else {
-                            freeTodayMomentumCard
-                        }
+                        weeklyMomentumCard
                         if IntentionSuggestionFeature.isEnabled {
                             intentionSuggestionArea
                         }

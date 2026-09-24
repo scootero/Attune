@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var showPaywall = false
     @State private var paywallReason: String?
     @State private var showManageSubscriptions = false
+    @State private var showOfferCodeRedemption = false
     @State private var showOnboardingReplay = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var premiumIconIsGlowing = false
@@ -73,6 +74,9 @@ struct SettingsView: View {
                     .environmentObject(subscriptionManager)
             }
             .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
+            .offerCodeRedemption(isPresented: $showOfferCodeRedemption) { result in
+                Task { await subscriptionManager.completeOfferCodeRedemption(result) }
+            }
             .fullScreenCover(isPresented: $showOnboardingReplay) {
                 OnboardingView(finalButtonTitle: "Done") {
                     showOnboardingReplay = false
@@ -167,6 +171,14 @@ struct SettingsView: View {
 
                     Divider().overlay(PonderaTheme.border)
 
+                    Button { showOfferCodeRedemption = true } label: {
+                        settingsLabel("Redeem Offer Code", icon: "giftcard.fill", color: PonderaTheme.accent)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .disabled(subscriptionManager.isBusy)
+
+                    Divider().overlay(PonderaTheme.border)
+
                     Button { showManageSubscriptions = true } label: {
                         settingsLabel("Manage Subscription", icon: "person.crop.circle", color: PonderaTheme.accentSecondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -206,7 +218,7 @@ struct SettingsView: View {
         } header: {
             Text("Membership")
         } footer: {
-            Text("Free includes one active intention, one Voice Check-In per day, today's Momentum, and the daily reminder. Pondera Pro adds more active intentions and Talk it out for \(subscriptionManager.priceText).")
+            Text("Free includes one active intention, one Voice Check-In and one Talk it out session per day, the Home progress card, and the daily reminder. Pondera Pro adds more sessions, Insights, and full Momentum history for \(subscriptionManager.priceText).")
         }
     }
 

@@ -48,6 +48,7 @@ struct HomeRecordView: View {
     @State private var completionFeedbackToken = UUID()
     @State private var showSessionsSheet = false
     @State private var showPaywall = false
+    @State private var paywallReason = "Pondera Pro unlocks additional Talk it out sessions and Insights."
     @State private var recapPreview: (sessionId: String, recap: SessionRecap)?
     @State private var recapDetailSessionId: String?
     @State private var recapPreviewToken = UUID()
@@ -160,7 +161,7 @@ struct HomeRecordView: View {
             }
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView(reason: "Talk it out and the Insights it creates are included with Pondera Pro.")
+            PaywallView(reason: paywallReason)
                 .environmentObject(subscriptionManager)
         }
         .sheet(
@@ -241,6 +242,17 @@ struct HomeRecordView: View {
                 .italic()
                 .foregroundStyle(PonderaTheme.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if !subscriptionManager.hasPremiumAccess {
+                Text(freeTalkSessionMessage)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(
+                        subscriptionManager.canStartListeningSession(todaySessionCount: todaySessionsCount)
+                            ? PonderaTheme.success
+                            : PonderaTheme.warning
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if let startErrorMessage {
                 Label(startErrorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -451,6 +463,7 @@ struct HomeRecordView: View {
 
     private func openInsights() {
         guard subscriptionManager.canUseInsights else {
+            paywallReason = "Insights from Talk it out are included with Pondera Pro."
             showPaywall = true
             return
         }
@@ -552,7 +565,10 @@ struct HomeRecordView: View {
     }
 
     private func startListeningSession() {
-        guard subscriptionManager.canUseAllDayRecording else {
+        let sessionsUsedToday = listeningSessionsUsedToday()
+        todaySessionsCount = sessionsUsedToday
+        guard subscriptionManager.canStartListeningSession(todaySessionCount: sessionsUsedToday) else {
+            paywallReason = "You’ve used today’s free Talk it out session. Pondera Pro unlocks additional sessions."
             showPaywall = true
             return
         }
@@ -708,12 +724,11 @@ struct HomeRecordView: View {
     }
 
     private func loadTodayCounts() {
+        todaySessionsCount = listeningSessionsUsedToday()
+
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
         guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { return }
-
-        let sessions = SessionStore.shared.loadAllSessions()
-        todaySessionsCount = sessions.filter { $0.startedAt >= startOfDay && $0.startedAt < endOfDay }.count
 
         let items = ExtractionStore.shared.loadAllExtractions()
         let fractionalFormatter = ISO8601DateFormatter()
@@ -725,6 +740,23 @@ struct HomeRecordView: View {
             guard let date else { return false }
             return date >= startOfDay && date < endOfDay
         }.count
+    }
+
+    private func listeningSessionsUsedToday() -> Int {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: Date())
+        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { return 0 }
+
+        return SessionStore.shared.loadAllSessions().filter {
+            $0.startedAt >= startOfDay && $0.startedAt < endOfDay && $0.status != "error"
+        }.count
+    }
+
+    private var freeTalkSessionMessage: String {
+        if subscriptionManager.canStartListeningSession(todaySessionCount: todaySessionsCount) {
+            return "Free includes one Talk it out session each day."
+        }
+        return "Today’s free session has been used. Tap Start talking to view Pondera Pro."
     }
 
     /// Displays completion feedback only after this session's transcription and captures are saved.

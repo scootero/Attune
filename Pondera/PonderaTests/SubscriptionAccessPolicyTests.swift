@@ -45,9 +45,14 @@ final class SubscriptionAccessPolicyTests: XCTestCase {
         XCTAssertFalse(pro.canSaveIntentions(baselineIDs: [], proposedIDs: eleven))
     }
 
-    func testListeningSessionsAndOtherExistingGates() {
-        XCTAssertFalse(free.canUseListeningSessions)
-        XCTAssertTrue(pro.canUseListeningSessions)
+    func testFreeUserGetsOneListeningSessionPerDay() {
+        XCTAssertTrue(free.canStartListeningSession(todaySessionCount: 0))
+        XCTAssertFalse(free.canStartListeningSession(todaySessionCount: 1))
+        XCTAssertFalse(free.canStartListeningSession(todaySessionCount: 2))
+        XCTAssertTrue(pro.canStartListeningSession(todaySessionCount: 20))
+    }
+
+    func testOtherExistingGates() {
         XCTAssertFalse(free.canUseVoiceIntentions)
         XCTAssertTrue(pro.canUseVoiceIntentions)
         XCTAssertTrue(free.canStartCheckIn(todayCheckInCount: 0))
@@ -55,4 +60,3 @@ final class SubscriptionAccessPolicyTests: XCTestCase {
         XCTAssertTrue(pro.canStartCheckIn(todayCheckInCount: 20))
     }
 }
-

@@ -40,7 +40,7 @@ struct PaywallView: View {
                     VStack(spacing: 7) {
                         proFeature(icon: "target", title: "Track More Intentions", detail: "Keep up to \(SubscriptionConfig.maximumActiveIntentions) active intentions moving at the same time.", tint: PonderaTheme.accent)
                         proFeature(icon: "mic.fill", title: "Voice Check-Ins", detail: "Update intentions and optional mood within Pro’s included monthly AI allowance.", tint: PonderaTheme.recording)
-                        proFeature(icon: "waveform.badge.mic", title: "Talk it out with Insights", detail: "Organize what’s on your mind into intentions, commitments, events, states, and themes.", tint: PonderaTheme.accentSecondary)
+                        proFeature(icon: "waveform.badge.mic", title: "More Talk it out + Insights", detail: "Go beyond the daily free session and organize what’s on your mind into reviewable Insights.", tint: PonderaTheme.accentSecondary)
                         proFeature(icon: "chart.line.uptrend.xyaxis", title: "Full Momentum History", detail: "Review past days plus Week and Month views to see progress over time.", tint: PonderaTheme.warning)
                         proFeature(icon: "square.and.arrow.up", title: "Voice Setup and Data Export", detail: "Create intentions by voice with review, and export a portable copy of your Pondera data.", tint: PonderaTheme.success)
                     }

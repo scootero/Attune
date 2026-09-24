@@ -11,6 +11,11 @@ final class BrandMigrationTests: XCTestCase {
 
     func testSubscriptionUsesPonderaProductID() {
         XCTAssertEqual(SubscriptionConfig.monthlyProductID, "com.scottoliver.Pondera.Intentions.monthly")
+        XCTAssertEqual(SubscriptionConfig.lifetimeProductID, "com.scottoliver.Pondera.Intentions.lifetime")
+        XCTAssertEqual(
+            SubscriptionConfig.proProductIDs,
+            [SubscriptionConfig.monthlyProductID, SubscriptionConfig.lifetimeProductID]
+        )
         XCTAssertEqual(SubscriptionConfig.displayName, "Pondera Pro")
     }
 
@@ -19,9 +24,11 @@ final class BrandMigrationTests: XCTestCase {
         session.disableDialogs = true
         session.clearTransactions()
 
-        let products = try await Product.products(for: [SubscriptionConfig.monthlyProductID])
+        let products = try await Product.products(for: Array(SubscriptionConfig.proProductIDs))
+        let productsByID = Dictionary(uniqueKeysWithValues: products.map { ($0.id, $0) })
 
-        XCTAssertEqual(products.map(\.id), [SubscriptionConfig.monthlyProductID])
-        XCTAssertEqual(products.first?.displayPrice, "$4.99")
+        XCTAssertEqual(Set(products.map(\.id)), SubscriptionConfig.proProductIDs)
+        XCTAssertEqual(productsByID[SubscriptionConfig.monthlyProductID]?.displayPrice, "$3.99")
+        XCTAssertEqual(productsByID[SubscriptionConfig.lifetimeProductID]?.type, .nonConsumable)
     }
 }

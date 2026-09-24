@@ -28,6 +28,50 @@ final class SubscriptionManagerTests: XCTestCase {
         XCTAssertEqual(manager.actionState, .restored)
     }
 
+    func testLifetimeEntitlementUnlocksSystemAccess() async {
+        let store = FakeSubscriptionStoreClient()
+        store.hasEntitlement = true
+        let manager = makeManager(store)
+        manager.debugMode = .system
+
+        await manager.refreshEntitlement()
+
+        XCTAssertTrue(manager.isSubscribed)
+        XCTAssertTrue(manager.hasPremiumAccess)
+    }
+
+    func testSuccessfulOfferCodeSheetCompletionRefreshesEntitlement() async {
+        let store = FakeSubscriptionStoreClient()
+        store.hasEntitlement = true
+        let manager = makeManager(store)
+        manager.debugMode = .system
+
+        await manager.completeOfferCodeRedemption(.success(()))
+
+        XCTAssertTrue(manager.hasPremiumAccess)
+        XCTAssertEqual(manager.actionState, .codeRedeemed)
+    }
+
+    func testClosingOfferCodeSheetWithoutTransactionDoesNotShowFalseFailure() async {
+        let store = FakeSubscriptionStoreClient()
+        let manager = makeManager(store)
+
+        await manager.completeOfferCodeRedemption(.success(()))
+
+        XCTAssertFalse(manager.isSubscribed)
+        XCTAssertEqual(manager.actionState, .idle)
+    }
+
+    func testOfferCodeRedemptionFailureStaysUsable() async {
+        let store = FakeSubscriptionStoreClient()
+        let manager = makeManager(store)
+
+        await manager.completeOfferCodeRedemption(.failure(TestError.expected))
+
+        XCTAssertTrue(manager.actionState.isFailure)
+        XCTAssertFalse(manager.isBusy)
+    }
+
     func testRestoreWithoutEntitlementStaysUsable() async {
         let store = FakeSubscriptionStoreClient()
         let manager = makeManager(store)
@@ -126,7 +170,7 @@ final class SubscriptionManagerTests: XCTestCase {
 
 @MainActor
 private final class FakeSubscriptionStoreClient: SubscriptionStoreClient {
-    var productDetails: SubscriptionProductDetails? = .init(displayPrice: "$4.99")
+    var productDetails: SubscriptionProductDetails? = .init(displayPrice: "$3.99")
     var purchaseOutcome: SubscriptionPurchaseOutcome = .purchased
     var purchaseError: Error?
     var restoreError: Error?
@@ -155,7 +199,7 @@ private final class FakeSubscriptionStoreClient: SubscriptionStoreClient {
         hasEntitlement = entitlementAfterRestore
     }
 
-    func hasCurrentMonthlyEntitlement() async -> Bool {
+    func hasCurrentProEntitlement() async -> Bool {
         hasEntitlement
     }
 }

@@ -37,17 +37,7 @@ struct RootTabView: View {
                     .tag(RootTab.home)
 
                 // Tab 2: Record — user-started Listening Sessions.
-                Group {
-                    if subscriptionManager.canUseAllDayRecording {
-                        HomeRecordView()
-                    } else {
-                        ProLockedFeatureView(
-                            title: "Talk it out",
-                            detail: "Talk through what’s on your mind. Pondera organizes clear intentions, commitments, events, and states into reviewable Insights.",
-                            icon: "waveform.badge.mic"
-                        )
-                    }
-                }
+                HomeRecordView()
                     .tabItem {
                         Label("Talk", systemImage: "waveform.circle.fill")
                             .accessibilityLabel("Talk it out")
@@ -76,7 +66,11 @@ struct RootTabView: View {
                     if subscriptionManager.canUseMomentumHistory {
                         MomentumView(selectedDate: appRouter.momentumSelectedDate ?? Date()) // Full historical Momentum for Pro
                     } else {
-                        FreeMomentumTodayView() // Free is intentionally limited to the current day
+                        ProLockedFeatureView(
+                            title: "Momentum history",
+                            detail: "Review past days plus Week and Month views to see how your intentions move over time.",
+                            icon: "chart.line.uptrend.xyaxis"
+                        )
                     }
                 }
                     .tabItem {

@@ -10,7 +10,7 @@ Connect, Sandbox, TestFlight, signing, or production status.
 | --- | --- | --- |
 | StoreKit implementation | Product load, purchase, restore, transaction updates, and current-entitlement checks are present | Ready for local/sandbox testing |
 | Product identity | Bundle `com.scottoliver.Pondera.Intentions`; product `com.scottoliver.Pondera.Intentions.monthly` | Matches repository and recorded App Store Connect setup |
-| Local StoreKit | Shared `Products.storekit` configuration at $4.99/month; automated product-load test plus manager purchase/restore state tests | Verified locally; interactive purchase still required |
+| Local StoreKit | Shared `Products.storekit` configuration at $3.99/month; automated product-load test plus manager purchase/restore state tests | Verified locally; interactive purchase still required |
 | Feature access | Free/Pro decisions are centralized in `SubscriptionManager` and `SubscriptionAccessPolicy` | Verified by unit tests; visual/device sweep still required |
 | Public legal links | Privacy, Terms, and Support return HTTP 404 | **Blocking: deploy before TestFlight review** |
 | Support contact | Local support page still says a private email will be added | **Blocking: choose and publish a private support address/form** |
@@ -40,7 +40,7 @@ Connect, Sandbox, TestFlight, signing, or production status.
 - Product Reference Name: `Pondera Pro Monthly`
 - Product ID: `com.scottoliver.Pondera.Intentions.monthly`
 - Duration: `1 Month`
-- Price: `$4.99`
+- Price: `$3.99`
 - Display Name: `Pondera Pro Monthly`
 - Description: `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.`
 
@@ -66,7 +66,7 @@ Connect, Sandbox, TestFlight, signing, or production status.
   - Reference Name: `Pondera Pro Monthly`
   - Product ID: `com.scottoliver.Pondera.Intentions.monthly`
   - Duration: `1 Month`
-  - Price: `$4.99`
+  - Price: `$3.99`
   - Display Name: `Pondera Pro Monthly`
   - Description: `Unlimited intentions and check-ins, Listening Sessions, Insights, Momentum history, and data export.`
   - Family Sharing: enabled
